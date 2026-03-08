@@ -288,6 +288,7 @@ ApplicationWindow {
                         anchors.left: splitterHandle.right
                         anchors.right: parent.right
                         photoId: root.selectedPhotoId
+                        gridView: photoGrid
                         onClosed: root.closeDetail()
                         onNavigateNext: {
                             var nextId = photoModel.nextPhotoId(root.selectedPhotoId)

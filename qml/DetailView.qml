@@ -9,6 +9,8 @@ Rectangle {
 
     property int photoId: -1
 
+    property ListView gridView: null
+
     signal closed()
     signal navigateNext()
     signal navigatePrevious()
@@ -55,6 +57,10 @@ Rectangle {
             else
                 detailPlayer.play()
             event.accepted = true
+        } else if (gridView && (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp
+                   || event.key === Qt.Key_Home || event.key === Qt.Key_End)) {
+            // Forward scroll keys to the grid
+            gridView.Keys.pressed(event)
         }
     }
 
