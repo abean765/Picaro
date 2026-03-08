@@ -19,6 +19,13 @@ ApplicationWindow {
 
     function selectPhoto(photoId) {
         selectedPhotoId = photoId
+        // Jump timeline to selected photo's month
+        if (photoId > 0) {
+            var tlIdx = photoModel.timelineIndexForPhotoId(photoId)
+            if (tlIdx >= 0) {
+                timelineView.activeIndex = tlIdx
+            }
+        }
     }
 
     function closeDetail() {
@@ -186,69 +193,107 @@ ApplicationWindow {
                             : currentView === "overview" ? 1
                             : 2
 
-                // Photos view with timeline + grid + detail
+                // Photos view with timeline + grid + splitter + detail
                 Item {
-                    RowLayout {
-                        anchors.fill: parent
-                        spacing: 0
+                    id: photosViewRoot
 
-                        TimelineView {
-                            id: timelineView
-                            Layout.fillHeight: true
-                            visible: photoModel.totalPhotos > 0
-                            activeIndex: {
-                                // Find which timeline month corresponds to current scroll position
-                                if (!photoGrid.count) return -1
-                                var topIdx = photoGrid.indexAt(0, photoGrid.contentY + 10)
-                                if (topIdx < 0) return -1
-                                // Walk backward to find nearest header
-                                var data = photoModel.timelineData
-                                var bestMatch = -1
-                                for (var i = 0; i < data.length; ++i) {
-                                    if (data[i].rowIndex <= topIdx) {
-                                        bestMatch = i
-                                    } else {
-                                        break
-                                    }
+                    // Splitter position (ratio of grid width to total available width)
+                    property real splitRatio: 0.55
+                    // Available width after timeline
+                    readonly property real contentWidth: width - timelineView.width
+                    readonly property bool detailVisible: root.selectedPhotoId > 0
+
+                    TimelineView {
+                        id: timelineView
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        visible: photoModel.totalPhotos > 0
+                        activeIndex: {
+                            // Find which timeline month corresponds to current scroll position
+                            if (!photoGrid.count) return -1
+                            var topIdx = photoGrid.indexAt(0, photoGrid.contentY + 10)
+                            if (topIdx < 0) return -1
+                            // Walk backward to find nearest header
+                            var data = photoModel.timelineData
+                            var bestMatch = -1
+                            for (var i = 0; i < data.length; ++i) {
+                                if (data[i].rowIndex <= topIdx) {
+                                    bestMatch = i
+                                } else {
+                                    break
                                 }
-                                return bestMatch
                             }
-                            onMonthClicked: function(timelineIndex, rowIndex) {
-                                photoGrid.positionViewAtIndex(rowIndex, ListView.Beginning)
+                            return bestMatch
+                        }
+                        onMonthClicked: function(timelineIndex, rowIndex) {
+                            photoGrid.positionViewAtIndex(rowIndex, ListView.Beginning)
+                        }
+                    }
+
+                    PhotoGridView {
+                        id: photoGrid
+                        anchors.left: timelineView.visible ? timelineView.right : parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: photosViewRoot.detailVisible
+                              ? photosViewRoot.contentWidth * photosViewRoot.splitRatio
+                              : photosViewRoot.contentWidth
+                    }
+
+                    // Draggable splitter handle
+                    Rectangle {
+                        id: splitterHandle
+                        visible: photosViewRoot.detailVisible
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        x: photoGrid.x + photoGrid.width - 3
+                        width: 6
+                        color: splitterMouse.containsMouse || splitterMouse.pressed ? "#4a9eff" : "#333333"
+                        z: 10
+
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        MouseArea {
+                            id: splitterMouse
+                            anchors.fill: parent
+                            anchors.margins: -3  // larger hit area
+                            hoverEnabled: true
+                            cursorShape: Qt.SplitHCursor
+                            property real dragStartX: 0
+                            property real dragStartRatio: 0
+
+                            onPressed: function(mouse) {
+                                dragStartX = mouse.x + splitterHandle.x
+                                dragStartRatio = photosViewRoot.splitRatio
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (!pressed) return
+                                var currentX = mouse.x + splitterHandle.x
+                                var delta = currentX - dragStartX
+                                var newRatio = dragStartRatio + delta / photosViewRoot.contentWidth
+                                photosViewRoot.splitRatio = Math.max(0.2, Math.min(0.8, newRatio))
                             }
                         }
+                    }
 
-                        PhotoGridView {
-                            id: photoGrid
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
+                    // Detail panel (right side)
+                    DetailView {
+                        id: detailPanel
+                        visible: photosViewRoot.detailVisible
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.left: splitterHandle.right
+                        anchors.right: parent.right
+                        photoId: root.selectedPhotoId
+                        onClosed: root.closeDetail()
+                        onNavigateNext: {
+                            var nextId = photoModel.nextPhotoId(root.selectedPhotoId)
+                            if (nextId > 0) root.selectPhoto(nextId)
                         }
-
-                        // Vertical separator
-                        Rectangle {
-                            Layout.fillHeight: true
-                            Layout.preferredWidth: 1
-                            color: "#333333"
-                            visible: detailPanel.visible
-                        }
-
-                        // Detail panel (right side)
-                        DetailView {
-                            id: detailPanel
-                            Layout.fillHeight: true
-                            Layout.preferredWidth: parent.width * 0.45
-                            Layout.minimumWidth: 400
-                            visible: root.selectedPhotoId > 0
-                            photoId: root.selectedPhotoId
-                            onClosed: root.closeDetail()
-                            onNavigateNext: {
-                                var nextId = photoModel.nextPhotoId(root.selectedPhotoId)
-                                if (nextId > 0) root.selectedPhotoId = nextId
-                            }
-                            onNavigatePrevious: {
-                                var prevId = photoModel.previousPhotoId(root.selectedPhotoId)
-                                if (prevId > 0) root.selectedPhotoId = prevId
-                            }
+                        onNavigatePrevious: {
+                            var prevId = photoModel.previousPhotoId(root.selectedPhotoId)
+                            if (prevId > 0) root.selectPhoto(prevId)
                         }
                     }
                 }

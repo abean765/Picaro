@@ -289,3 +289,17 @@ int PhotoModel::headerRowIndex(int timelineIndex) const
         return 0;
     return m_headerRowIndices[timelineIndex];
 }
+
+int PhotoModel::timelineIndexForPhotoId(qint64 id) const
+{
+    auto it = m_idToPhotoIndex.constFind(id);
+    if (it == m_idToPhotoIndex.constEnd()) return -1;
+
+    const QString &monthKey = m_allPhotos[it.value()].monthKey;
+
+    for (int i = 0; i < m_timelineData.size(); ++i) {
+        if (m_timelineData[i].toMap().value(QStringLiteral("monthKey")).toString() == monthKey)
+            return i;
+    }
+    return -1;
+}

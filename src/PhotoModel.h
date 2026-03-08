@@ -56,6 +56,7 @@ public:
     int timelineMaxCount() const { return m_timelineMaxCount; }
 
     Q_INVOKABLE int headerRowIndex(int timelineIndex) const;
+    Q_INVOKABLE int timelineIndexForPhotoId(qint64 id) const;
 
     Q_INVOKABLE QString filePathForId(qint64 id) const;
     Q_INVOKABLE int mediaTypeForId(qint64 id) const;
