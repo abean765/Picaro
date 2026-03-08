@@ -20,6 +20,7 @@ find_package(PkgConfig QUIET)
 
 set(HAVE_LIBHEIF OFF)
 set(HAVE_EXIV2 OFF)
+set(HAVE_FFMPEG_HW OFF)
 
 if(PkgConfig_FOUND)
     pkg_check_modules(LIBHEIF QUIET libheif)
@@ -57,6 +58,34 @@ else()
     message(STATUS "exiv2 NOT found - EXIF metadata support disabled (using file dates)")
 endif()
 
+# Optional: FFmpeg with hardware-accelerated HEVC decoding (NVDEC, VAAPI, VideoToolbox)
+set(FFMPEG_HW_LIBS "")
+if(PkgConfig_FOUND)
+    pkg_check_modules(LIBAVCODEC QUIET libavcodec)
+    pkg_check_modules(LIBAVFORMAT QUIET libavformat)
+    pkg_check_modules(LIBAVUTIL QUIET libavutil)
+    pkg_check_modules(LIBSWSCALE QUIET libswscale)
+endif()
+
+if(LIBAVCODEC_FOUND AND LIBAVFORMAT_FOUND AND LIBAVUTIL_FOUND AND LIBSWSCALE_FOUND)
+    set(HAVE_FFMPEG_HW ON)
+    set(FFMPEG_HW_INCLUDE_DIRS
+        ${LIBAVCODEC_INCLUDE_DIRS}
+        ${LIBAVFORMAT_INCLUDE_DIRS}
+        ${LIBAVUTIL_INCLUDE_DIRS}
+        ${LIBSWSCALE_INCLUDE_DIRS}
+    )
+    set(FFMPEG_HW_LIBS
+        ${LIBAVCODEC_LIBRARIES}
+        ${LIBAVFORMAT_LIBRARIES}
+        ${LIBAVUTIL_LIBRARIES}
+        ${LIBSWSCALE_LIBRARIES}
+    )
+    message(STATUS "FFmpeg found - GPU-accelerated HEIC decoding enabled (NVDEC/VAAPI/VideoToolbox)")
+else()
+    message(STATUS "FFmpeg NOT found - GPU-accelerated HEIC decoding disabled (using libheif CPU path)")
+endif()
+
 qt_add_executable(picaro
     src/main.cpp
     src/PhotoDatabase.h
@@ -73,6 +102,8 @@ qt_add_executable(picaro
     src/VideoFrameExtractor.cpp
     src/AppSettings.h
     src/StatsProvider.h
+    src/GpuHeicDecoder.h
+    src/GpuHeicDecoder.cpp
 )
 
 qt_add_qml_module(picaro
@@ -92,6 +123,7 @@ qt_add_qml_module(picaro
 target_include_directories(picaro PRIVATE
     ${LIBHEIF_INCLUDE_DIRS}
     ${EXIV2_INCLUDE_DIRS}
+    ${FFMPEG_HW_INCLUDE_DIRS}
 )
 
 target_link_libraries(picaro PRIVATE
@@ -110,6 +142,11 @@ endif()
 if(HAVE_EXIV2)
     target_link_libraries(picaro PRIVATE ${EXIV2_LIBRARIES})
     target_compile_definitions(picaro PRIVATE HAVE_EXIV2)
+endif()
+
+if(HAVE_FFMPEG_HW)
+    target_link_libraries(picaro PRIVATE ${FFMPEG_HW_LIBS})
+    target_compile_definitions(picaro PRIVATE HAVE_FFMPEG_HW)
 endif()
 
 target_compile_definitions(picaro PRIVATE

@@ -1,4 +1,5 @@
 #include "HeicImageReader.h"
+#include "GpuHeicDecoder.h"
 #include <QFileInfo>
 #include <QDebug>
 
@@ -102,6 +103,12 @@ QImage readHeicThumbnail(const QString &filePath)
 
 QImage readHeicThumbnailOrScaled(const QString &filePath, int maxSize)
 {
+    // Try GPU-accelerated decode first (NVDEC / VAAPI / VideoToolbox)
+    QImage gpuResult = GpuHeicDecoder::decodeThumbnail(filePath, maxSize);
+    if (!gpuResult.isNull())
+        return gpuResult;
+
+    // CPU fallback via libheif
     heif_context *ctx = heif_context_alloc();
     heif_error err = heif_context_read_from_file(ctx, filePath.toUtf8().constData(), nullptr);
     if (err.code != heif_error_Ok) {
@@ -164,9 +171,8 @@ QImage readHeicThumbnail(const QString &filePath)
 
 QImage readHeicThumbnailOrScaled(const QString &filePath, int maxSize)
 {
-    Q_UNUSED(filePath);
-    Q_UNUSED(maxSize);
-    return {};
+    // Even without libheif, try GPU path (FFmpeg can handle HEIF container)
+    return GpuHeicDecoder::decodeThumbnail(filePath, maxSize);
 }
 
 #endif // HAVE_LIBHEIF
