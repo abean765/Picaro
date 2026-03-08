@@ -147,11 +147,41 @@ ApplicationWindow {
                     Behavior on width { NumberAnimation { duration: 100 } }
                 }
 
-                Label {
-                    anchors.centerIn: parent
-                    text: "Importiere " + photoImporter.currentDirectory + " \u2013 " + photoImporter.progress + " / " + photoImporter.totalFiles
-                    color: "#ffffff"
-                    font.pixelSize: 12
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 4
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: "Importiere " + photoImporter.currentDirectory + " \u2013 " + photoImporter.progress + " / " + photoImporter.totalFiles
+                        color: "#ffffff"
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Rectangle {
+                        implicitWidth: cancelLabel.implicitWidth + 16
+                        implicitHeight: 22
+                        radius: 4
+                        color: cancelArea.containsMouse ? "#aa4444" : "#664444"
+
+                        Label {
+                            id: cancelLabel
+                            anchors.centerIn: parent
+                            text: "Abbrechen"
+                            color: "#ffffff"
+                            font.pixelSize: 11
+                        }
+
+                        MouseArea {
+                            id: cancelArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: photoImporter.cancel()
+                        }
+                    }
                 }
             }
 
@@ -371,6 +401,14 @@ ApplicationWindow {
 
                 SettingsView {}
             }
+        }
+    }
+
+    // Refresh view when import finishes or is cancelled
+    Connections {
+        target: photoImporter
+        function onImportFinished(imported, skipped) {
+            photoModel.reload()
         }
     }
 
