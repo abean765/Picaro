@@ -175,9 +175,7 @@ ApplicationWindow {
                             : currentView === "overview" ? 1
                             : 2
 
-                PhotoGridView {
-                    model: photoModel
-                }
+                PhotoGridView {}
 
                 OverviewView {}
 
