@@ -78,6 +78,7 @@ qt_add_executable(picaro
 qt_add_qml_module(picaro
     URI Picaro
     VERSION 1.0
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/Main.qml
         qml/PhotoGridView.qml

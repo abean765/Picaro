@@ -74,10 +74,15 @@ int main(int argc, char *argv[])
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     engine.loadFromModule("Picaro", "Main");
 #else
-    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/Picaro/Main.qml")));
-    if (engine.rootObjects().isEmpty()) {
-        // Try alternative resource path for older Qt
-        engine.load(QUrl(QStringLiteral("qrc:/Picaro/Main.qml")));
+    const QStringList qmlPaths = {
+        QStringLiteral("qrc:/qt/qml/Picaro/qml/Main.qml"),
+        QStringLiteral("qrc:/qt/qml/Picaro/Main.qml"),
+        QStringLiteral("qrc:/Picaro/qml/Main.qml"),
+        QStringLiteral("qrc:/Picaro/Main.qml"),
+    };
+    for (const auto &path : qmlPaths) {
+        engine.load(QUrl(path));
+        if (!engine.rootObjects().isEmpty()) break;
     }
 #endif
 
