@@ -4,7 +4,7 @@ import QtQuick.Controls
 Rectangle {
     id: timeline
     color: "#1e1e1e"
-    width: 56
+    width: 80
 
     // Which timeline index is currently active (set externally)
     property int activeIndex: -1
@@ -42,7 +42,7 @@ Rectangle {
         delegate: Item {
             id: monthDelegate
             width: timelineList.width
-            height: showYear ? 42 : 26
+            height: showYear ? 52 : 30
 
             required property var modelData
             required property int index
@@ -56,16 +56,35 @@ Rectangle {
 
             readonly property bool isActive: timeline.activeIndex === index
 
-            // Year label
-            Label {
-                id: yearLabel
+            // Year separator line + label
+            Item {
                 visible: monthDelegate.showYear
-                text: monthDelegate.modelData.year
-                color: "#888888"
-                font.pixelSize: 11
-                font.bold: true
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: 2
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 22
+                y: 0
+
+                // Horizontal separator line
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    anchors.top: parent.top
+                    anchors.topMargin: 2
+                    height: 1
+                    color: "#3a3a3a"
+                    visible: monthDelegate.index > 0
+                }
+
+                Label {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    text: monthDelegate.modelData.year
+                    color: "#aaaaaa"
+                    font.pixelSize: 13
+                    font.bold: true
+                }
             }
 
             // Month row
@@ -74,26 +93,48 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: 22
+                height: 26
 
                 // Highlight background
                 Rectangle {
                     anchors.fill: parent
-                    anchors.leftMargin: 2
-                    anchors.rightMargin: 2
-                    radius: 3
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 4
+                    radius: 4
                     color: monthDelegate.isActive ? "#2a4a7a" : (monthMouse.containsMouse ? "#2a2a2a" : "transparent")
+                }
+
+                // Vertical connector line (between months)
+                Rectangle {
+                    anchors.horizontalCenter: monthDot.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.bottom: monthDot.verticalCenter
+                    width: 1
+                    color: "#333333"
+                    visible: monthDelegate.index > 0
+                }
+
+                // Dot on the timeline
+                Rectangle {
+                    id: monthDot
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: monthDelegate.isActive ? 8 : 6
+                    height: width
+                    radius: width / 2
+                    color: monthDelegate.isActive ? "#4a9eff" : "#555555"
                 }
 
                 // Month abbreviation
                 Label {
                     id: monthLabel
-                    anchors.left: parent.left
+                    anchors.left: monthDot.right
                     anchors.leftMargin: 6
                     anchors.verticalCenter: parent.verticalCenter
                     text: monthDelegate.modelData.label
-                    color: monthDelegate.isActive ? "#4a9eff" : "#777777"
-                    font.pixelSize: 10
+                    color: monthDelegate.isActive ? "#4a9eff" : "#999999"
+                    font.pixelSize: 12
                     font.bold: monthDelegate.isActive
                 }
 
@@ -106,9 +147,9 @@ Rectangle {
                     radius: 2
                     color: monthDelegate.isActive ? "#4a9eff" : "#444444"
                     width: {
-                        var maxBarWidth = timeline.width - monthLabel.width - 18
+                        var maxBarWidth = timeline.width - monthDot.width - monthLabel.implicitWidth - 28
                         var ratio = monthDelegate.modelData.count / photoModel.timelineMaxCount
-                        return Math.max(2, maxBarWidth * ratio)
+                        return Math.max(2, Math.max(0, maxBarWidth) * ratio)
                     }
                 }
 
@@ -128,6 +169,15 @@ Rectangle {
                         timeline.monthClicked(monthDelegate.index, monthDelegate.modelData.rowIndex)
                     }
                 }
+            }
+
+            // Vertical connector line going down to next month
+            Rectangle {
+                anchors.horizontalCenter: monthDot.horizontalCenter
+                anchors.top: monthDot.verticalCenter
+                anchors.bottom: parent.bottom
+                width: 1
+                color: "#333333"
             }
         }
 
