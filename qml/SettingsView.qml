@@ -185,7 +185,7 @@ Item {
                     }
 
                     Label {
-                        text: "Pfad zur SQLite-Datenbank. Hier werden alle Metadaten und Thumbnails gespeichert."
+                        text: "Speicherort der SQLite-Datenbank (picaro.db). Hier werden alle Metadaten und Thumbnails gespeichert."
                         color: "#999999"
                         font.pixelSize: 13
                         wrapMode: Text.WordWrap
@@ -334,18 +334,17 @@ Item {
         onAccepted: appSettings.accentColor = selectedColor
     }
 
-    FileDialog {
+    FolderDialog {
         id: dbFileDialog
-        title: "Datenbank-Datei auswählen"
-        nameFilters: ["SQLite Datenbank (*.db)", "Alle Dateien (*)"]
+        title: "Speicherort für Datenbank wählen"
         onAccepted: {
-            var path = selectedFile.toString()
+            var path = selectedFolder.toString()
             if (Qt.platform.os === "windows") {
                 path = path.replace("file:///", "")
             } else {
                 path = path.replace("file://", "")
             }
-            appSettings.databasePath = path
+            appSettings.databasePath = path + "/picaro.db"
         }
     }
 }
