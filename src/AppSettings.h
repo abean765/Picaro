@@ -121,7 +121,7 @@ public:
                 env = static_cast<double>(i) / fadeLen;
             else if (i > numSamples - fadeLen)
                 env = static_cast<double>(numSamples - i) / fadeLen;
-            qint16 val = static_cast<qint16>(sample * env * 24000);
+            qint16 val = static_cast<qint16>(sample * env * 32000);
             f.write(reinterpret_cast<const char*>(&val), 2);
         }
 
