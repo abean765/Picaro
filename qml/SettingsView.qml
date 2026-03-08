@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtMultimedia
 
 Item {
     id: settingsView
@@ -158,6 +159,76 @@ Item {
                                 verticalAlignment: Text.AlignVCenter
                                 leftPadding: 12
                                 rightPadding: 12
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Audio section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: audioSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: audioSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Audio"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Prüfe ob die Audio-Ausgabe für die Videowiedergabe funktioniert."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    AudioOutput { id: testAudio }
+                    MediaPlayer {
+                        id: testPlayer
+                        audioOutput: testAudio
+                    }
+
+                    RowLayout {
+                        spacing: 12
+
+                        Button {
+                            text: testPlayer.playbackState === MediaPlayer.PlayingState
+                                ? "Wird abgespielt..."
+                                : "Audio testen"
+                            enabled: testPlayer.playbackState !== MediaPlayer.PlayingState
+                            onClicked: {
+                                var path = appSettings.generateTestTone();
+                                if (path !== "") {
+                                    testPlayer.source = "file:///" + path;
+                                    testPlayer.play();
+                                }
+                            }
+
+                            background: Rectangle {
+                                color: parent.enabled
+                                    ? (parent.hovered ? "#4a4a4a" : "#3a3a3a")
+                                    : "#2a2a2a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: parent.enabled ? "#ffffff" : "#666666"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 16
+                                rightPadding: 16
                             }
                         }
                     }

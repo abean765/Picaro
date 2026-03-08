@@ -6,6 +6,9 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QColor>
+#include <QTemporaryDir>
+#include <QFile>
+#include <QtMath>
 
 class AppSettings : public QObject
 {
@@ -72,10 +75,65 @@ public:
         emit accentColorChanged();
     }
 
+    Q_INVOKABLE QString generateTestTone()
+    {
+        if (!m_tempDir.isValid())
+            return {};
+        QString path = m_tempDir.path() + QStringLiteral("/test_tone.wav");
+        QFile f(path);
+        if (!f.open(QIODevice::WriteOnly))
+            return {};
+
+        const int sampleRate = 44100;
+        const int channels = 1;
+        const int bitsPerSample = 16;
+        const double duration = 0.5;
+        const double freq = 440.0;
+        const int numSamples = static_cast<int>(sampleRate * duration);
+        const int dataSize = numSamples * channels * (bitsPerSample / 8);
+
+        // WAV header
+        auto writeU32 = [&](quint32 v) { f.write(reinterpret_cast<const char*>(&v), 4); };
+        auto writeU16 = [&](quint16 v) { f.write(reinterpret_cast<const char*>(&v), 2); };
+
+        f.write("RIFF", 4);
+        writeU32(36 + dataSize);
+        f.write("WAVE", 4);
+        f.write("fmt ", 4);
+        writeU32(16);
+        writeU16(1); // PCM
+        writeU16(channels);
+        writeU32(sampleRate);
+        writeU32(sampleRate * channels * bitsPerSample / 8);
+        writeU16(channels * bitsPerSample / 8);
+        writeU16(bitsPerSample);
+        f.write("data", 4);
+        writeU32(dataSize);
+
+        // Sine wave samples with fade in/out
+        const int fadeLen = sampleRate / 20; // 50ms fade
+        for (int i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double sample = qSin(2.0 * M_PI * freq * t);
+            // Fade envelope
+            double env = 1.0;
+            if (i < fadeLen)
+                env = static_cast<double>(i) / fadeLen;
+            else if (i > numSamples - fadeLen)
+                env = static_cast<double>(numSamples - i) / fadeLen;
+            qint16 val = static_cast<qint16>(sample * env * 24000);
+            f.write(reinterpret_cast<const char*>(&val), 2);
+        }
+
+        f.close();
+        return path;
+    }
+
 signals:
     void databasePathChanged();
     void accentColorChanged();
 
 private:
     QSettings m_settings;
+    QTemporaryDir m_tempDir;
 };
