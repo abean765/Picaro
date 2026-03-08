@@ -71,7 +71,15 @@ int main(int argc, char *argv[])
     });
 
     // Load QML
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     engine.loadFromModule("Picaro", "Main");
+#else
+    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/Picaro/Main.qml")));
+    if (engine.rootObjects().isEmpty()) {
+        // Try alternative resource path for older Qt
+        engine.load(QUrl(QStringLiteral("qrc:/Picaro/Main.qml")));
+    }
+#endif
 
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "Failed to load QML";

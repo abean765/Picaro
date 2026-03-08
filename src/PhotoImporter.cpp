@@ -45,9 +45,9 @@ void PhotoImporter::importDirectory(const QString &path)
     emit runningChanged();
     emit currentDirectoryChanged();
 
-    QtConcurrent::run([this, path]() {
+    Q_UNUSED(QtConcurrent::run([this, path]() {
         doImport(path);
-    });
+    }));
 }
 
 void PhotoImporter::cancel()
@@ -136,7 +136,7 @@ void PhotoImporter::regenerateVideoThumbnails()
     m_progress = 0;
     emit runningChanged();
 
-    QtConcurrent::run([this]() {
+    Q_UNUSED(QtConcurrent::run([this]() {
         QElapsedTimer timer;
         timer.start();
 
@@ -175,7 +175,7 @@ void PhotoImporter::regenerateVideoThumbnails()
             emit runningChanged();
             emit importFinished(updated, static_cast<int>(total) - updated);
         });
-    });
+    }));
 }
 
 PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
@@ -205,7 +205,7 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
     // Try EXIF data for actual date taken
     try {
         auto image = Exiv2::ImageFactory::open(filePath.toStdString());
-        if (image) {
+        if (image.get()) {
             image->readMetadata();
             const auto &exifData = image->exifData();
 
@@ -223,8 +223,8 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
 
             auto wIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"));
             auto hIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"));
-            if (wIt != exifData.end()) record.width = wIt->toInt64();
-            if (hIt != exifData.end()) record.height = hIt->toInt64();
+            if (wIt != exifData.end()) record.width = static_cast<int>(wIt->toLong());
+            if (hIt != exifData.end()) record.height = static_cast<int>(hIt->toLong());
         }
     } catch (const Exiv2::Error &) {
         // EXIF extraction is best-effort; videos won't have EXIF
