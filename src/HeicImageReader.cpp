@@ -100,6 +100,53 @@ QImage readHeicThumbnail(const QString &filePath)
     return result;
 }
 
+QImage readHeicThumbnailOrScaled(const QString &filePath, int maxSize)
+{
+    heif_context *ctx = heif_context_alloc();
+    heif_error err = heif_context_read_from_file(ctx, filePath.toUtf8().constData(), nullptr);
+    if (err.code != heif_error_Ok) {
+        qWarning() << "HEIC open error:" << err.message;
+        heif_context_free(ctx);
+        return {};
+    }
+
+    heif_image_handle *handle = nullptr;
+    err = heif_context_get_primary_image_handle(ctx, &handle);
+    if (err.code != heif_error_Ok) {
+        heif_context_free(ctx);
+        return {};
+    }
+
+    QImage result;
+
+    // Try embedded thumbnail first
+    heif_item_id thumbIds[1];
+    int nThumbs = heif_image_handle_get_list_of_thumbnail_IDs(handle, thumbIds, 1);
+    if (nThumbs > 0) {
+        heif_image_handle *thumbHandle = nullptr;
+        err = heif_image_handle_get_thumbnail(handle, thumbIds[0], &thumbHandle);
+        if (err.code == heif_error_Ok) {
+            result = decodeHandle(thumbHandle);
+            heif_image_handle_release(thumbHandle);
+        }
+    }
+
+    // Fallback: decode full image
+    if (result.isNull()) {
+        result = decodeHandle(handle);
+    }
+
+    heif_image_handle_release(handle);
+    heif_context_free(ctx);
+
+    // Scale down if needed
+    if (!result.isNull() && (result.width() > maxSize || result.height() > maxSize)) {
+        result = result.scaled(maxSize, maxSize, Qt::KeepAspectRatio, Qt::FastTransformation);
+    }
+
+    return result;
+}
+
 #else // !HAVE_LIBHEIF
 
 QImage readHeicImage(const QString &filePath)
@@ -112,6 +159,13 @@ QImage readHeicImage(const QString &filePath)
 QImage readHeicThumbnail(const QString &filePath)
 {
     Q_UNUSED(filePath);
+    return {};
+}
+
+QImage readHeicThumbnailOrScaled(const QString &filePath, int maxSize)
+{
+    Q_UNUSED(filePath);
+    Q_UNUSED(maxSize);
     return {};
 }
 

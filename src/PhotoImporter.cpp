@@ -10,6 +10,7 @@
 #include <QMimeDatabase>
 #include <QDebug>
 #include <QElapsedTimer>
+#include <QThreadPool>
 #include <QtConcurrent>
 
 #ifdef HAVE_EXIV2
@@ -86,37 +87,117 @@ void PhotoImporter::doImport(const QString &path)
 
     qDebug() << "Found" << m_totalFiles << "media files in" << timer.elapsed() << "ms";
 
-    int imported = 0;
+    // Phase 1: Filter out existing files (fast DB lookups)
+    QStringList photoFiles;
+    QStringList videoFiles;
     int skipped = 0;
-    const int batchSize = 500;
 
-    m_db->beginTransaction();
-
-    for (int i = 0; i < files.size(); ++i) {
+    for (const QString &filePath : files) {
         if (m_cancelled) break;
-
-        const QString &filePath = files[i];
-
         if (m_db->photoExists(filePath)) {
             ++skipped;
+        } else if (classifyFile(filePath) == MediaType::Video) {
+            videoFiles.append(filePath);
         } else {
+            photoFiles.append(filePath);
+        }
+    }
+
+    int imported = 0;
+    const int batchSize = 500;
+
+    // Phase 2: Import photos in parallel (HEIC decode is CPU-bound)
+    if (!photoFiles.isEmpty() && !m_cancelled) {
+        QThreadPool pool;
+        pool.setMaxThreadCount(qMin(4, QThread::idealThreadCount()));
+
+        m_submittedCount = 0;
+        m_resultQueue.clear();
+
+        // Submit photo processing tasks
+        for (const QString &filePath : photoFiles) {
+            if (m_cancelled) break;
+            QtConcurrent::run(&pool, [this, filePath]() {
+                if (m_cancelled) return;
+                ImportResult result;
+                result.record = extractMetadata(filePath);
+                result.thumbnail = generateThumbnail(filePath, result.record.mediaType);
+
+                QMutexLocker lock(&m_queueMutex);
+                m_resultQueue.enqueue(std::move(result));
+                m_queueCondition.wakeOne();
+            });
+        }
+
+        // Drain queue and write to DB on this thread
+        int photoRemaining = m_cancelled ? 0 : photoFiles.size();
+        m_db->beginTransaction();
+
+        while (photoRemaining > 0) {
+            QMutexLocker lock(&m_queueMutex);
+            while (m_resultQueue.isEmpty()) {
+                m_queueCondition.wait(&m_queueMutex, 100);
+                if (m_cancelled && m_resultQueue.isEmpty()) break;
+            }
+
+            while (!m_resultQueue.isEmpty()) {
+                ImportResult result = m_resultQueue.dequeue();
+                lock.unlock();
+
+                m_db->insertPhoto(result.record, result.thumbnail);
+                ++imported;
+                --photoRemaining;
+
+                if (imported % batchSize == 0) {
+                    m_db->commitTransaction();
+                    m_db->beginTransaction();
+                }
+
+                m_progress = skipped + imported;
+                QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
+
+                lock.relock();
+            }
+
+            if (m_cancelled) break;
+        }
+
+        m_db->commitTransaction();
+
+        // Wait for any remaining workers to finish
+        pool.waitForDone();
+
+        // Drain any leftovers added after cancellation
+        QMutexLocker lock(&m_queueMutex);
+        m_resultQueue.clear();
+    }
+
+    // Phase 3: Import videos sequentially (VideoFrameExtractor not thread-safe)
+    if (!videoFiles.isEmpty() && !m_cancelled) {
+        m_db->beginTransaction();
+
+        for (int i = 0; i < videoFiles.size(); ++i) {
+            if (m_cancelled) break;
+
+            const QString &filePath = videoFiles[i];
             PhotoRecord record = extractMetadata(filePath);
             QByteArray thumbnail = generateThumbnail(filePath, record.mediaType);
             m_db->insertPhoto(record, thumbnail);
             ++imported;
+
+            if (imported % batchSize == 0) {
+                m_db->commitTransaction();
+                m_db->beginTransaction();
+            }
+
+            m_progress = skipped + imported;
+            QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
         }
 
-        if ((i + 1) % batchSize == 0) {
-            m_db->commitTransaction();
-            m_db->beginTransaction();
-        }
-
-        m_progress = i + 1;
-        QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
+        m_db->commitTransaction();
     }
 
-    m_db->commitTransaction();
-
+    m_progress = skipped + imported;
     m_running = false;
     qDebug() << "Import finished:" << imported << "imported," << skipped
              << "skipped in" << timer.elapsed() << "ms";
@@ -253,13 +334,7 @@ QByteArray PhotoImporter::generateThumbnail(const QString &filePath, MediaType t
             thumb.fill(QColor(60, 60, 60));
         }
     } else if (HeicImageReader::isHeicFile(filePath)) {
-        thumb = HeicImageReader::readHeicThumbnail(filePath);
-        if (thumb.isNull()) {
-            thumb = HeicImageReader::readHeicImage(filePath);
-        }
-        if (!thumb.isNull() && (thumb.width() > thumbSize || thumb.height() > thumbSize)) {
-            thumb = thumb.scaled(thumbSize, thumbSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        }
+        thumb = HeicImageReader::readHeicThumbnailOrScaled(filePath, thumbSize);
     } else {
         QImageReader reader(filePath);
         reader.setAutoTransform(true);

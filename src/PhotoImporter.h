@@ -3,8 +3,17 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QMutex>
+#include <QWaitCondition>
+#include <QQueue>
+#include <atomic>
 #include "PhotoDatabase.h"
 #include "VideoFrameExtractor.h"
+
+struct ImportResult {
+    PhotoRecord record;
+    QByteArray thumbnail;
+};
 
 // Async photo importer that scans a directory, reads metadata,
 // generates thumbnails, and inserts into the database.
@@ -51,10 +60,15 @@ private:
     PhotoDatabase *m_db;
     VideoFrameExtractor m_frameExtractor;
     bool m_running = false;
-    bool m_cancelled = false;
+    std::atomic<bool> m_cancelled{false};
     int m_progress = 0;
     int m_totalFiles = 0;
     QString m_currentDirectory;
+
+    QMutex m_queueMutex;
+    QWaitCondition m_queueCondition;
+    QQueue<ImportResult> m_resultQueue;
+    std::atomic<int> m_submittedCount{0};
 
     static const QStringList s_photoExtensions;
     static const QStringList s_videoExtensions;
