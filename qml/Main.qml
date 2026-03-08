@@ -99,7 +99,10 @@ ApplicationWindow {
                     Layout.rightMargin: 8
                     Layout.bottomMargin: 8
                     implicitHeight: 36
-                    color: importBtnArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : Qt.darker(root.accentColor, 1.5)
+                    opacity: photoImporter.running ? 0.4 : 1.0
+                    color: !photoImporter.running && importBtnArea.containsMouse
+                           ? Qt.darker(root.accentColor, 1.3)
+                           : Qt.darker(root.accentColor, 1.5)
                     radius: 6
 
                     Label {
@@ -113,8 +116,11 @@ ApplicationWindow {
                         id: importBtnArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: folderDialog.open()
+                        cursorShape: photoImporter.running ? Qt.ArrowCursor : Qt.PointingHandCursor
+                        onClicked: {
+                            if (!photoImporter.running)
+                                folderDialog.open()
+                        }
                     }
                 }
             }
