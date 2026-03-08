@@ -41,7 +41,9 @@ void PhotoImporter::importDirectory(const QString &path)
     m_running = true;
     m_cancelled = false;
     m_progress = 0;
+    m_currentDirectory = QFileInfo(path).fileName();
     emit runningChanged();
+    emit currentDirectoryChanged();
 
     QtConcurrent::run([this, path]() {
         doImport(path);
@@ -110,9 +112,7 @@ void PhotoImporter::doImport(const QString &path)
         }
 
         m_progress = i + 1;
-        if (m_progress % 100 == 0 || m_progress == m_totalFiles) {
-            QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
-        }
+        QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
     }
 
     m_db->commitTransaction();

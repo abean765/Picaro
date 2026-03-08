@@ -16,6 +16,7 @@ class PhotoImporter : public QObject
     Q_PROPERTY(bool running READ isRunning NOTIFY runningChanged)
     Q_PROPERTY(int progress READ progress NOTIFY progressChanged)
     Q_PROPERTY(int totalFiles READ totalFiles NOTIFY totalFilesChanged)
+    Q_PROPERTY(QString currentDirectory READ currentDirectory NOTIFY currentDirectoryChanged)
 
 public:
     explicit PhotoImporter(PhotoDatabase *db, QObject *parent = nullptr);
@@ -23,6 +24,7 @@ public:
     bool isRunning() const { return m_running; }
     int progress() const { return m_progress; }
     int totalFiles() const { return m_totalFiles; }
+    QString currentDirectory() const { return m_currentDirectory; }
 
     Q_INVOKABLE void importDirectory(const QString &path);
     Q_INVOKABLE void regenerateVideoThumbnails();
@@ -32,6 +34,7 @@ signals:
     void runningChanged();
     void progressChanged();
     void totalFilesChanged();
+    void currentDirectoryChanged();
     void importFinished(int imported, int skipped);
     void errorOccurred(const QString &message);
 
@@ -51,6 +54,7 @@ private:
     bool m_cancelled = false;
     int m_progress = 0;
     int m_totalFiles = 0;
+    QString m_currentDirectory;
 
     static const QStringList s_photoExtensions;
     static const QStringList s_videoExtensions;

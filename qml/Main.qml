@@ -137,7 +137,7 @@ ApplicationWindow {
 
                 Label {
                     anchors.centerIn: parent
-                    text: "Importiere... " + photoImporter.progress + " / " + photoImporter.totalFiles
+                    text: "Importiere " + photoImporter.currentDirectory + " \u2013 " + photoImporter.progress + " / " + photoImporter.totalFiles
                     color: "#ffffff"
                     font.pixelSize: 12
                 }
