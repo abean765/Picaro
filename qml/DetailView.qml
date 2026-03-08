@@ -22,13 +22,18 @@ Rectangle {
     readonly property bool hasContent: photoId > 0 && filePath !== ""
 
     // Stop video when photo changes or view closes
+    // Query model directly to avoid stale derived properties (QML binding order is not guaranteed)
     onPhotoIdChanged: {
         detailPlayer.stop()
         detailPlayer.source = ""
-        if (isVideo && filePath !== "") {
-            detailPlayer.source = "file:///" + filePath
-        } else if (isLivePhoto && liveVideoPath !== "") {
-            detailPlayer.source = "file:///" + liveVideoPath
+        if (photoId <= 0) return
+        var mt = photoModel.mediaTypeForId(photoId)
+        var fp = photoModel.filePathForId(photoId)
+        var lvp = photoModel.liveVideoPathForId(photoId)
+        if (mt === 1 && fp !== "") {
+            detailPlayer.source = "file:///" + fp
+        } else if (mt === 2 && lvp !== "") {
+            detailPlayer.source = "file:///" + lvp
         }
     }
 
