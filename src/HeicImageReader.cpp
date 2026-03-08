@@ -1,9 +1,14 @@
 #include "HeicImageReader.h"
-#include <libheif/heif.h>
 #include <QFileInfo>
 #include <QDebug>
 
+#ifdef HAVE_LIBHEIF
+#include <libheif/heif.h>
+#endif
+
 namespace HeicImageReader {
+
+#ifdef HAVE_LIBHEIF
 
 static QImage decodeHandle(heif_image_handle *handle)
 {
@@ -22,7 +27,6 @@ static QImage decodeHandle(heif_image_handle *handle)
     int w = heif_image_get_width(img, heif_channel_interleaved);
     int h = heif_image_get_height(img, heif_channel_interleaved);
 
-    // Copy data into QImage (heif_image will be freed)
     QImage result(w, h, QImage::Format_RGBA8888);
     for (int y = 0; y < h; ++y) {
         memcpy(result.scanLine(y), data + y * stride, w * 4);
@@ -71,7 +75,6 @@ QImage readHeicThumbnail(const QString &filePath)
         return {};
     }
 
-    // Try to get an embedded thumbnail first (much faster)
     heif_item_id thumbIds[1];
     int nThumbs = heif_image_handle_get_list_of_thumbnail_IDs(handle, thumbIds, 1);
 
@@ -85,7 +88,6 @@ QImage readHeicThumbnail(const QString &filePath)
         }
     }
 
-    // Fallback: decode full image and scale down
     if (result.isNull()) {
         result = decodeHandle(handle);
         if (!result.isNull()) {
@@ -97,6 +99,23 @@ QImage readHeicThumbnail(const QString &filePath)
     heif_context_free(ctx);
     return result;
 }
+
+#else // !HAVE_LIBHEIF
+
+QImage readHeicImage(const QString &filePath)
+{
+    Q_UNUSED(filePath);
+    qWarning() << "HEIC support not available (libheif not found)";
+    return {};
+}
+
+QImage readHeicThumbnail(const QString &filePath)
+{
+    Q_UNUSED(filePath);
+    return {};
+}
+
+#endif // HAVE_LIBHEIF
 
 bool isHeicFile(const QString &filePath)
 {

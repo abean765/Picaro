@@ -12,7 +12,9 @@
 #include <QElapsedTimer>
 #include <QtConcurrent>
 
+#ifdef HAVE_EXIV2
 #include <exiv2/exiv2.hpp>
+#endif
 
 const QStringList PhotoImporter::s_photoExtensions = {
     QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("png"),
@@ -93,7 +95,6 @@ void PhotoImporter::doImport(const QString &path)
 
         const QString &filePath = files[i];
 
-        // Skip already imported files
         if (m_db->photoExists(filePath)) {
             ++skipped;
         } else {
@@ -103,14 +104,12 @@ void PhotoImporter::doImport(const QString &path)
             ++imported;
         }
 
-        // Commit in batches for performance
         if ((i + 1) % batchSize == 0) {
             m_db->commitTransaction();
             m_db->beginTransaction();
         }
 
         m_progress = i + 1;
-        // Emit progress at reasonable intervals to not flood the UI
         if (m_progress % 100 == 0 || m_progress == m_totalFiles) {
             QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
         }
@@ -151,6 +150,7 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
     // Default date to file modification time
     record.dateTaken = record.dateModified;
 
+#ifdef HAVE_EXIV2
     // Try EXIF data for actual date taken
     try {
         auto image = Exiv2::ImageFactory::open(filePath.toStdString());
@@ -158,29 +158,27 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
             image->readMetadata();
             const auto &exifData = image->exifData();
 
-            // Date taken
             auto it = exifData.findKey(Exiv2::ExifKey("Exif.Photo.DateTimeOriginal"));
             if (it == exifData.end()) {
                 it = exifData.findKey(Exiv2::ExifKey("Exif.Image.DateTime"));
             }
             if (it != exifData.end()) {
                 QString dateStr = QString::fromStdString(it->toString());
-                // EXIF format: "2024:01:15 14:30:00"
                 QDateTime dt = QDateTime::fromString(dateStr, QStringLiteral("yyyy:MM:dd HH:mm:ss"));
                 if (dt.isValid()) {
                     record.dateTaken = dt;
                 }
             }
 
-            // Image dimensions
             auto wIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"));
             auto hIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"));
             if (wIt != exifData.end()) record.width = wIt->toInt64();
             if (hIt != exifData.end()) record.height = hIt->toInt64();
         }
-    } catch (const Exiv2::Error &e) {
+    } catch (const Exiv2::Error &) {
         // EXIF extraction is best-effort; videos won't have EXIF
     }
+#endif
 
     // Generate month key for grouping
     record.monthKey = record.dateTaken.toString(QStringLiteral("yyyy-MM"));
@@ -194,11 +192,8 @@ QByteArray PhotoImporter::generateThumbnail(const QString &filePath, MediaType t
     const int thumbSize = 320;
 
     if (type == MediaType::Video) {
-        // For videos, we create a simple placeholder; a real implementation
-        // would use ffmpeg/GStreamer to extract a frame
         thumb = QImage(thumbSize, thumbSize, QImage::Format_RGB32);
         thumb.fill(QColor(60, 60, 60));
-        // TODO: Extract video frame using QMediaPlayer/ffmpeg
     } else if (HeicImageReader::isHeicFile(filePath)) {
         thumb = HeicImageReader::readHeicThumbnail(filePath);
         if (thumb.isNull()) {
@@ -208,11 +203,9 @@ QByteArray PhotoImporter::generateThumbnail(const QString &filePath, MediaType t
             thumb = thumb.scaled(thumbSize, thumbSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }
     } else {
-        // Standard image formats - use Qt's built-in readers
         QImageReader reader(filePath);
         reader.setAutoTransform(true);
 
-        // Read at reduced size for speed
         QSize originalSize = reader.size();
         if (originalSize.isValid() && (originalSize.width() > thumbSize || originalSize.height() > thumbSize)) {
             QSize scaled = originalSize.scaled(thumbSize, thumbSize, Qt::KeepAspectRatio);
@@ -249,12 +242,10 @@ MediaType PhotoImporter::classifyFile(const QString &filePath) const
 
 QString PhotoImporter::findLiveVideo(const QString &photoPath) const
 {
-    // iPhone Live Photos: "IMG_1234.HEIC" has a companion "IMG_1234.MOV"
     QFileInfo fi(photoPath);
     QString baseName = fi.completeBaseName();
     QString dir = fi.absolutePath();
 
-    // Check common video extensions for the companion file
     for (const auto &ext : { QStringLiteral("mov"), QStringLiteral("MOV"),
                               QStringLiteral("mp4"), QStringLiteral("MP4") }) {
         QString videoPath = dir + QStringLiteral("/") + baseName + QStringLiteral(".") + ext;
