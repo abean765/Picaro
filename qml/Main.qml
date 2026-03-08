@@ -159,6 +159,58 @@ ApplicationWindow {
                         font.pixelSize: 14
                     }
 
+                    // Media type filter buttons
+                    Row {
+                        spacing: 1
+
+                        Repeater {
+                            model: [
+                                { label: "Alle", filter: -1 },
+                                { label: "Fotos", filter: 0 },
+                                { label: "Videos", filter: 1 }
+                            ]
+
+                            Rectangle {
+                                required property var modelData
+                                required property int index
+                                width: filterLabel.implicitWidth + 20
+                                height: 26
+                                radius: index === 0 ? 4 : (index === 2 ? 4 : 0)
+                                color: photoModel.mediaTypeFilter === modelData.filter ? "#555555" : "#3a3a3a"
+
+                                // Round only left corners for first, right for last
+                                Rectangle {
+                                    visible: index === 0
+                                    anchors.right: parent.right
+                                    width: parent.width / 2
+                                    height: parent.height
+                                    color: parent.color
+                                }
+                                Rectangle {
+                                    visible: index === 2
+                                    anchors.left: parent.left
+                                    width: parent.width / 2
+                                    height: parent.height
+                                    color: parent.color
+                                }
+
+                                Label {
+                                    id: filterLabel
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    color: photoModel.mediaTypeFilter === modelData.filter ? "#ffffff" : "#aaaaaa"
+                                    font.pixelSize: 12
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: photoModel.mediaTypeFilter = modelData.filter
+                                }
+                            }
+                        }
+                    }
+
                     Item { Layout.fillWidth: true }
 
                     Label {

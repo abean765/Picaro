@@ -76,7 +76,6 @@ void PhotoModel::loadFromDatabase(PhotoDatabase *db)
     timer.start();
 
     m_allPhotos = db->loadAllRecords();
-    m_totalPhotos = m_allPhotos.size();
 
     // Build id->index lookup
     m_idToPhotoIndex.clear();
@@ -105,6 +104,18 @@ void PhotoModel::setPhotosPerRow(int n)
     m_photosPerRow = n;
     emit photosPerRowChanged();
     rebuildGrid();
+    buildTimelineData();
+    emit modelReloaded();
+}
+
+void PhotoModel::setMediaTypeFilter(int filter)
+{
+    if (filter == m_mediaTypeFilter) return;
+    m_mediaTypeFilter = filter;
+    emit mediaTypeFilterChanged();
+    rebuildGrid();
+    buildTimelineData();
+    emit modelReloaded();
 }
 
 void PhotoModel::rebuildGrid()
@@ -140,7 +151,14 @@ void PhotoModel::rebuildGrid()
 
     QLocale locale(QStringLiteral("de_DE"));
 
+    int filteredCount = 0;
+
     for (const auto &photo : m_allPhotos) {
+        // Apply media type filter
+        if (m_mediaTypeFilter >= 0 && static_cast<int>(photo.mediaType) != m_mediaTypeFilter)
+            continue;
+
+        ++filteredCount;
         const QString &monthKey = photo.monthKey;
 
         // New month → flush current row, insert header
@@ -176,9 +194,10 @@ void PhotoModel::rebuildGrid()
     }
 
     flushPending();
+    m_totalPhotos = filteredCount;
     endResetModel();
 
-    qDebug() << "Grid built:" << m_rows.size() << "rows in" << timer.elapsed() << "ms";
+    qDebug() << "Grid built:" << m_rows.size() << "rows (" << filteredCount << "photos) in" << timer.elapsed() << "ms";
 }
 
 QString PhotoModel::filePathForId(qint64 id) const
@@ -223,18 +242,24 @@ qint64 PhotoModel::nextPhotoId(qint64 currentId) const
 {
     auto it = m_idToPhotoIndex.constFind(currentId);
     if (it == m_idToPhotoIndex.constEnd()) return -1;
-    int idx = it.value() + 1;
-    if (idx >= m_allPhotos.size()) return -1;
-    return m_allPhotos[idx].id;
+    for (int idx = it.value() + 1; idx < m_allPhotos.size(); ++idx) {
+        if (m_mediaTypeFilter >= 0 && static_cast<int>(m_allPhotos[idx].mediaType) != m_mediaTypeFilter)
+            continue;
+        return m_allPhotos[idx].id;
+    }
+    return -1;
 }
 
 qint64 PhotoModel::previousPhotoId(qint64 currentId) const
 {
     auto it = m_idToPhotoIndex.constFind(currentId);
     if (it == m_idToPhotoIndex.constEnd()) return -1;
-    int idx = it.value() - 1;
-    if (idx < 0) return -1;
-    return m_allPhotos[idx].id;
+    for (int idx = it.value() - 1; idx >= 0; --idx) {
+        if (m_mediaTypeFilter >= 0 && static_cast<int>(m_allPhotos[idx].mediaType) != m_mediaTypeFilter)
+            continue;
+        return m_allPhotos[idx].id;
+    }
+    return -1;
 }
 
 void PhotoModel::buildTimelineData()
