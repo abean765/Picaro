@@ -179,30 +179,34 @@ ApplicationWindow {
                         spacing: 1
 
                         Repeater {
+                            id: filterRepeater
                             model: [
                                 { label: "Alle", filter: -1 },
                                 { label: "Fotos", filter: 0 },
-                                { label: "Videos", filter: 1 }
+                                { label: "Videos", filter: 1 },
+                                { label: "Live", filter: 2 }
                             ]
 
                             Rectangle {
                                 required property var modelData
                                 required property int index
+                                readonly property bool isFirst: index === 0
+                                readonly property bool isLast: index === filterRepeater.count - 1
                                 width: filterLabel.implicitWidth + 20
                                 height: 26
-                                radius: index === 0 ? 4 : (index === 2 ? 4 : 0)
+                                radius: isFirst || isLast ? 4 : 0
                                 color: photoModel.mediaTypeFilter === modelData.filter ? "#555555" : "#3a3a3a"
 
                                 // Round only left corners for first, right for last
                                 Rectangle {
-                                    visible: index === 0
+                                    visible: isFirst
                                     anchors.right: parent.right
                                     width: parent.width / 2
                                     height: parent.height
                                     color: parent.color
                                 }
                                 Rectangle {
-                                    visible: index === 2
+                                    visible: isLast
                                     anchors.left: parent.left
                                     width: parent.width / 2
                                     height: parent.height
