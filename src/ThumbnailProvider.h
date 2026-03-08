@@ -22,7 +22,7 @@ public:
 
 private:
     QImage m_image;
-    QMutex m_mutex;
+    mutable QMutex m_mutex;
 };
 
 class ThumbnailProvider : public QQuickAsyncImageProvider
