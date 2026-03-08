@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
 
     // Register thumbnail image provider (engine takes ownership)
-    engine.addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider(&db));
+    engine.addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider(dbPath));
 
     // Expose C++ objects to QML
     QQmlContext *ctx = engine.rootContext();

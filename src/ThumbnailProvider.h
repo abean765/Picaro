@@ -3,17 +3,19 @@
 #include <QQuickAsyncImageProvider>
 #include <QThreadPool>
 #include <QMutex>
-#include "PhotoDatabase.h"
+#include <QString>
 
 // Async image provider that loads thumbnails from SQLite on demand.
 // Qt Quick requests "image://thumbnail/<photoId>" and we fetch the JPEG blob.
+// Each worker thread gets its own SQLite connection (QSqlDatabase is not thread-safe).
 
 class ThumbnailResponse : public QQuickImageResponse
 {
     Q_OBJECT
 
 public:
-    ThumbnailResponse(qint64 photoId, const QSize &requestedSize, PhotoDatabase *db, QThreadPool *pool);
+    ThumbnailResponse(qint64 photoId, const QSize &requestedSize,
+                      const QString &dbPath, QThreadPool *pool);
 
     QQuickTextureFactory *textureFactory() const override;
 
@@ -28,12 +30,12 @@ private:
 class ThumbnailProvider : public QQuickAsyncImageProvider
 {
 public:
-    explicit ThumbnailProvider(PhotoDatabase *db);
+    explicit ThumbnailProvider(const QString &dbPath);
 
     QQuickImageResponse *requestImageResponse(
         const QString &id, const QSize &requestedSize) override;
 
 private:
-    PhotoDatabase *m_db;
+    QString m_dbPath;
     QThreadPool m_pool;
 };

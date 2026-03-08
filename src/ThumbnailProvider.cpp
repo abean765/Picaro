@@ -1,13 +1,49 @@
 #include "ThumbnailProvider.h"
 #include <QImage>
 #include <QRunnable>
-#include <QBuffer>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QThread>
+
+// Each thread gets its own SQLite connection, cached via thread-local connection name.
+static QByteArray loadThumbnailFromDb(const QString &dbPath, qint64 photoId)
+{
+    // Connection name unique per thread
+    QString connName = QStringLiteral("thumb_") +
+        QString::number(reinterpret_cast<quintptr>(QThread::currentThread()), 16);
+
+    if (!QSqlDatabase::contains(connName)) {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connName);
+        db.setDatabaseName(dbPath);
+        db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        if (!db.open()) {
+            return {};
+        }
+        // Read-only pragmas for thumbnail loading
+        QSqlQuery pragma(db);
+        pragma.exec(QStringLiteral("PRAGMA mmap_size=8589934592"));
+        pragma.exec(QStringLiteral("PRAGMA cache_size=-65536"));
+    }
+
+    QSqlDatabase db = QSqlDatabase::database(connName, false);
+    if (!db.isOpen()) {
+        return {};
+    }
+
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT thumbnail FROM photos WHERE id = ?"));
+    q.addBindValue(photoId);
+    if (q.exec() && q.next()) {
+        return q.value(0).toByteArray();
+    }
+    return {};
+}
 
 class ThumbnailRunnable : public QRunnable
 {
 public:
-    ThumbnailRunnable(qint64 photoId, PhotoDatabase *db, ThumbnailResponse *response)
-        : m_photoId(photoId), m_db(db), m_response(response)
+    ThumbnailRunnable(qint64 photoId, const QString &dbPath, ThumbnailResponse *response)
+        : m_photoId(photoId), m_dbPath(dbPath), m_response(response)
     {
         setAutoDelete(true);
     }
@@ -15,27 +51,26 @@ public:
     void run() override
     {
         QImage img;
-        QByteArray data = m_db->loadThumbnail(m_photoId);
+        QByteArray data = loadThumbnailFromDb(m_dbPath, m_photoId);
         if (!data.isEmpty()) {
             img.loadFromData(data, "JPEG");
         }
-        // Thread-safe: mutex protects m_image, emit finished() is safe from any thread
         m_response->handleResult(std::move(img));
     }
 
 private:
     qint64 m_photoId;
-    PhotoDatabase *m_db;
+    QString m_dbPath;
     ThumbnailResponse *m_response;
 };
 
 // -- ThumbnailResponse --
 
 ThumbnailResponse::ThumbnailResponse(qint64 photoId, const QSize &requestedSize,
-                                     PhotoDatabase *db, QThreadPool *pool)
+                                     const QString &dbPath, QThreadPool *pool)
 {
     Q_UNUSED(requestedSize);
-    auto *runnable = new ThumbnailRunnable(photoId, db, this);
+    auto *runnable = new ThumbnailRunnable(photoId, dbPath, this);
     pool->start(runnable);
 }
 
@@ -56,8 +91,8 @@ QQuickTextureFactory *ThumbnailResponse::textureFactory() const
 
 // -- ThumbnailProvider --
 
-ThumbnailProvider::ThumbnailProvider(PhotoDatabase *db)
-    : m_db(db)
+ThumbnailProvider::ThumbnailProvider(const QString &dbPath)
+    : m_dbPath(dbPath)
 {
     m_pool.setMaxThreadCount(4);
 }
@@ -69,5 +104,5 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(
     qint64 photoId = id.toLongLong(&ok);
     if (!ok) photoId = 0;
 
-    return new ThumbnailResponse(photoId, requestedSize, m_db, &m_pool);
+    return new ThumbnailResponse(photoId, requestedSize, m_dbPath, &m_pool);
 }
