@@ -19,12 +19,7 @@ ApplicationWindow {
 
     function selectPhoto(photoId) {
         selectedPhotoId = photoId
-        // Jump timeline to selected photo's month
         if (photoId > 0) {
-            var tlIdx = photoModel.timelineIndexForPhotoId(photoId)
-            if (tlIdx >= 0) {
-                timelineView.activeIndex = tlIdx
-            }
             detailPanel.forceActiveFocus()
         }
     }
