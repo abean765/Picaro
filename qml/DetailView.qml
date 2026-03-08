@@ -263,12 +263,17 @@ Rectangle {
         }
     }
 
-    // File name at bottom
+    // File name and resolution at bottom
     Label {
         anchors.bottom: isVideo ? parent.bottom : parent.bottom
         anchors.bottomMargin: isVideo ? 56 : 12
         anchors.horizontalCenter: parent.horizontalCenter
-        text: filePath !== "" ? filePath.split("/").pop() : ""
+        text: {
+            if (filePath === "") return ""
+            var name = filePath.split("/").pop()
+            var res = photoModel.resolutionForId(photoId)
+            return res !== "" ? name + "  ·  " + res : name
+        }
         color: "#888888"
         font.pixelSize: 11
         visible: hasContent

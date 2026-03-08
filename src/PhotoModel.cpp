@@ -208,6 +208,17 @@ QString PhotoModel::liveVideoPathForId(qint64 id) const
     return {};
 }
 
+QString PhotoModel::resolutionForId(qint64 id) const
+{
+    auto it = m_idToPhotoIndex.constFind(id);
+    if (it != m_idToPhotoIndex.constEnd()) {
+        const auto &rec = m_allPhotos[it.value()];
+        if (rec.width > 0 && rec.height > 0)
+            return QString::number(rec.width) + QStringLiteral(" × ") + QString::number(rec.height);
+    }
+    return {};
+}
+
 qint64 PhotoModel::nextPhotoId(qint64 currentId) const
 {
     auto it = m_idToPhotoIndex.constFind(currentId);
