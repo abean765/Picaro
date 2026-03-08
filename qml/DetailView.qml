@@ -84,7 +84,7 @@ Rectangle {
     MediaPlayer {
         id: detailPlayer
         videoOutput: detailVideoOutput
-        loops: isLivePhoto ? MediaPlayer.Infinite : 1
+        loops: 1
         onSourceChanged: {
             if (source.toString() !== "") {
                 play()
@@ -161,7 +161,7 @@ Rectangle {
         }
     }
 
-    // LivePhoto badge
+    // LivePhoto badge – hover to replay
     Rectangle {
         visible: isLivePhoto && hasContent
         anchors.top: parent.top
@@ -170,15 +170,26 @@ Rectangle {
         width: liveBadge.implicitWidth + 16
         height: liveBadge.implicitHeight + 8
         radius: 6
-        color: "#90000000"
+        color: liveBadgeArea.containsMouse ? "#c0000000" : "#90000000"
 
         Label {
             id: liveBadge
             anchors.centerIn: parent
             text: "LIVE"
-            color: "#ffffff"
+            color: liveBadgeArea.containsMouse ? "#ffffff" : "#cccccc"
             font.pixelSize: 14
             font.bold: true
+        }
+
+        MouseArea {
+            id: liveBadgeArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                detailPlayer.position = 0
+                detailPlayer.play()
+            }
         }
     }
 
