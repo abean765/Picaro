@@ -57,10 +57,26 @@ Rectangle {
             else
                 detailPlayer.play()
             event.accepted = true
-        } else if (gridView && (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp
-                   || event.key === Qt.Key_Home || event.key === Qt.Key_End)) {
+        } else if (gridView) {
             // Forward scroll keys to the grid
-            gridView.Keys.pressed(event)
+            if (event.key === Qt.Key_PageDown) {
+                gridView.contentY = Math.min(gridView.contentY + gridView.height * 0.9,
+                                             gridView.contentHeight - gridView.height)
+                gridView.forceLayout()
+                event.accepted = true
+            } else if (event.key === Qt.Key_PageUp) {
+                gridView.contentY = Math.max(gridView.contentY - gridView.height * 0.9, 0)
+                gridView.forceLayout()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Home) {
+                gridView.contentY = 0
+                gridView.forceLayout()
+                event.accepted = true
+            } else if (event.key === Qt.Key_End) {
+                gridView.contentY = gridView.contentHeight - gridView.height
+                gridView.forceLayout()
+                event.accepted = true
+            }
         }
     }
 
