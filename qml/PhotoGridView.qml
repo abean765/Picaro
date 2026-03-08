@@ -5,13 +5,41 @@ ListView {
     id: gridView
 
     clip: true
-    cacheBuffer: 1000
+    cacheBuffer: 4000
     reuseItems: true
 
     model: photoModel
 
-    flickDeceleration: 3000
-    maximumFlickVelocity: 8000
+    flickDeceleration: 1500
+    maximumFlickVelocity: 15000
+
+    // Faster mouse wheel scrolling
+    WheelHandler {
+        id: wheelHandler
+        target: gridView
+        property: "contentY"
+        // Each wheel step scrolls ~300px (3 notches worth)
+        rotationScale: -3.0
+    }
+
+    // Page Up / Page Down keyboard support
+    focus: true
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_PageDown) {
+            gridView.contentY = Math.min(gridView.contentY + gridView.height * 0.9,
+                                         gridView.contentHeight - gridView.height);
+            event.accepted = true;
+        } else if (event.key === Qt.Key_PageUp) {
+            gridView.contentY = Math.max(gridView.contentY - gridView.height * 0.9, 0);
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Home) {
+            gridView.contentY = 0;
+            event.accepted = true;
+        } else if (event.key === Qt.Key_End) {
+            gridView.contentY = gridView.contentHeight - gridView.height;
+            event.accepted = true;
+        }
+    }
 
     ScrollBar.vertical: ScrollBar {
         active: true
@@ -63,10 +91,10 @@ ListView {
                         cache: true
 
                         opacity: status === Image.Ready ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                        Behavior on opacity { NumberAnimation { duration: 100 } }
                     }
 
-                    // Loading placeholder
+                    // Loading placeholder (neutral dark gray, not black)
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: 1
