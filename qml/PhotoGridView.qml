@@ -92,6 +92,7 @@ ListView {
                     // Selection highlight
                     Rectangle {
                         anchors.fill: parent
+                        anchors.margins: 1
                         color: "transparent"
                         border.color: root.accentColor
                         border.width: root.selectedPhotoId === modelData.id ? 3 : 0
