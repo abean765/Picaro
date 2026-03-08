@@ -175,7 +175,45 @@ ApplicationWindow {
                             : currentView === "overview" ? 1
                             : 2
 
-                PhotoGridView {}
+                // Photos view with timeline
+                Item {
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 0
+
+                        TimelineView {
+                            id: timelineView
+                            Layout.fillHeight: true
+                            visible: photoModel.totalPhotos > 0
+                            activeIndex: {
+                                // Find which timeline month corresponds to current scroll position
+                                if (!photoGrid.count) return -1
+                                var topIdx = photoGrid.indexAt(0, photoGrid.contentY + 10)
+                                if (topIdx < 0) return -1
+                                // Walk backward to find nearest header
+                                var data = photoModel.timelineData
+                                var bestMatch = -1
+                                for (var i = 0; i < data.length; ++i) {
+                                    if (data[i].rowIndex <= topIdx) {
+                                        bestMatch = i
+                                    } else {
+                                        break
+                                    }
+                                }
+                                return bestMatch
+                            }
+                            onMonthClicked: function(timelineIndex, rowIndex) {
+                                photoGrid.positionViewAtIndex(rowIndex, ListView.Beginning)
+                            }
+                        }
+
+                        PhotoGridView {
+                            id: photoGrid
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                        }
+                    }
+                }
 
                 OverviewView {}
 

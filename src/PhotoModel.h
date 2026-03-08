@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QVariantList>
 #include <QVector>
 #include <QString>
 #include "PhotoDatabase.h"
@@ -28,6 +29,8 @@ class PhotoModel : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(int photosPerRow READ photosPerRow WRITE setPhotosPerRow NOTIFY photosPerRowChanged)
     Q_PROPERTY(int totalPhotos READ totalPhotos NOTIFY modelReloaded)
+    Q_PROPERTY(QVariantList timelineData READ timelineData NOTIFY modelReloaded)
+    Q_PROPERTY(int timelineMaxCount READ timelineMaxCount NOTIFY modelReloaded)
 
 public:
     enum Roles {
@@ -49,6 +52,10 @@ public:
     int photosPerRow() const { return m_photosPerRow; }
     void setPhotosPerRow(int n);
     int totalPhotos() const { return m_totalPhotos; }
+    QVariantList timelineData() const { return m_timelineData; }
+    int timelineMaxCount() const { return m_timelineMaxCount; }
+
+    Q_INVOKABLE int headerRowIndex(int timelineIndex) const;
 
     Q_INVOKABLE QString filePathForId(qint64 id) const;
     Q_INVOKABLE int mediaTypeForId(qint64 id) const;
@@ -60,6 +67,7 @@ signals:
 
 private:
     void rebuildGrid();
+    void buildTimelineData();
 
     QVector<PhotoRecord> m_allPhotos;   // flat, sorted by date desc
     QVector<GridRow> m_rows;            // computed grid rows
@@ -67,4 +75,8 @@ private:
     PhotoDatabase *m_db = nullptr;
     int m_photosPerRow = 5;
     int m_totalPhotos = 0;
+
+    QVariantList m_timelineData;
+    QVector<int> m_headerRowIndices;    // row index for each timeline entry
+    int m_timelineMaxCount = 1;
 };

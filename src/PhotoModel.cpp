@@ -88,6 +88,7 @@ void PhotoModel::loadFromDatabase(PhotoDatabase *db)
     qDebug() << "Loaded" << m_totalPhotos << "records in" << timer.elapsed() << "ms";
 
     rebuildGrid();
+    buildTimelineData();
     emit modelReloaded();
 }
 
@@ -205,4 +206,68 @@ QString PhotoModel::liveVideoPathForId(qint64 id) const
         return m_allPhotos[it.value()].liveVideoPath;
     }
     return {};
+}
+
+void PhotoModel::buildTimelineData()
+{
+    m_timelineData.clear();
+    m_headerRowIndices.clear();
+    m_timelineMaxCount = 1;
+
+    QLocale locale(QStringLiteral("de_DE"));
+
+    for (int i = 0; i < m_rows.size(); ++i) {
+        const auto &row = m_rows[i];
+        if (row.type != GridRow::MonthHeader) continue;
+
+        // Count photos in this month (sum cells in subsequent PhotoRows until next header)
+        int count = 0;
+        for (int j = i + 1; j < m_rows.size() && m_rows[j].type == GridRow::PhotoRow; ++j) {
+            count += m_rows[j].cells.size();
+        }
+
+        // Parse monthKey from headerText back, or find it from context
+        // We can extract year/month from the header row's photos
+        QString monthKey;
+        QString shortMonth;
+        int year = 0;
+
+        // Find monthKey from the first photo after this header
+        for (int j = i + 1; j < m_rows.size() && m_rows[j].type == GridRow::PhotoRow; ++j) {
+            if (!m_rows[j].cells.isEmpty()) {
+                auto it = m_idToPhotoIndex.constFind(m_rows[j].cells[0].id);
+                if (it != m_idToPhotoIndex.constEnd()) {
+                    monthKey = m_allPhotos[it.value()].monthKey;
+                    if (monthKey.length() >= 7) {
+                        year = monthKey.left(4).toInt();
+                        int month = monthKey.mid(5, 2).toInt();
+                        QDate d(year, month, 1);
+                        shortMonth = locale.toString(d, QStringLiteral("MMM"));
+                    }
+                }
+                break;
+            }
+        }
+
+        QVariantMap entry;
+        entry[QStringLiteral("monthKey")] = monthKey;
+        entry[QStringLiteral("label")] = shortMonth;
+        entry[QStringLiteral("fullLabel")] = row.headerText;
+        entry[QStringLiteral("year")] = year;
+        entry[QStringLiteral("count")] = count;
+        entry[QStringLiteral("rowIndex")] = i;
+
+        m_timelineData.append(entry);
+        m_headerRowIndices.append(i);
+
+        if (count > m_timelineMaxCount)
+            m_timelineMaxCount = count;
+    }
+}
+
+int PhotoModel::headerRowIndex(int timelineIndex) const
+{
+    if (timelineIndex < 0 || timelineIndex >= m_headerRowIndices.size())
+        return 0;
+    return m_headerRowIndices[timelineIndex];
 }
