@@ -11,114 +11,179 @@ ApplicationWindow {
     title: "Picaro"
     color: "#1a1a1a"
 
-    // Properties exposed from C++
-    // photoModel: PhotoModel instance
-    // photoImporter: PhotoImporter instance
+    // Navigation state
+    property string currentView: "photos"
 
-    header: ToolBar {
-        background: Rectangle { color: "#2d2d2d" }
-        height: 48
+    RowLayout {
+        anchors.fill: parent
+        spacing: 0
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 16
-            anchors.rightMargin: 16
-            spacing: 12
-
-            Label {
-                text: "Picaro"
-                color: "#ffffff"
-                font.pixelSize: 20
-                font.bold: true
-            }
-
-            Label {
-                text: photoModel.totalPhotos + " Fotos"
-                color: "#aaaaaa"
-                font.pixelSize: 14
-            }
-
-            Item { Layout.fillWidth: true }
-
-            // Zoom slider for grid density
-            Label {
-                text: "Größe"
-                color: "#aaaaaa"
-                font.pixelSize: 12
-            }
-
-            Slider {
-                id: zoomSlider
-                from: 3
-                to: 12
-                value: 5
-                stepSize: 1
-                implicitWidth: 120
-
-                onValueChanged: {
-                    photoModel.photosPerRow = Math.round(value)
-                }
-            }
-
-            Button {
-                text: "Ordner importieren"
-                onClicked: folderDialog.open()
-
-                background: Rectangle {
-                    color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
-                    radius: 4
-                }
-
-                contentItem: Label {
-                    text: parent.text
-                    color: "#ffffff"
-                    font.pixelSize: 13
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-        }
-    }
-
-    // Import progress bar
-    Rectangle {
-        id: progressBar
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: photoImporter.running ? 32 : 0
-        color: "#2d2d2d"
-        visible: height > 0
-
-        Behavior on height { NumberAnimation { duration: 200 } }
-
+        // Sidebar
         Rectangle {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: photoImporter.totalFiles > 0
-                   ? parent.width * (photoImporter.progress / photoImporter.totalFiles)
-                   : 0
-            color: "#4a9eff"
+            Layout.fillHeight: true
+            Layout.preferredWidth: 200
+            color: "#222222"
 
-            Behavior on width { NumberAnimation { duration: 100 } }
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.topMargin: 12
+                spacing: 2
+
+                // App title
+                Label {
+                    text: "Picaro"
+                    color: "#ffffff"
+                    font.pixelSize: 22
+                    font.bold: true
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 16
+                }
+
+                SidebarButton {
+                    text: "Fotos"
+                    icon: "\u25A3"
+                    active: currentView === "photos"
+                    onClicked: currentView = "photos"
+                }
+
+                SidebarButton {
+                    text: "Übersicht"
+                    icon: "\u25C9"
+                    active: currentView === "overview"
+                    onClicked: currentView = "overview"
+                }
+
+                SidebarButton {
+                    text: "Einstellungen"
+                    icon: "\u2699"
+                    active: currentView === "settings"
+                    onClicked: currentView = "settings"
+                }
+
+                Item { Layout.fillHeight: true }
+
+                // Import button at bottom of sidebar
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    Layout.bottomMargin: 8
+                    implicitHeight: 36
+                    color: importBtnArea.containsMouse ? "#3a6abf" : "#2d5aa0"
+                    radius: 6
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: "Ordner importieren"
+                        color: "#ffffff"
+                        font.pixelSize: 13
+                    }
+
+                    MouseArea {
+                        id: importBtnArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: folderDialog.open()
+                    }
+                }
+            }
         }
 
-        Label {
-            anchors.centerIn: parent
-            text: "Importiere... " + photoImporter.progress + " / " + photoImporter.totalFiles
-            color: "#ffffff"
-            font.pixelSize: 12
-        }
-    }
+        // Main content area
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 0
 
-    // Main content
-    PhotoGridView {
-        anchors.top: progressBar.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        model: photoModel
+            // Import progress bar
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: photoImporter.running ? 32 : 0
+                color: "#2d2d2d"
+                visible: photoImporter.running
+                clip: true
+
+                Behavior on implicitHeight { NumberAnimation { duration: 200 } }
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: photoImporter.totalFiles > 0
+                           ? parent.width * (photoImporter.progress / photoImporter.totalFiles)
+                           : 0
+                    color: "#4a9eff"
+                    Behavior on width { NumberAnimation { duration: 100 } }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    text: "Importiere... " + photoImporter.progress + " / " + photoImporter.totalFiles
+                    color: "#ffffff"
+                    font.pixelSize: 12
+                }
+            }
+
+            // Toolbar (only for photos view)
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: currentView === "photos" ? 44 : 0
+                color: "#2d2d2d"
+                visible: currentView === "photos"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 16
+                    spacing: 12
+
+                    Label {
+                        text: photoModel.totalPhotos + " Medien"
+                        color: "#aaaaaa"
+                        font.pixelSize: 14
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Label {
+                        text: "Größe"
+                        color: "#aaaaaa"
+                        font.pixelSize: 12
+                    }
+
+                    Slider {
+                        id: zoomSlider
+                        from: 3
+                        to: 12
+                        value: 5
+                        stepSize: 1
+                        implicitWidth: 120
+
+                        onValueChanged: {
+                            photoModel.photosPerRow = Math.round(value)
+                        }
+                    }
+                }
+            }
+
+            // Stacked views
+            StackLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                currentIndex: currentView === "photos" ? 0
+                            : currentView === "overview" ? 1
+                            : 2
+
+                PhotoGridView {
+                    model: photoModel
+                }
+
+                OverviewView {}
+
+                SettingsView {}
+            }
+        }
     }
 
     // Folder picker dialog
@@ -126,9 +191,58 @@ ApplicationWindow {
         id: folderDialog
         title: "Foto-Ordner auswählen"
         onAccepted: {
-            photoImporter.importDirectory(selectedFolder.toString().replace("file://", ""))
+            var path = selectedFolder.toString()
+            if (Qt.platform.os === "windows") {
+                path = path.replace("file:///", "")
+            } else {
+                path = path.replace("file://", "")
+            }
+            photoImporter.importDirectory(path)
         }
     }
 
-    // Model reload is handled in C++ via signal connection
+    // Sidebar button component
+    component SidebarButton: Rectangle {
+        id: sidebarBtn
+        property string text: ""
+        property string icon: ""
+        property bool active: false
+
+        signal clicked()
+
+        Layout.fillWidth: true
+        Layout.leftMargin: 4
+        Layout.rightMargin: 4
+        implicitHeight: 36
+        color: active ? "#3a3a3a" : (btnArea.containsMouse ? "#2d2d2d" : "transparent")
+        radius: 6
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            spacing: 10
+
+            Label {
+                text: sidebarBtn.icon
+                color: sidebarBtn.active ? "#4a9eff" : "#888888"
+                font.pixelSize: 16
+            }
+
+            Label {
+                text: sidebarBtn.text
+                color: sidebarBtn.active ? "#ffffff" : "#bbbbbb"
+                font.pixelSize: 14
+            }
+
+            Item { Layout.fillWidth: true }
+        }
+
+        MouseArea {
+            id: btnArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: sidebarBtn.clicked()
+        }
+    }
 }

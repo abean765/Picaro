@@ -14,6 +14,12 @@ enum class MediaType : int {
     LivePhoto = 2
 };
 
+enum class PhotoCategory : int {
+    Normal = 0,
+    Screenshot = 1,
+    Selfie = 2
+};
+
 struct PhotoRecord {
     qint64 id = 0;
     QString filePath;
@@ -24,10 +30,21 @@ struct PhotoRecord {
     int height = 0;
     qint64 fileSize = 0;
     MediaType mediaType = MediaType::Photo;
+    PhotoCategory category = PhotoCategory::Normal;
     QString liveVideoPath;
     QString mimeType;
     double duration = 0.0;
     QString monthKey;  // "2024-01"
+};
+
+struct PhotoStats {
+    int totalPhotos = 0;
+    int normalPhotos = 0;
+    int videos = 0;
+    int livePhotos = 0;
+    int screenshots = 0;
+    int selfies = 0;
+    qint64 totalSizeBytes = 0;
 };
 
 class PhotoDatabase : public QObject
@@ -41,6 +58,7 @@ public:
     bool open(const QString &path);
     void close();
     bool isOpen() const;
+    QString databasePath() const { return m_dbPath; }
 
     // Bulk insert for import performance
     bool beginTransaction();
@@ -54,11 +72,15 @@ public:
     QVector<PhotoRecord> loadAllRecords() const;
     int photoCount() const;
 
+    // Statistics
+    PhotoStats loadStats() const;
+
     // Thumbnail access for the image provider
     QByteArray loadThumbnail(qint64 photoId) const;
 
 private:
     void createSchema();
+    void migrateSchema();
     void configurePragmas();
 
     QSqlDatabase m_db;

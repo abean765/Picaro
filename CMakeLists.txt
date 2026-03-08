@@ -69,6 +69,8 @@ qt_add_executable(picaro
     src/ThumbnailProvider.cpp
     src/HeicImageReader.h
     src/HeicImageReader.cpp
+    src/AppSettings.h
+    src/StatsProvider.h
 )
 
 qt_add_qml_module(picaro
@@ -77,6 +79,8 @@ qt_add_qml_module(picaro
     QML_FILES
         qml/Main.qml
         qml/PhotoGridView.qml
+        qml/OverviewView.qml
+        qml/SettingsView.qml
         qml/ImportDialog.qml
 )
 

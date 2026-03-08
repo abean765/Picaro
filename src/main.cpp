@@ -10,6 +10,8 @@
 #include "PhotoModel.h"
 #include "PhotoImporter.h"
 #include "ThumbnailProvider.h"
+#include "AppSettings.h"
+#include "StatsProvider.h"
 
 int main(int argc, char *argv[])
 {
@@ -22,10 +24,12 @@ int main(int argc, char *argv[])
 
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
-    // Database location: ~/.local/share/Picaro/picaro.db
-    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dataDir);
-    QString dbPath = dataDir + QStringLiteral("/picaro.db");
+    // Settings
+    AppSettings settings;
+
+    // Database location from settings (default: ~/.local/share/Picaro/picaro.db)
+    QString dbPath = settings.databasePath();
+    QDir().mkpath(QFileInfo(dbPath).absolutePath());
 
     // Open database
     PhotoDatabase db;
@@ -41,6 +45,9 @@ int main(int argc, char *argv[])
     // Importer
     PhotoImporter importer(&db);
 
+    // Statistics provider
+    StatsProvider statsProvider(&db);
+
     // QML engine
     QQmlApplicationEngine engine;
 
@@ -51,13 +58,15 @@ int main(int argc, char *argv[])
     QQmlContext *ctx = engine.rootContext();
     ctx->setContextProperty(QStringLiteral("photoModel"), &photoModel);
     ctx->setContextProperty(QStringLiteral("photoImporter"), &importer);
+    ctx->setContextProperty(QStringLiteral("appSettings"), &settings);
+    ctx->setContextProperty(QStringLiteral("statsProvider"), &statsProvider);
 
-    // Add reload method to photoModel for QML access
-    // (We connect import finish to model reload)
+    // Reload model and stats after import finishes
     QObject::connect(&importer, &PhotoImporter::importFinished,
-                     [&photoModel, &db](int imported, int /*skipped*/) {
+                     [&photoModel, &db, &statsProvider](int imported, int /*skipped*/) {
         if (imported > 0) {
             photoModel.loadFromDatabase(&db);
+            statsProvider.refresh();
         }
     });
 

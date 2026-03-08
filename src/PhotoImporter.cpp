@@ -183,6 +183,9 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
     // Generate month key for grouping
     record.monthKey = record.dateTaken.toString(QStringLiteral("yyyy-MM"));
 
+    // Classify category (screenshot, selfie, or normal)
+    record.category = classifyCategory(record);
+
     return record;
 }
 
@@ -238,6 +241,42 @@ MediaType PhotoImporter::classifyFile(const QString &filePath) const
         return MediaType::Video;
     }
     return MediaType::Photo;
+}
+
+PhotoCategory PhotoImporter::classifyCategory(const PhotoRecord &record) const
+{
+    if (record.mediaType == MediaType::Video) {
+        return PhotoCategory::Normal;
+    }
+
+    QString nameLower = record.fileName.toLower();
+    QString pathLower = record.filePath.toLower();
+
+    // Screenshot detection:
+    // - Filename patterns: "screenshot", "bildschirmfoto", "captura"
+    // - Path contains "screenshots" folder
+    // - Common Android pattern: "Screenshot_2024..."
+    if (nameLower.contains(QStringLiteral("screenshot"))
+        || nameLower.contains(QStringLiteral("bildschirmfoto"))
+        || nameLower.contains(QStringLiteral("captura"))
+        || nameLower.startsWith(QStringLiteral("screen_"))
+        || pathLower.contains(QStringLiteral("/screenshots/"))
+        || pathLower.contains(QStringLiteral("\\screenshots\\"))) {
+        return PhotoCategory::Screenshot;
+    }
+
+    // Selfie detection:
+    // - Path contains "selfie" or "front camera"
+    // - iPhone naming: files from front camera often in specific folders
+    if (nameLower.contains(QStringLiteral("selfie"))
+        || pathLower.contains(QStringLiteral("/selfies/"))
+        || pathLower.contains(QStringLiteral("\\selfies\\"))
+        || pathLower.contains(QStringLiteral("/front camera/"))
+        || pathLower.contains(QStringLiteral("\\front camera\\"))) {
+        return PhotoCategory::Selfie;
+    }
+
+    return PhotoCategory::Normal;
 }
 
 QString PhotoImporter::findLiveVideo(const QString &photoPath) const

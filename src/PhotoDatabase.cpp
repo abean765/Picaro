@@ -27,6 +27,7 @@ bool PhotoDatabase::open(const QString &path)
 
     configurePragmas();
     createSchema();
+    migrateSchema();
 
     qDebug() << "Database opened:" << path;
     return true;
@@ -35,23 +36,11 @@ bool PhotoDatabase::open(const QString &path)
 void PhotoDatabase::configurePragmas()
 {
     QSqlQuery q(m_db);
-
-    // WAL mode for concurrent reads during import
     q.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
-
-    // Memory-map up to 8 GB for near-instant access from SSD
     q.exec(QStringLiteral("PRAGMA mmap_size=8589934592"));
-
-    // Larger cache: 256 MB worth of pages (64k pages × 4KB)
     q.exec(QStringLiteral("PRAGMA cache_size=-262144"));
-
-    // We trust the SSD + filesystem for durability on import
     q.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
-
-    // Larger page size for blob-heavy workloads (thumbnails)
-    // Only effective on new databases
     q.exec(QStringLiteral("PRAGMA page_size=8192"));
-
     q.exec(QStringLiteral("PRAGMA temp_store=MEMORY"));
 }
 
@@ -70,6 +59,7 @@ void PhotoDatabase::createSchema()
         "  height INTEGER DEFAULT 0,"
         "  file_size INTEGER DEFAULT 0,"
         "  media_type INTEGER DEFAULT 0,"
+        "  category INTEGER DEFAULT 0,"
         "  live_video_path TEXT,"
         "  mime_type TEXT,"
         "  duration REAL DEFAULT 0,"
@@ -81,14 +71,34 @@ void PhotoDatabase::createSchema()
     q.exec(QStringLiteral(
         "CREATE INDEX IF NOT EXISTS idx_photos_date ON photos(date_taken DESC)"
     ));
-
     q.exec(QStringLiteral(
         "CREATE INDEX IF NOT EXISTS idx_photos_month ON photos(month_key)"
     ));
-
     q.exec(QStringLiteral(
         "CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)"
     ));
+    q.exec(QStringLiteral(
+        "CREATE INDEX IF NOT EXISTS idx_photos_category ON photos(category)"
+    ));
+}
+
+void PhotoDatabase::migrateSchema()
+{
+    // Add 'category' column if missing (for databases created before this field existed)
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
+    bool hasCategory = false;
+    while (q.next()) {
+        if (q.value(1).toString() == QStringLiteral("category")) {
+            hasCategory = true;
+            break;
+        }
+    }
+    if (!hasCategory) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN category INTEGER DEFAULT 0"));
+        q.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_photos_category ON photos(category)"));
+        qDebug() << "Migrated: added category column";
+    }
 }
 
 void PhotoDatabase::close()
@@ -124,8 +134,8 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
     q.prepare(QStringLiteral(
         "INSERT OR IGNORE INTO photos "
         "(file_path, file_name, date_taken, date_modified, width, height, "
-        " file_size, media_type, live_video_path, mime_type, duration, month_key, thumbnail) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        " file_size, media_type, category, live_video_path, mime_type, duration, month_key, thumbnail) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ));
 
     q.addBindValue(record.filePath);
@@ -136,6 +146,7 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
     q.addBindValue(record.height);
     q.addBindValue(record.fileSize);
     q.addBindValue(static_cast<int>(record.mediaType));
+    q.addBindValue(static_cast<int>(record.category));
     q.addBindValue(record.liveVideoPath);
     q.addBindValue(record.mimeType);
     q.addBindValue(record.duration);
@@ -172,7 +183,7 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
     QSqlQuery q(m_db);
     q.exec(QStringLiteral(
         "SELECT id, file_path, file_name, date_taken, date_modified, "
-        "       width, height, file_size, media_type, live_video_path, "
+        "       width, height, file_size, media_type, category, live_video_path, "
         "       mime_type, duration, month_key "
         "FROM photos ORDER BY date_taken DESC"
     ));
@@ -188,10 +199,11 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
         r.height = q.value(6).toInt();
         r.fileSize = q.value(7).toLongLong();
         r.mediaType = static_cast<MediaType>(q.value(8).toInt());
-        r.liveVideoPath = q.value(9).toString();
-        r.mimeType = q.value(10).toString();
-        r.duration = q.value(11).toDouble();
-        r.monthKey = q.value(12).toString();
+        r.category = static_cast<PhotoCategory>(q.value(9).toInt());
+        r.liveVideoPath = q.value(10).toString();
+        r.mimeType = q.value(11).toString();
+        r.duration = q.value(12).toDouble();
+        r.monthKey = q.value(13).toString();
         records.append(std::move(r));
     }
 
@@ -206,6 +218,51 @@ int PhotoDatabase::photoCount() const
         return q.value(0).toInt();
     }
     return 0;
+}
+
+PhotoStats PhotoDatabase::loadStats() const
+{
+    PhotoStats stats;
+
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral(
+        "SELECT media_type, category, COUNT(*), COALESCE(SUM(file_size), 0) "
+        "FROM photos GROUP BY media_type, category"
+    ));
+
+    while (q.next()) {
+        auto type = static_cast<MediaType>(q.value(0).toInt());
+        auto cat = static_cast<PhotoCategory>(q.value(1).toInt());
+        int count = q.value(2).toInt();
+        qint64 size = q.value(3).toLongLong();
+
+        stats.totalPhotos += count;
+        stats.totalSizeBytes += size;
+
+        switch (type) {
+        case MediaType::Video:
+            stats.videos += count;
+            break;
+        case MediaType::LivePhoto:
+            stats.livePhotos += count;
+            break;
+        case MediaType::Photo:
+            switch (cat) {
+            case PhotoCategory::Screenshot:
+                stats.screenshots += count;
+                break;
+            case PhotoCategory::Selfie:
+                stats.selfies += count;
+                break;
+            default:
+                stats.normalPhotos += count;
+                break;
+            }
+            break;
+        }
+    }
+
+    return stats;
 }
 
 QByteArray PhotoDatabase::loadThumbnail(qint64 photoId) const

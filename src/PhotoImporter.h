@@ -39,6 +39,7 @@ private:
     QByteArray generateThumbnail(const QString &filePath, MediaType type) const;
     QByteArray imageToJpegBlob(const QImage &img) const;
     MediaType classifyFile(const QString &filePath) const;
+    PhotoCategory classifyCategory(const PhotoRecord &record) const;
     QString findLiveVideo(const QString &photoPath) const;
     QStringList scanDirectory(const QString &path) const;
 
