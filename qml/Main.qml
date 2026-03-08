@@ -25,11 +25,13 @@ ApplicationWindow {
             if (tlIdx >= 0) {
                 timelineView.activeIndex = tlIdx
             }
+            detailPanel.forceActiveFocus()
         }
     }
 
     function closeDetail() {
         selectedPhotoId = -1
+        photoGrid.forceActiveFocus()
     }
 
     RowLayout {
