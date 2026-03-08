@@ -7,7 +7,7 @@ Rectangle {
     id: detailView
     color: "#111111"
 
-    property qint64 photoId: -1
+    property int photoId: -1
 
     signal closed()
     signal navigateNext()

@@ -15,7 +15,7 @@ ApplicationWindow {
     property string currentView: "photos"
 
     // Photo selection state
-    property qint64 selectedPhotoId: -1
+    property int selectedPhotoId: -1
 
     function selectPhoto(photoId) {
         selectedPhotoId = photoId
