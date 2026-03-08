@@ -276,3 +276,25 @@ QByteArray PhotoDatabase::loadThumbnail(qint64 photoId) const
     }
     return {};
 }
+
+QVector<QPair<qint64, QString>> PhotoDatabase::loadVideoFilePaths() const
+{
+    QVector<QPair<qint64, QString>> result;
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral(
+        "SELECT id, file_path FROM photos WHERE media_type = 1"
+    ));
+    while (q.next()) {
+        result.append({q.value(0).toLongLong(), q.value(1).toString()});
+    }
+    return result;
+}
+
+bool PhotoDatabase::updateThumbnail(qint64 photoId, const QByteArray &thumbnail)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("UPDATE photos SET thumbnail = ? WHERE id = ?"));
+    q.addBindValue(thumbnail);
+    q.addBindValue(photoId);
+    return q.exec();
+}

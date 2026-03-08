@@ -25,6 +25,7 @@ public:
     int totalFiles() const { return m_totalFiles; }
 
     Q_INVOKABLE void importDirectory(const QString &path);
+    Q_INVOKABLE void regenerateVideoThumbnails();
     Q_INVOKABLE void cancel();
 
 signals:

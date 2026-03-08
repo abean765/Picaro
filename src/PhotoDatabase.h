@@ -78,6 +78,10 @@ public:
     // Thumbnail access for the image provider
     QByteArray loadThumbnail(qint64 photoId) const;
 
+    // Video thumbnail regeneration
+    QVector<QPair<qint64, QString>> loadVideoFilePaths() const;
+    bool updateThumbnail(qint64 photoId, const QByteArray &thumbnail);
+
 private:
     void createSchema();
     void migrateSchema();

@@ -127,6 +127,57 @@ void PhotoImporter::doImport(const QString &path)
     });
 }
 
+void PhotoImporter::regenerateVideoThumbnails()
+{
+    if (m_running) return;
+
+    m_running = true;
+    m_cancelled = false;
+    m_progress = 0;
+    emit runningChanged();
+
+    QtConcurrent::run([this]() {
+        QElapsedTimer timer;
+        timer.start();
+
+        auto videos = m_db->loadVideoFilePaths();
+        m_totalFiles = videos.size();
+        QMetaObject::invokeMethod(this, [this]() { emit totalFilesChanged(); });
+
+        qDebug() << "Regenerating thumbnails for" << m_totalFiles << "videos";
+
+        int updated = 0;
+
+        for (int i = 0; i < videos.size(); ++i) {
+            if (m_cancelled) break;
+
+            const auto &[id, filePath] = videos[i];
+            QImage frame = m_frameExtractor.grabFrame(filePath, 320);
+            if (!frame.isNull()) {
+                QByteArray blob = imageToJpegBlob(frame);
+                if (!blob.isEmpty()) {
+                    m_db->updateThumbnail(id, blob);
+                    ++updated;
+                }
+            }
+
+            m_progress = i + 1;
+            if (m_progress % 10 == 0 || m_progress == m_totalFiles) {
+                QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
+            }
+        }
+
+        m_running = false;
+        qDebug() << "Thumbnail regeneration finished:" << updated << "of"
+                 << videos.size() << "updated in" << timer.elapsed() << "ms";
+
+        QMetaObject::invokeMethod(this, [this, updated, total = videos.size()]() {
+            emit runningChanged();
+            emit importFinished(updated, static_cast<int>(total) - updated);
+        });
+    });
+}
+
 PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
 {
     QFileInfo fi(filePath);

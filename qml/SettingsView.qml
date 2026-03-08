@@ -124,6 +124,64 @@ Item {
                 }
             }
 
+            // Maintenance section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: maintSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: maintSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Wartung"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Video-Thumbnails aus dem ersten Frame des Videos neu generieren. Nützlich wenn Videos zuvor nur einen grauen Platzhalter hatten."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        spacing: 12
+
+                        Button {
+                            text: photoImporter.running
+                                ? "Wird generiert... (%1/%2)".arg(photoImporter.progress).arg(photoImporter.totalFiles)
+                                : "Video Thumbnails neu generieren"
+                            enabled: !photoImporter.running
+                            onClicked: photoImporter.regenerateVideoThumbnails()
+
+                            background: Rectangle {
+                                color: parent.enabled
+                                    ? (parent.hovered ? "#4a4a4a" : "#3a3a3a")
+                                    : "#2a2a2a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: parent.enabled ? "#ffffff" : "#666666"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 16
+                                rightPadding: 16
+                            }
+                        }
+                    }
+                }
+            }
+
             Item { Layout.fillHeight: true }
         }
     }
