@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtMultimedia
 
 ListView {
     id: gridView
@@ -18,7 +19,6 @@ ListView {
         id: wheelHandler
         target: gridView
         property: "contentY"
-        // Each wheel step scrolls ~300px (3 notches worth)
         rotationScale: -3.0
     }
 
@@ -76,8 +76,14 @@ ListView {
                 model: rowDelegate.rowCells
 
                 Item {
+                    id: cellItem
                     width: (gridView.width - (photoModel.photosPerRow - 1) * 2) / photoModel.photosPerRow
                     height: rowDelegate.cellHeight
+
+                    readonly property bool isVideo: modelData.mediaType === 1
+                    readonly property bool isLivePhoto: modelData.mediaType === 2
+                    readonly property bool hasVideo: isVideo || isLivePhoto
+                    property bool hovered: false
 
                     Image {
                         id: thumbImage
@@ -89,6 +95,7 @@ ListView {
                         sourceSize.width: width
                         sourceSize.height: height
                         cache: true
+                        visible: !videoOutput.visible
 
                         opacity: status === Image.Ready ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 100 } }
@@ -99,12 +106,42 @@ ListView {
                         anchors.fill: parent
                         anchors.margins: 1
                         color: "#2a2a2a"
-                        visible: thumbImage.status !== Image.Ready
+                        visible: thumbImage.status !== Image.Ready && !videoOutput.visible
                     }
 
-                    // Video/Live Photo badge
+                    // Video player overlay (created on hover for videos/live photos)
+                    MediaPlayer {
+                        id: mediaPlayer
+                        videoOutput: videoOutput
+                        loops: cellItem.isLivePhoto ? MediaPlayer.Infinite : 1
+
+                        function startPreview() {
+                            let path = cellItem.isLivePhoto
+                                ? (modelData.liveVideoPath || "")
+                                : (modelData.filePath || "");
+                            if (path === "") return;
+                            source = "file:///" + path;
+                            play();
+                        }
+
+                        function stopPreview() {
+                            stop();
+                            source = "";
+                        }
+                    }
+
+                    VideoOutput {
+                        id: videoOutput
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        fillMode: VideoOutput.PreserveAspectCrop
+                        visible: cellItem.hovered && cellItem.hasVideo
+                                 && mediaPlayer.playbackState === MediaPlayer.PlayingState
+                    }
+
+                    // Video/Live Photo badge (hidden during playback)
                     Rectangle {
-                        visible: modelData.mediaType > 0
+                        visible: modelData.mediaType > 0 && !videoOutput.visible
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 6
@@ -123,8 +160,36 @@ ListView {
                         }
                     }
 
+                    // Hover area with delay to avoid accidental triggers
+                    HoverHandler {
+                        id: hoverHandler
+                    }
+
+                    Timer {
+                        id: hoverTimer
+                        interval: 300
+                        running: hoverHandler.hovered && cellItem.hasVideo
+                        onTriggered: {
+                            cellItem.hovered = true;
+                            mediaPlayer.startPreview();
+                        }
+                    }
+
+                    Connections {
+                        target: hoverHandler
+                        function onHoveredChanged() {
+                            if (!hoverHandler.hovered) {
+                                hoverTimer.stop();
+                                cellItem.hovered = false;
+                                mediaPlayer.stopPreview();
+                            }
+                        }
+                    }
+
                     MouseArea {
                         anchors.fill: parent
+                        // Let HoverHandler handle hover; MouseArea handles clicks
+                        hoverEnabled: false
                         onClicked: {
                             console.log("Clicked photo ID:", modelData.id)
                         }

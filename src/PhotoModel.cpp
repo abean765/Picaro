@@ -39,6 +39,12 @@ QVariant PhotoModel::data(const QModelIndex &index, int role) const
             QVariantMap m;
             m[QStringLiteral("id")] = cell.id;
             m[QStringLiteral("mediaType")] = static_cast<int>(cell.mediaType);
+            m[QStringLiteral("filePath")] = cell.filePath;
+            // Look up liveVideoPath from the full record
+            auto it = m_idToPhotoIndex.constFind(cell.id);
+            if (it != m_idToPhotoIndex.constEnd()) {
+                m[QStringLiteral("liveVideoPath")] = m_allPhotos[it.value()].liveVideoPath;
+            }
             list.append(m);
         }
         return list;
