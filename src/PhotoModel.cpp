@@ -208,6 +208,24 @@ QString PhotoModel::liveVideoPathForId(qint64 id) const
     return {};
 }
 
+qint64 PhotoModel::nextPhotoId(qint64 currentId) const
+{
+    auto it = m_idToPhotoIndex.constFind(currentId);
+    if (it == m_idToPhotoIndex.constEnd()) return -1;
+    int idx = it.value() + 1;
+    if (idx >= m_allPhotos.size()) return -1;
+    return m_allPhotos[idx].id;
+}
+
+qint64 PhotoModel::previousPhotoId(qint64 currentId) const
+{
+    auto it = m_idToPhotoIndex.constFind(currentId);
+    if (it == m_idToPhotoIndex.constEnd()) return -1;
+    int idx = it.value() - 1;
+    if (idx < 0) return -1;
+    return m_allPhotos[idx].id;
+}
+
 void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();

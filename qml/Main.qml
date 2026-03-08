@@ -14,6 +14,17 @@ ApplicationWindow {
     // Navigation state
     property string currentView: "photos"
 
+    // Photo selection state
+    property qint64 selectedPhotoId: -1
+
+    function selectPhoto(photoId) {
+        selectedPhotoId = photoId
+    }
+
+    function closeDetail() {
+        selectedPhotoId = -1
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -175,7 +186,7 @@ ApplicationWindow {
                             : currentView === "overview" ? 1
                             : 2
 
-                // Photos view with timeline
+                // Photos view with timeline + grid + detail
                 Item {
                     RowLayout {
                         anchors.fill: parent
@@ -211,6 +222,33 @@ ApplicationWindow {
                             id: photoGrid
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                        }
+
+                        // Vertical separator
+                        Rectangle {
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 1
+                            color: "#333333"
+                            visible: detailPanel.visible
+                        }
+
+                        // Detail panel (right side)
+                        DetailView {
+                            id: detailPanel
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: parent.width * 0.45
+                            Layout.minimumWidth: 400
+                            visible: root.selectedPhotoId > 0
+                            photoId: root.selectedPhotoId
+                            onClosed: root.closeDetail()
+                            onNavigateNext: {
+                                var nextId = photoModel.nextPhotoId(root.selectedPhotoId)
+                                if (nextId > 0) root.selectedPhotoId = nextId
+                            }
+                            onNavigatePrevious: {
+                                var prevId = photoModel.previousPhotoId(root.selectedPhotoId)
+                                if (prevId > 0) root.selectedPhotoId = prevId
+                            }
                         }
                     }
                 }

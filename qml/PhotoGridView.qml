@@ -85,6 +85,15 @@ ListView {
                     readonly property bool hasVideo: isVideo || isLivePhoto
                     property bool hovered: false
 
+                    // Selection highlight
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "transparent"
+                        border.color: "#4a9eff"
+                        border.width: root.selectedPhotoId === modelData.id ? 3 : 0
+                        z: 2
+                    }
+
                     Image {
                         id: thumbImage
                         anchors.fill: parent
@@ -190,8 +199,9 @@ ListView {
                         anchors.fill: parent
                         // Let HoverHandler handle hover; MouseArea handles clicks
                         hoverEnabled: false
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            console.log("Clicked photo ID:", modelData.id)
+                            root.selectPhoto(modelData.id)
                         }
                     }
                 }

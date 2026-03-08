@@ -82,6 +82,7 @@ qt_add_qml_module(picaro
         qml/Main.qml
         qml/PhotoGridView.qml
         qml/TimelineView.qml
+        qml/DetailView.qml
         qml/OverviewView.qml
         qml/SettingsView.qml
         qml/ImportDialog.qml

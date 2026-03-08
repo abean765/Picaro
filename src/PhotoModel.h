@@ -60,6 +60,8 @@ public:
     Q_INVOKABLE QString filePathForId(qint64 id) const;
     Q_INVOKABLE int mediaTypeForId(qint64 id) const;
     Q_INVOKABLE QString liveVideoPathForId(qint64 id) const;
+    Q_INVOKABLE qint64 nextPhotoId(qint64 currentId) const;
+    Q_INVOKABLE qint64 previousPhotoId(qint64 currentId) const;
 
 signals:
     void photosPerRowChanged();
