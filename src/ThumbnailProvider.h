@@ -2,6 +2,7 @@
 
 #include <QQuickAsyncImageProvider>
 #include <QThreadPool>
+#include <QMutex>
 #include "PhotoDatabase.h"
 
 // Async image provider that loads thumbnails from SQLite on demand.
@@ -15,10 +16,13 @@ public:
     ThumbnailResponse(qint64 photoId, const QSize &requestedSize, PhotoDatabase *db, QThreadPool *pool);
 
     QQuickTextureFactory *textureFactory() const override;
-    void setImage(QImage image);
+
+    // Thread-safe: called from worker thread
+    void handleResult(QImage image);
 
 private:
     QImage m_image;
+    QMutex m_mutex;
 };
 
 class ThumbnailProvider : public QQuickAsyncImageProvider

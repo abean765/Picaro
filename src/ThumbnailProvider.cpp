@@ -14,18 +14,13 @@ public:
 
     void run() override
     {
+        QImage img;
         QByteArray data = m_db->loadThumbnail(m_photoId);
         if (!data.isEmpty()) {
-            QImage img;
             img.loadFromData(data, "JPEG");
-            QMetaObject::invokeMethod(m_response, [this, img = std::move(img)]() mutable {
-                m_response->setImage(std::move(img));
-            });
-        } else {
-            QMetaObject::invokeMethod(m_response, [this]() {
-                m_response->setImage({});
-            });
         }
+        // Thread-safe: mutex protects m_image, emit finished() is safe from any thread
+        m_response->handleResult(std::move(img));
     }
 
 private:
@@ -39,18 +34,23 @@ private:
 ThumbnailResponse::ThumbnailResponse(qint64 photoId, const QSize &requestedSize,
                                      PhotoDatabase *db, QThreadPool *pool)
 {
+    Q_UNUSED(requestedSize);
     auto *runnable = new ThumbnailRunnable(photoId, db, this);
     pool->start(runnable);
 }
 
-void ThumbnailResponse::setImage(QImage image)
+void ThumbnailResponse::handleResult(QImage image)
 {
-    m_image = std::move(image);
+    {
+        QMutexLocker lock(&m_mutex);
+        m_image = std::move(image);
+    }
     emit finished();
 }
 
 QQuickTextureFactory *ThumbnailResponse::textureFactory() const
 {
+    QMutexLocker lock(&m_mutex);
     return QQuickTextureFactory::textureFactoryForImage(m_image);
 }
 
@@ -59,7 +59,6 @@ QQuickTextureFactory *ThumbnailResponse::textureFactory() const
 ThumbnailProvider::ThumbnailProvider(PhotoDatabase *db)
     : m_db(db)
 {
-    // Limit threads to avoid overwhelming SQLite
     m_pool.setMaxThreadCount(4);
 }
 
