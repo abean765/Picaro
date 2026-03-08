@@ -21,7 +21,11 @@
 ```bash
 sudo apt install build-essential cmake \
   qt6-declarative-dev qt6-multimedia-dev libqt6sql6-sqlite \
-  libgl-dev
+  libgl-dev \
+  qml6-module-qtquick-controls qml6-module-qtquick-layouts \
+  qml6-module-qtquick-templates qml6-module-qtquick-dialogs \
+  qml6-module-qtqml-workerscript qml6-module-qtmultimedia \
+  qml6-module-qt5compat-graphicaleffects
 
 # Optional
 sudo apt install libheif-dev libexiv2-dev

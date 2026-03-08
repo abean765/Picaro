@@ -93,7 +93,7 @@ ListView {
                     Rectangle {
                         anchors.fill: parent
                         color: "transparent"
-                        border.color: "#4a9eff"
+                        border.color: root.accentColor
                         border.width: root.selectedPhotoId === modelData.id ? 3 : 0
                         z: 2
                     }

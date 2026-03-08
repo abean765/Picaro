@@ -5,12 +5,14 @@
 #include <QString>
 #include <QStandardPaths>
 #include <QDir>
+#include <QColor>
 
 class AppSettings : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString databasePath READ databasePath WRITE setDatabasePath NOTIFY databasePathChanged)
     Q_PROPERTY(QString defaultDatabasePath READ defaultDatabasePath CONSTANT)
+    Q_PROPERTY(QColor accentColor READ accentColor WRITE setAccentColor NOTIFY accentColorChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -47,8 +49,32 @@ public:
         emit databasePathChanged();
     }
 
+    QColor accentColor() const
+    {
+        return QColor(m_settings.value(
+            QStringLiteral("appearance/accentColor"),
+            QStringLiteral("#4a9eff")
+        ).toString());
+    }
+
+    void setAccentColor(const QColor &color)
+    {
+        if (color == accentColor()) return;
+        m_settings.setValue(QStringLiteral("appearance/accentColor"), color.name());
+        m_settings.sync();
+        emit accentColorChanged();
+    }
+
+    Q_INVOKABLE void resetAccentColor()
+    {
+        m_settings.remove(QStringLiteral("appearance/accentColor"));
+        m_settings.sync();
+        emit accentColorChanged();
+    }
+
 signals:
     void databasePathChanged();
+    void accentColorChanged();
 
 private:
     QSettings m_settings;

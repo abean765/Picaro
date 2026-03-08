@@ -101,7 +101,7 @@ Rectangle {
                     anchors.leftMargin: 4
                     anchors.rightMargin: 4
                     radius: 4
-                    color: monthDelegate.isActive ? "#2a4a7a" : (monthMouse.containsMouse ? "#2a2a2a" : "transparent")
+                    color: monthDelegate.isActive ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.25) : (monthMouse.containsMouse ? "#2a2a2a" : "transparent")
                 }
 
                 // Vertical connector line (between months)
@@ -123,7 +123,7 @@ Rectangle {
                     width: monthDelegate.isActive ? 8 : 6
                     height: width
                     radius: width / 2
-                    color: monthDelegate.isActive ? "#4a9eff" : "#555555"
+                    color: monthDelegate.isActive ? root.accentColor : "#555555"
                 }
 
                 // Month abbreviation
@@ -133,7 +133,7 @@ Rectangle {
                     anchors.leftMargin: 6
                     anchors.verticalCenter: parent.verticalCenter
                     text: monthDelegate.modelData.label
-                    color: monthDelegate.isActive ? "#4a9eff" : "#999999"
+                    color: monthDelegate.isActive ? root.accentColor : "#999999"
                     font.pixelSize: 12
                     font.bold: monthDelegate.isActive
                 }
@@ -145,7 +145,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     height: 4
                     radius: 2
-                    color: monthDelegate.isActive ? "#4a9eff" : "#444444"
+                    color: monthDelegate.isActive ? root.accentColor : "#444444"
                     width: {
                         var maxBarWidth = timeline.width - monthDot.width - monthLabel.implicitWidth - 28
                         var ratio = monthDelegate.modelData.count / photoModel.timelineMaxCount

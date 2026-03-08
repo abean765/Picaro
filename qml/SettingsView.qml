@@ -23,6 +23,147 @@ Item {
                 font.bold: true
             }
 
+            // Appearance section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: colorSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: colorSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Aussehen"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Akzentfarbe für Buttons, Auswahl-Rahmen und aktive Elemente."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    // Color preset grid
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Repeater {
+                            model: [
+                                "#4a9eff", "#3b82f6", "#6366f1", "#8b5cf6",
+                                "#a855f7", "#d946ef", "#ec4899", "#f43f5e",
+                                "#ef4444", "#f97316", "#eab308", "#22c55e",
+                                "#14b8a6", "#06b6d4", "#0ea5e9", "#64748b"
+                            ]
+
+                            Rectangle {
+                                required property string modelData
+                                required property int index
+                                width: 36
+                                height: 36
+                                radius: 18
+                                color: modelData
+                                border.color: Qt.colorEqual(appSettings.accentColor, modelData) ? "#ffffff" : "transparent"
+                                border.width: 3
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: 16
+                                    height: 16
+                                    radius: 8
+                                    color: "#ffffff"
+                                    visible: Qt.colorEqual(appSettings.accentColor, parent.modelData)
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: appSettings.accentColor = parent.modelData
+                                }
+                            }
+                        }
+                    }
+
+                    // Custom color input
+                    RowLayout {
+                        spacing: 8
+
+                        Label {
+                            text: "Eigene Farbe:"
+                            color: "#cccccc"
+                            font.pixelSize: 13
+                        }
+
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: 14
+                            color: appSettings.accentColor
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: colorDialog.open()
+                            }
+                        }
+
+                        Rectangle {
+                            implicitWidth: 90
+                            implicitHeight: 28
+                            color: "#1e1e1e"
+                            border.color: "#444444"
+                            border.width: 1
+                            radius: 4
+
+                            TextInput {
+                                id: hexInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                verticalAlignment: Text.AlignVCenter
+                                color: "#cccccc"
+                                font.pixelSize: 13
+                                text: appSettings.accentColor.toString().toUpperCase()
+                                maximumLength: 7
+                                validator: RegularExpressionValidator { regularExpression: /^#[0-9A-Fa-f]{0,6}$/ }
+                                onAccepted: {
+                                    if (text.length === 7) {
+                                        appSettings.accentColor = text
+                                    }
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Standard"
+                            onClicked: appSettings.resetAccentColor()
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#333333"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#aaaaaa"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 12
+                                rightPadding: 12
+                            }
+                        }
+                    }
+                }
+            }
+
             // Database section
             Rectangle {
                 Layout.fillWidth: true
@@ -184,6 +325,13 @@ Item {
 
             Item { Layout.fillHeight: true }
         }
+    }
+
+    ColorDialog {
+        id: colorDialog
+        title: "Akzentfarbe wählen"
+        selectedColor: appSettings.accentColor
+        onAccepted: appSettings.accentColor = selectedColor
     }
 
     FileDialog {

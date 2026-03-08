@@ -14,6 +14,21 @@ ApplicationWindow {
     // Navigation state
     property string currentView: "photos"
 
+    // Accent color from settings
+    property color accentColor: appSettings.accentColor
+
+    Connections {
+        target: appSettings
+        function onAccentColorChanged() {
+            root.accentColor = appSettings.accentColor
+        }
+    }
+
+    // Derive darker variant for button backgrounds
+    function darkenColor(c, factor) {
+        return Qt.darker(c, factor)
+    }
+
     // Photo selection state
     property int selectedPhotoId: -1
 
@@ -84,7 +99,7 @@ ApplicationWindow {
                     Layout.rightMargin: 8
                     Layout.bottomMargin: 8
                     implicitHeight: 36
-                    color: importBtnArea.containsMouse ? "#3a6abf" : "#2d5aa0"
+                    color: importBtnArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : Qt.darker(root.accentColor, 1.5)
                     radius: 6
 
                     Label {
@@ -128,7 +143,7 @@ ApplicationWindow {
                     width: photoImporter.totalFiles > 0
                            ? parent.width * (photoImporter.progress / photoImporter.totalFiles)
                            : 0
-                    color: "#4a9eff"
+                    color: root.accentColor
                     Behavior on width { NumberAnimation { duration: 100 } }
                 }
 
@@ -298,7 +313,7 @@ ApplicationWindow {
                         anchors.bottom: parent.bottom
                         x: photoGrid.x + photoGrid.width - 3
                         width: 6
-                        color: splitterMouse.containsMouse || splitterMouse.pressed ? "#4a9eff" : "#333333"
+                        color: splitterMouse.containsMouse || splitterMouse.pressed ? root.accentColor : "#333333"
                         z: 10
 
                         Behavior on color { ColorAnimation { duration: 150 } }
@@ -393,7 +408,7 @@ ApplicationWindow {
 
             Label {
                 text: sidebarBtn.icon
-                color: sidebarBtn.active ? "#4a9eff" : "#888888"
+                color: sidebarBtn.active ? root.accentColor : "#888888"
                 font.pixelSize: 16
             }
 

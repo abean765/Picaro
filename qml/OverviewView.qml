@@ -41,7 +41,7 @@ Item {
                     title: "Fotos"
                     value: statsProvider.normalPhotos
                     icon: "🖼"
-                    accentColor: "#4a9eff"
+                    accentColor: root.accentColor
                 }
 
                 StatCard {
