@@ -189,14 +189,18 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
     return record;
 }
 
-QByteArray PhotoImporter::generateThumbnail(const QString &filePath, MediaType type) const
+QByteArray PhotoImporter::generateThumbnail(const QString &filePath, MediaType type)
 {
     QImage thumb;
     const int thumbSize = 320;
 
     if (type == MediaType::Video) {
-        thumb = QImage(thumbSize, thumbSize, QImage::Format_RGB32);
-        thumb.fill(QColor(60, 60, 60));
+        thumb = m_frameExtractor.grabFrame(filePath, thumbSize);
+        if (thumb.isNull()) {
+            // Fallback: gray placeholder if frame extraction fails
+            thumb = QImage(thumbSize, thumbSize, QImage::Format_RGB32);
+            thumb.fill(QColor(60, 60, 60));
+        }
     } else if (HeicImageReader::isHeicFile(filePath)) {
         thumb = HeicImageReader::readHeicThumbnail(filePath);
         if (thumb.isNull()) {

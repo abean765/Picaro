@@ -142,20 +142,20 @@ ListView {
                     // Video/Live Photo badge (hidden during playback)
                     Rectangle {
                         visible: modelData.mediaType > 0 && !videoOutput.visible
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.margins: 6
-                        width: badge.width + 8
-                        height: 20
-                        radius: 4
-                        color: "#80000000"
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.margins: 8
+                        width: badge.implicitWidth + 14
+                        height: badge.implicitHeight + 8
+                        radius: 6
+                        color: "#90000000"
 
                         Label {
                             id: badge
                             anchors.centerIn: parent
                             text: modelData.mediaType === 2 ? "LIVE" : "\u25B6"
                             color: "#ffffff"
-                            font.pixelSize: 10
+                            font.pixelSize: 16
                             font.bold: true
                         }
                     }

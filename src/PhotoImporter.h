@@ -4,6 +4,7 @@
 #include <QString>
 #include <QStringList>
 #include "PhotoDatabase.h"
+#include "VideoFrameExtractor.h"
 
 // Async photo importer that scans a directory, reads metadata,
 // generates thumbnails, and inserts into the database.
@@ -36,7 +37,7 @@ signals:
 private:
     void doImport(const QString &path);
     PhotoRecord extractMetadata(const QString &filePath) const;
-    QByteArray generateThumbnail(const QString &filePath, MediaType type) const;
+    QByteArray generateThumbnail(const QString &filePath, MediaType type);
     QByteArray imageToJpegBlob(const QImage &img) const;
     MediaType classifyFile(const QString &filePath) const;
     PhotoCategory classifyCategory(const PhotoRecord &record) const;
@@ -44,6 +45,7 @@ private:
     QStringList scanDirectory(const QString &path) const;
 
     PhotoDatabase *m_db;
+    VideoFrameExtractor m_frameExtractor;
     bool m_running = false;
     bool m_cancelled = false;
     int m_progress = 0;

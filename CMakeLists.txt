@@ -69,6 +69,8 @@ qt_add_executable(picaro
     src/ThumbnailProvider.cpp
     src/HeicImageReader.h
     src/HeicImageReader.cpp
+    src/VideoFrameExtractor.h
+    src/VideoFrameExtractor.cpp
     src/AppSettings.h
     src/StatsProvider.h
 )
