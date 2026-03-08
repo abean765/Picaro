@@ -103,9 +103,11 @@ Rectangle {
     }
 
     // Video/LivePhoto player
+    AudioOutput { id: detailAudio }
     MediaPlayer {
         id: detailPlayer
         videoOutput: detailVideoOutput
+        audioOutput: detailAudio
         loops: 1
         onSourceChanged: {
             if (source.toString() !== "") {
