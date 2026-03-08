@@ -1,0 +1,32 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+
+# Qt Creator files
+*.user
+*.user.*
+CMakeLists.txt.user
+
+# Compiled objects
+*.o
+*.obj
+*.moc
+moc_*.cpp
+qrc_*.cpp
+
+# Generated
+*.qmlc
+*.jsc
+.qmake.stash
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
