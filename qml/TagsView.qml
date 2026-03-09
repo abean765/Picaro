@@ -379,6 +379,33 @@ Item {
                         font.pixelSize: 12
                     }
 
+                    // Send button
+                    Rectangle {
+                        implicitWidth: 28
+                        implicitHeight: 28
+                        radius: 4
+                        color: sendTagArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "transparent"
+                        visible: tagItemArea.containsMouse && photoCount > 0
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "\u{1F4E4}"
+                            font.pixelSize: 14
+                        }
+                        MouseArea {
+                            id: sendTagArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                var ids = tagModel.photoIdsForTag(tagId)
+                                if (ids.length > 0) {
+                                    sendSheet.openMultiple(ids)
+                                }
+                            }
+                        }
+                    }
+
                     // Edit button
                     Rectangle {
                         implicitWidth: 28

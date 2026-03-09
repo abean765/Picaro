@@ -126,3 +126,15 @@ QString TagModel::tagIcon(qint64 tagId) const
     }
     return {};
 }
+
+QVariantList TagModel::photoIdsForTag(qint64 tagId) const
+{
+    QVariantList result;
+    if (!m_db) return result;
+
+    const auto ids = m_db->photoIdsForTag(tagId);
+    for (qint64 id : ids) {
+        result.append(id);
+    }
+    return result;
+}

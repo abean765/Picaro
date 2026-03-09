@@ -38,6 +38,7 @@ struct PhotoRecord {
     bool hasExif = false;
     bool hasGeolocation = false;
     QString owner;  // empty = own photo, otherwise sender name
+    QString phash;  // perceptual hash (dHash, 16 hex chars = 64 bits)
 };
 
 struct PhotoStats {
@@ -114,6 +115,10 @@ public:
     QVector<qint64> tagsForPhoto(qint64 photoId) const;
     bool addTagToPhoto(qint64 photoId, qint64 tagId);
     bool removeTagFromPhoto(qint64 photoId, qint64 tagId);
+
+    // Perceptual hashing for duplicate detection
+    QStringList loadAllHashes() const;
+    QVector<qint64> photoIdsForTag(qint64 tagId) const;
 
 private:
     void createSchema();

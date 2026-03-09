@@ -169,6 +169,18 @@ void PhotoDatabase::migrateSchema()
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN owner TEXT DEFAULT ''"));
         qDebug() << "Migrated: added owner column";
     }
+
+    // Check for phash column
+    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
+    bool hasPhash = false;
+    while (q.next()) {
+        if (q.value(1).toString() == QStringLiteral("phash")) hasPhash = true;
+    }
+    if (!hasPhash) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN phash TEXT DEFAULT ''"));
+        q.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_photos_phash ON photos(phash)"));
+        qDebug() << "Migrated: added phash column with index";
+    }
 }
 
 void PhotoDatabase::close()
@@ -205,8 +217,8 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
         "INSERT OR IGNORE INTO photos "
         "(file_path, file_name, date_taken, date_modified, width, height, "
         " file_size, media_type, category, live_video_path, mime_type, duration, month_key, thumbnail, "
-        " has_exif, has_geolocation, owner) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        " has_exif, has_geolocation, owner, phash) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ));
 
     q.addBindValue(record.filePath);
@@ -226,6 +238,7 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
     q.addBindValue(record.hasExif ? 1 : 0);
     q.addBindValue(record.hasGeolocation ? 1 : 0);
     q.addBindValue(record.owner);
+    q.addBindValue(record.phash);
 
     if (!q.exec()) {
         qWarning() << "Insert failed:" << q.lastError().text();
@@ -250,7 +263,7 @@ std::optional<PhotoRecord> PhotoDatabase::loadRecord(qint64 photoId) const
     q.prepare(QStringLiteral(
         "SELECT id, file_path, file_name, date_taken, date_modified, "
         "       width, height, file_size, media_type, category, live_video_path, "
-        "       mime_type, duration, month_key "
+        "       mime_type, duration, month_key, phash "
         "FROM photos WHERE id = ?"
     ));
     q.addBindValue(photoId);
@@ -273,6 +286,7 @@ std::optional<PhotoRecord> PhotoDatabase::loadRecord(qint64 photoId) const
     r.mimeType = q.value(11).toString();
     r.duration = q.value(12).toDouble();
     r.monthKey = q.value(13).toString();
+    r.phash = q.value(14).toString();
     return r;
 }
 
@@ -563,4 +577,31 @@ bool PhotoDatabase::removeTagFromPhoto(qint64 photoId, qint64 tagId)
     q.addBindValue(photoId);
     q.addBindValue(tagId);
     return q.exec();
+}
+
+QStringList PhotoDatabase::loadAllHashes() const
+{
+    QStringList hashes;
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral("SELECT phash FROM photos WHERE deleted = 0 AND phash != ''"));
+    while (q.next()) {
+        hashes.append(q.value(0).toString());
+    }
+    return hashes;
+}
+
+QVector<qint64> PhotoDatabase::photoIdsForTag(qint64 tagId) const
+{
+    QVector<qint64> ids;
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT photo_id FROM photo_tags WHERE tag_id = ?"
+    ));
+    q.addBindValue(tagId);
+    if (q.exec()) {
+        while (q.next()) {
+            ids.append(q.value(0).toLongLong());
+        }
+    }
+    return ids;
 }

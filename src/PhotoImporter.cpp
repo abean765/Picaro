@@ -209,6 +209,19 @@ void PhotoImporter::doImport(const QString &path)
                 result.record = extractMetadata(filePath);
                 result.thumbnail = generateThumbnail(filePath, result.record.mediaType);
 
+                // Compute perceptual hash for duplicate detection (photos only)
+                if (result.record.mediaType != MediaType::Video) {
+                    QImageReader hashReader(filePath);
+                    hashReader.setAutoTransform(true);
+                    QSize origSize = hashReader.size();
+                    if (origSize.isValid()) {
+                        // Read at reduced size for speed
+                        hashReader.setScaledSize(origSize.scaled(64, 64, Qt::KeepAspectRatio));
+                    }
+                    QImage hashImg = hashReader.read();
+                    result.record.phash = computeDHash(hashImg);
+                }
+
                 QMutexLocker lock(&m_queueMutex);
                 m_resultQueue.enqueue(std::move(result));
                 m_queueCondition.wakeOne();
@@ -458,6 +471,30 @@ QByteArray PhotoImporter::imageToJpegBlob(const QImage &img) const
     buffer.open(QIODevice::WriteOnly);
     img.save(&buffer, "JPEG", 80);
     return data;
+}
+
+QString PhotoImporter::computeDHash(const QImage &img)
+{
+    if (img.isNull())
+        return {};
+
+    // Difference Hash: resize to 9x8 grayscale, compare adjacent horizontal pixels
+    QImage small = img.scaled(9, 8, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                      .convertToFormat(QImage::Format_Grayscale8);
+
+    quint64 hash = 0;
+    int bit = 0;
+    for (int y = 0; y < 8; ++y) {
+        const uchar *row = small.constScanLine(y);
+        for (int x = 0; x < 8; ++x) {
+            if (row[x] < row[x + 1]) {
+                hash |= (static_cast<quint64>(1) << bit);
+            }
+            ++bit;
+        }
+    }
+
+    return QStringLiteral("%1").arg(hash, 16, 16, QLatin1Char('0'));
 }
 
 MediaType PhotoImporter::classifyFile(const QString &filePath) const

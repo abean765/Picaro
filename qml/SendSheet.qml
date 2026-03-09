@@ -8,14 +8,21 @@ Rectangle {
     color: "#cc000000"
     visible: false
 
-    property int photoId: -1
+    property var photoIds: []
 
     signal closed()
 
     function open(pid) {
-        photoId = pid
+        photoIds = [pid]
         visible = true
-        // Ensure discovery is running
+        if (!networkManager.discoveryActive) {
+            networkManager.startDiscovery(appSettings.computerName)
+        }
+    }
+
+    function openMultiple(ids) {
+        photoIds = ids
+        visible = true
         if (!networkManager.discoveryActive) {
             networkManager.startDiscovery(appSettings.computerName)
         }
@@ -62,7 +69,9 @@ Rectangle {
                     font.pixelSize: 20
                 }
                 Label {
-                    text: "Foto senden"
+                    text: sendSheet.photoIds.length === 1
+                        ? "Foto senden"
+                        : sendSheet.photoIds.length + " Medien senden"
                     color: "#ffffff"
                     font.pixelSize: 20
                     font.bold: true
@@ -236,7 +245,7 @@ Rectangle {
                                     onClicked: {
                                         networkManager.sendPhotos(
                                             peerAddress, peerPort,
-                                            [sendSheet.photoId],
+                                            sendSheet.photoIds,
                                             appSettings.computerName
                                         )
                                     }

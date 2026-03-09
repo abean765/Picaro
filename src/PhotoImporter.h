@@ -52,6 +52,7 @@ private:
     PhotoRecord extractMetadata(const QString &filePath) const;
     QByteArray generateThumbnail(const QString &filePath, MediaType type);
     QByteArray imageToJpegBlob(const QImage &img) const;
+    static QString computeDHash(const QImage &img);
     MediaType classifyFile(const QString &filePath) const;
     PhotoCategory classifyCategory(const PhotoRecord &record) const;
     QString findLiveVideo(const QString &photoPath) const;

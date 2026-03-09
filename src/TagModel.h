@@ -37,6 +37,9 @@ public:
     Q_INVOKABLE bool addTagToPhoto(qint64 photoId, qint64 tagId);
     Q_INVOKABLE bool removeTagFromPhoto(qint64 photoId, qint64 tagId);
 
+    // Get all photo IDs for a tag (for bulk operations like sending)
+    Q_INVOKABLE QVariantList photoIdsForTag(qint64 tagId) const;
+
     // Lookup helpers for QML
     Q_INVOKABLE QString tagName(qint64 tagId) const;
     Q_INVOKABLE QString tagColor(qint64 tagId) const;

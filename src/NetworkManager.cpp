@@ -3,6 +3,7 @@
 #include <QDataStream>
 #include <QImageReader>
 #include <QBuffer>
+#include <QSet>
 
 NetworkManager::NetworkManager(PhotoDatabase *db, QObject *parent)
     : QObject(parent)
@@ -238,16 +239,11 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
     auto *socket = new QTcpSocket(this);
 
     connect(socket, &QTcpSocket::connected, this, [=]() {
-        // Send transfer request header
-        QJsonObject header;
-        header[QStringLiteral("type")] = QStringLiteral("transfer_request");
-        header[QStringLiteral("sender")] = senderName;
-        header[QStringLiteral("fileCount")] = static_cast<int>(photoIds.size());
-
         // Gather file info via loadRecord
-        qint64 totalSz = 0;
-        struct FileEntry { QString path; QString name; qint64 size; };
+        struct FileEntry { QString path; QString name; qint64 size; QString hash; };
         QVector<FileEntry> entries;
+        QJsonArray hashArray;
+        qint64 totalSz = 0;
 
         for (const auto &idVar : photoIds) {
             qint64 id = idVar.toLongLong();
@@ -257,12 +253,20 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
                 e.path = rec->filePath;
                 e.name = rec->fileName;
                 e.size = rec->fileSize;
+                e.hash = rec->phash;
                 totalSz += e.size;
                 entries.append(e);
+                hashArray.append(e.hash);
             }
         }
 
+        // Send transfer request header with hashes for dedup
+        QJsonObject header;
+        header[QStringLiteral("type")] = QStringLiteral("transfer_request");
+        header[QStringLiteral("sender")] = senderName;
+        header[QStringLiteral("fileCount")] = static_cast<int>(entries.size());
         header[QStringLiteral("totalSize")] = totalSz;
+        header[QStringLiteral("hashes")] = hashArray;
         QByteArray headerData = QJsonDocument(header).toJson(QJsonDocument::Compact);
 
         // Write: [4 bytes header length][header json]
@@ -281,7 +285,6 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
             QByteArray allData = socket->readAll();
             QJsonDocument respDoc = QJsonDocument::fromJson(allData.mid(4));
             if (respDoc.isNull()) {
-                // Try without length prefix
                 respDoc = QJsonDocument::fromJson(allData);
             }
 
@@ -315,19 +318,57 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
             // Disconnect readyRead to avoid re-entry
             disconnect(socket, &QTcpSocket::readyRead, this, nullptr);
 
+            // Collect existing hashes from receiver to skip duplicates
+            QSet<QString> existingHashes;
+            const QJsonArray existArr = resp.value(QStringLiteral("existingHashes")).toArray();
+            for (const auto &h : existArr) {
+                QString hs = h.toString();
+                if (!hs.isEmpty())
+                    existingHashes.insert(hs);
+            }
+
+            // Filter out entries whose hash is already on the receiver
+            QVector<FileEntry> toSend;
+            for (const auto &entry : entries) {
+                if (entry.hash.isEmpty() || !existingHashes.contains(entry.hash)) {
+                    toSend.append(entry);
+                }
+            }
+
+            int skipped = entries.size() - toSend.size();
+            if (skipped > 0)
+                qDebug() << "Skipping" << skipped << "duplicate files";
+
+            m_sendTotal = toSend.size();
+            emit sendTotalChanged();
+
+            // Send actual file count to receiver
+            {
+                QJsonObject countMsg;
+                countMsg[QStringLiteral("type")] = QStringLiteral("file_count");
+                countMsg[QStringLiteral("count")] = static_cast<int>(toSend.size());
+                QByteArray countData = QJsonDocument(countMsg).toJson(QJsonDocument::Compact);
+                QDataStream cs(socket);
+                cs.setByteOrder(QDataStream::BigEndian);
+                cs << static_cast<quint32>(countData.size());
+                socket->write(countData);
+                socket->flush();
+            }
+
             // Send files one by one
             int sent = 0;
-            for (const auto &entry : entries) {
+            for (const auto &entry : toSend) {
                 QFile file(entry.path);
                 if (!file.open(QIODevice::ReadOnly)) {
                     qWarning() << "Cannot open file for sending:" << entry.path;
                     continue;
                 }
 
-                // File header: [4 bytes json length][json with name, size]
+                // File header: [4 bytes json length][json with name, size, hash]
                 QJsonObject fh;
                 fh[QStringLiteral("name")] = entry.name;
                 fh[QStringLiteral("size")] = entry.size;
+                fh[QStringLiteral("hash")] = entry.hash;
                 QByteArray fhData = QJsonDocument(fh).toJson(QJsonDocument::Compact);
 
                 QDataStream fs(socket);
@@ -353,7 +394,10 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
 
             m_sending = false;
             emit sendingChanged();
-            emit sendFinished(true, QStringLiteral("%1 Dateien gesendet").arg(sent));
+            QString msg = QStringLiteral("%1 Dateien gesendet").arg(sent);
+            if (skipped > 0)
+                msg += QStringLiteral(", %1 Duplikate übersprungen").arg(skipped);
+            emit sendFinished(true, msg);
             socket->disconnectFromHost();
             socket->deleteLater();
         });
@@ -447,9 +491,18 @@ void NetworkManager::acceptTransfer(const QString &receiveFolder)
     if (!m_pendingTransferSocket)
         return;
 
-    // Send accept response
+    // Send accept response with existing hashes for dedup
     QJsonObject resp;
     resp[QStringLiteral("type")] = QStringLiteral("accept");
+
+    // Include local hashes so sender can skip duplicates
+    QStringList localHashes = m_db->loadAllHashes();
+    QJsonArray existArr;
+    for (const auto &h : localHashes) {
+        existArr.append(h);
+    }
+    resp[QStringLiteral("existingHashes")] = existArr;
+
     QByteArray respData = QJsonDocument(resp).toJson(QJsonDocument::Compact);
 
     QDataStream stream(m_pendingTransferSocket);
@@ -497,7 +550,6 @@ void NetworkManager::rejectTransfer()
 void NetworkManager::receiveFiles(QTcpSocket *socket)
 {
     QString senderName = m_incomingSender;
-    int totalFiles = m_incomingFileCount;
     int received = 0;
 
     // Use a sequential read approach
@@ -510,6 +562,31 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
         }
         return result;
     };
+
+    // Read actual file count (after dedup on sender side)
+    int totalFiles = m_incomingFileCount;
+    {
+        QByteArray lenBuf = readExact(4);
+        if (lenBuf.size() == 4) {
+            QDataStream ls(lenBuf);
+            ls.setByteOrder(QDataStream::BigEndian);
+            quint32 msgLen;
+            ls >> msgLen;
+            if (msgLen <= 1024 * 1024) {
+                QByteArray msgData = readExact(msgLen);
+                QJsonDocument msgDoc = QJsonDocument::fromJson(msgData);
+                if (!msgDoc.isNull() && msgDoc.isObject()) {
+                    QJsonObject msg = msgDoc.object();
+                    if (msg.value(QStringLiteral("type")).toString() == QStringLiteral("file_count")) {
+                        totalFiles = msg.value(QStringLiteral("count")).toInt();
+                    }
+                }
+            }
+        }
+    }
+
+    m_receiveTotal = totalFiles;
+    emit receiveTotalChanged();
 
     for (int i = 0; i < totalFiles; ++i) {
         // Read file header length (4 bytes)
@@ -534,6 +611,7 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
         QJsonObject fh = fhDoc.object();
         QString fileName = fh.value(QStringLiteral("name")).toString();
         qint64 fileSize = fh.value(QStringLiteral("size")).toVariant().toLongLong();
+        QString fileHash = fh.value(QStringLiteral("hash")).toString();
 
         // Avoid overwriting: add suffix if file exists
         QString destPath = m_receiveFolder + QStringLiteral("/") + fileName;
@@ -579,6 +657,7 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
         record.fileSize = destInfo.size();
         record.monthKey = record.dateTaken.toString(QStringLiteral("yyyy-MM"));
         record.owner = senderName;
+        record.phash = fileHash;
 
         // Detect media type from extension
         QString ext = destInfo.suffix().toLower();
