@@ -6,9 +6,11 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QColor>
+#include <QVariantMap>
 #include <QTemporaryDir>
 #include <QFile>
 #include <QtMath>
+#include "GpuHeicDecoder.h"
 
 class AppSettings : public QObject
 {
@@ -127,6 +129,20 @@ public:
 
         f.close();
         return path;
+    }
+
+    Q_INVOKABLE QVariantMap testGpuHeicDecode()
+    {
+        QVariantMap result;
+        result[QStringLiteral("available")] = GpuHeicDecoder::isAvailable();
+
+#ifdef HAVE_FFMPEG_HW
+        result[QStringLiteral("compiled")] = true;
+#else
+        result[QStringLiteral("compiled")] = false;
+#endif
+
+        return result;
     }
 
 signals:

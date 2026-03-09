@@ -394,6 +394,100 @@ Item {
                 }
             }
 
+            // GPU HEIC Import section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: gpuSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: gpuSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "GPU HEIC Import"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Prüfe ob GPU-beschleunigtes Dekodieren von HEIC/HEIF-Bildern " +
+                              "(via NVDEC, VAAPI oder VideoToolbox) auf diesem System verfügbar ist."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        spacing: 12
+
+                        Button {
+                            text: "Test HEIC GPU Import"
+                            onClicked: {
+                                var result = appSettings.testGpuHeicDecode()
+                                gpuResultLabel.visible = true
+                                if (!result.compiled) {
+                                    gpuResultIcon.text = "\u26A0"
+                                    gpuResultIcon.color = "#ffaa00"
+                                    gpuResultText.text = "Nicht kompiliert: FFmpeg HW-Beschleunigung " +
+                                                         "wurde beim Build nicht aktiviert (HAVE_FFMPEG_HW=OFF)."
+                                    gpuResultText.color = "#ffaa00"
+                                } else if (result.available) {
+                                    gpuResultIcon.text = "\u2713"
+                                    gpuResultIcon.color = "#22c55e"
+                                    gpuResultText.text = "GPU HEIC-Dekodierung ist verfügbar und aktiv."
+                                    gpuResultText.color = "#22c55e"
+                                } else {
+                                    gpuResultIcon.text = "\u2717"
+                                    gpuResultIcon.color = "#ef4444"
+                                    gpuResultText.text = "Keine GPU-Beschleunigung gefunden. " +
+                                                         "HEIC-Import verwendet Software-Dekodierung (libheif)."
+                                    gpuResultText.color = "#ef4444"
+                                }
+                            }
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#ffffff"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 16
+                                rightPadding: 16
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        id: gpuResultLabel
+                        visible: false
+                        spacing: 8
+
+                        Label {
+                            id: gpuResultIcon
+                            font.pixelSize: 18
+                            font.bold: true
+                        }
+
+                        Label {
+                            id: gpuResultText
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+            }
+
             Item { Layout.fillHeight: true }
         }
     }
