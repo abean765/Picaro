@@ -1,5 +1,7 @@
 #include "ThumbnailProvider.h"
 #include <QImage>
+#include <QMetaObject>
+#include <QPointer>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QThread>
@@ -65,41 +67,22 @@ static QByteArray loadThumbnailFromDb(const QString &dbPath, qint64 photoId)
 
 // -- ThumbnailResponse --
 
-ThumbnailResponse::ThumbnailResponse(qint64 photoId, const QString &dbPath,
-                                     ThumbnailCache *cache)
-    : m_photoId(photoId), m_dbPath(dbPath), m_cache(cache)
+ThumbnailResponse::ThumbnailResponse(std::shared_ptr<std::atomic<bool>> cancelled)
+    : m_cancelled(std::move(cancelled))
 {
-    // Prevent the thread pool from deleting this object after run() returns.
-    // Qt Quick owns the lifetime and will delete after finished() is emitted.
-    setAutoDelete(false);
 }
 
 void ThumbnailResponse::setImage(QImage image)
 {
+    QMutexLocker lock(&m_mutex);
     m_image = std::move(image);
 }
 
 void ThumbnailResponse::cancel()
 {
-    m_cancelled.store(true, std::memory_order_relaxed);
-}
-
-void ThumbnailResponse::run()
-{
-    // Even if cancelled we always emit finished() so Qt Quick can clean up.
-    if (!m_cancelled.load(std::memory_order_relaxed)) {
-        QByteArray data = loadThumbnailFromDb(m_dbPath, m_photoId);
-        if (!data.isEmpty()) {
-            QImage img;
-            img.loadFromData(data, "JPEG");
-            if (!img.isNull()) {
-                m_cache->insert(m_photoId, img);
-                QMutexLocker lock(&m_mutex);
-                m_image = std::move(img);
-            }
-        }
+    if (m_cancelled) {
+        m_cancelled->store(true, std::memory_order_relaxed);
     }
-    emit finished();
 }
 
 QQuickTextureFactory *ThumbnailResponse::textureFactory() const
@@ -129,7 +112,8 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(
     qint64 photoId = id.toLongLong(&ok);
     if (!ok) photoId = 0;
 
-    auto *response = new ThumbnailResponse(photoId, m_dbPath, &m_cache);
+    auto cancelled = std::make_shared<std::atomic<bool>>(false);
+    auto *response = new ThumbnailResponse(cancelled);
 
     // Fast path: serve from in-memory cache without touching the thread pool.
     QImage cached;
@@ -142,7 +126,47 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(
         return response;
     }
 
-    // Slow path: load from DB in background.
-    m_pool.start(response);
+    // Slow path: load from DB in background. Use a guarded pointer so we never
+    // dereference a ThumbnailResponse after Qt Quick deleted it.
+    QPointer<ThumbnailResponse> guardedResponse(response);
+    QString dbPath = m_dbPath;
+    ThumbnailCache *cache = &m_cache;
+
+    m_pool.start([photoId, dbPath, cache, cancelled, guardedResponse]() {
+        if (cancelled->load(std::memory_order_relaxed)) {
+            if (guardedResponse) {
+                QMetaObject::invokeMethod(guardedResponse, &ThumbnailResponse::finished,
+                                          Qt::QueuedConnection);
+            }
+            return;
+        }
+
+        QImage img;
+        QByteArray data = loadThumbnailFromDb(dbPath, photoId);
+        if (!data.isEmpty()) {
+            img.loadFromData(data, "JPEG");
+            if (!img.isNull()) {
+                cache->insert(photoId, img);
+            }
+        }
+
+        if (!guardedResponse) {
+            return;
+        }
+
+        QMetaObject::invokeMethod(
+            guardedResponse,
+            [guardedResponse, cancelled, img = std::move(img)]() mutable {
+                if (!guardedResponse) {
+                    return;
+                }
+                if (!cancelled->load(std::memory_order_relaxed) && !img.isNull()) {
+                    guardedResponse->setImage(std::move(img));
+                }
+                emit guardedResponse->finished();
+            },
+            Qt::QueuedConnection);
+    });
+
     return response;
 }
