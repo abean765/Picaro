@@ -140,6 +140,24 @@ void PhotoDatabase::migrateSchema()
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN rating INTEGER DEFAULT 0"));
         qDebug() << "Migrated: added rating column";
     }
+
+    // Check for has_exif and has_geolocation columns
+    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
+    bool hasExifCol = false;
+    bool hasGeoCol = false;
+    while (q.next()) {
+        const QString col = q.value(1).toString();
+        if (col == QStringLiteral("has_exif")) hasExifCol = true;
+        if (col == QStringLiteral("has_geolocation")) hasGeoCol = true;
+    }
+    if (!hasExifCol) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN has_exif INTEGER DEFAULT 0"));
+        qDebug() << "Migrated: added has_exif column";
+    }
+    if (!hasGeoCol) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN has_geolocation INTEGER DEFAULT 0"));
+        qDebug() << "Migrated: added has_geolocation column";
+    }
 }
 
 void PhotoDatabase::close()
@@ -175,8 +193,9 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
     q.prepare(QStringLiteral(
         "INSERT OR IGNORE INTO photos "
         "(file_path, file_name, date_taken, date_modified, width, height, "
-        " file_size, media_type, category, live_video_path, mime_type, duration, month_key, thumbnail) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        " file_size, media_type, category, live_video_path, mime_type, duration, month_key, thumbnail, "
+        " has_exif, has_geolocation) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ));
 
     q.addBindValue(record.filePath);
@@ -193,6 +212,8 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
     q.addBindValue(record.duration);
     q.addBindValue(record.monthKey);
     q.addBindValue(thumbnail);
+    q.addBindValue(record.hasExif ? 1 : 0);
+    q.addBindValue(record.hasGeolocation ? 1 : 0);
 
     if (!q.exec()) {
         qWarning() << "Insert failed:" << q.lastError().text();
@@ -336,6 +357,18 @@ PhotoStats PhotoDatabase::loadStats() const
             break;
         }
     }
+
+    // Count photos with EXIF metadata
+    q.exec(QStringLiteral(
+        "SELECT COUNT(*) FROM photos WHERE deleted = 0 AND has_exif = 1"
+    ));
+    if (q.next()) stats.withExif = q.value(0).toInt();
+
+    // Count photos with geolocation
+    q.exec(QStringLiteral(
+        "SELECT COUNT(*) FROM photos WHERE deleted = 0 AND has_geolocation = 1"
+    ));
+    if (q.next()) stats.withGeolocation = q.value(0).toInt();
 
     return stats;
 }

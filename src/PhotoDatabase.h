@@ -35,6 +35,8 @@ struct PhotoRecord {
     QString mimeType;
     double duration = 0.0;
     QString monthKey;  // "2024-01"
+    bool hasExif = false;
+    bool hasGeolocation = false;
 };
 
 struct PhotoStats {
@@ -45,6 +47,8 @@ struct PhotoStats {
     int screenshots = 0;
     int selfies = 0;
     qint64 totalSizeBytes = 0;
+    int withExif = 0;
+    int withGeolocation = 0;
 };
 
 struct TagRecord {

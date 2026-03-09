@@ -73,10 +73,30 @@ Item {
                 }
 
                 StatCard {
+                    title: "Mit Metadaten"
+                    value: statsProvider.withExif
+                    subtitle: statsProvider.totalPhotos > 0
+                        ? Math.round(statsProvider.withExif / statsProvider.totalPhotos * 100) + " %"
+                        : ""
+                    icon: "\u{1F4CB}"
+                    accentColor: "#74c0fc"
+                }
+
+                StatCard {
+                    title: "Mit Standort"
+                    value: statsProvider.withGeolocation
+                    subtitle: statsProvider.totalPhotos > 0
+                        ? Math.round(statsProvider.withGeolocation / statsProvider.totalPhotos * 100) + " %"
+                        : ""
+                    icon: "\u{1F4CD}"
+                    accentColor: "#ff922b"
+                }
+
+                StatCard {
                     title: "Gesamt"
                     value: statsProvider.totalPhotos
                     subtitle: statsProvider.totalSize
-                    icon: "📊"
+                    icon: "\u{1F4CA}"
                     accentColor: "#ffffff"
                 }
             }

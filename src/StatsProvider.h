@@ -13,6 +13,8 @@ class StatsProvider : public QObject
     Q_PROPERTY(int screenshots READ screenshots NOTIFY statsChanged)
     Q_PROPERTY(int selfies READ selfies NOTIFY statsChanged)
     Q_PROPERTY(QString totalSize READ totalSize NOTIFY statsChanged)
+    Q_PROPERTY(int withExif READ withExif NOTIFY statsChanged)
+    Q_PROPERTY(int withGeolocation READ withGeolocation NOTIFY statsChanged)
 
 public:
     explicit StatsProvider(PhotoDatabase *db, QObject *parent = nullptr)
@@ -26,6 +28,8 @@ public:
     int livePhotos() const { return m_stats.livePhotos; }
     int screenshots() const { return m_stats.screenshots; }
     int selfies() const { return m_stats.selfies; }
+    int withExif() const { return m_stats.withExif; }
+    int withGeolocation() const { return m_stats.withGeolocation; }
 
     QString totalSize() const
     {

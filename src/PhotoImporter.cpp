@@ -390,6 +390,18 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
             auto hIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"));
             if (wIt != exifData.end()) record.width = static_cast<int>(wIt->toLong());
             if (hIt != exifData.end()) record.height = static_cast<int>(hIt->toLong());
+
+            // Mark as having EXIF data
+            if (!exifData.empty()) {
+                record.hasExif = true;
+            }
+
+            // Check for GPS data
+            auto latIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"));
+            auto lonIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"));
+            if (latIt != exifData.end() && lonIt != exifData.end()) {
+                record.hasGeolocation = true;
+            }
         }
     } catch (const Exiv2::Error &) {
         // EXIF extraction is best-effort; videos won't have EXIF
