@@ -17,6 +17,32 @@
 #include <exiv2/exiv2.hpp>
 #endif
 
+#ifdef Q_OS_LINUX
+#include <sys/resource.h>
+#include <dirent.h>
+#endif
+
+// Returns the number of FDs still available, or -1 if unknown.
+static int availableFds()
+{
+#ifdef Q_OS_LINUX
+    struct rlimit rl;
+    if (getrlimit(RLIMIT_NOFILE, &rl) != 0)
+        return -1;
+    // Count open FDs by scanning /proc/self/fd
+    int openCount = 0;
+    if (DIR *dir = opendir("/proc/self/fd")) {
+        while (readdir(dir))
+            ++openCount;
+        closedir(dir);
+        openCount -= 2; // subtract . and ..
+    }
+    return static_cast<int>(rl.rlim_cur) - openCount;
+#else
+    return -1;
+#endif
+}
+
 const QStringList PhotoImporter::s_photoExtensions = {
     QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("png"),
     QStringLiteral("heic"), QStringLiteral("heif"), QStringLiteral("hif"),
@@ -109,14 +135,74 @@ void PhotoImporter::doImport(const QString &path)
     // Phase 2: Import photos in parallel (HEIC decode is CPU-bound)
     if (!photoFiles.isEmpty() && !m_cancelled) {
         QThreadPool pool;
-        pool.setMaxThreadCount(qMin(4, QThread::idealThreadCount()));
+        const int threadCount = qMin(4, QThread::idealThreadCount());
+        pool.setMaxThreadCount(threadCount);
+
+        // Maximum tasks queued ahead of the consumer — keeps FD usage bounded.
+        // Each worker may open ~4 FDs (mime, exiv2, thumbnail reader, heif/ffmpeg).
+        const int maxInFlight = threadCount * 8;
 
         m_submittedCount = 0;
         m_resultQueue.clear();
 
-        // Submit photo processing tasks
-        for (const QString &filePath : photoFiles) {
+        int submitted = 0;
+        int photoRemaining = 0;
+        m_db->beginTransaction();
+
+        for (int fileIdx = 0; fileIdx < photoFiles.size(); ++fileIdx) {
             if (m_cancelled) break;
+
+            // Throttle: wait until the queue has room before submitting more
+            {
+                QMutexLocker lock(&m_queueMutex);
+                while (submitted - (imported + m_resultQueue.size()) >= maxInFlight
+                       && !m_cancelled) {
+                    // Drain available results while we wait
+                    while (!m_resultQueue.isEmpty()) {
+                        ImportResult result = m_resultQueue.dequeue();
+                        lock.unlock();
+
+                        m_db->insertPhoto(result.record, result.thumbnail);
+                        ++imported;
+                        --photoRemaining;
+
+                        if (imported % batchSize == 0) {
+                            m_db->commitTransaction();
+                            m_db->beginTransaction();
+                        }
+                        m_progress = skipped + imported;
+                        QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
+
+                        lock.relock();
+                    }
+                    if (submitted - (imported + m_resultQueue.size()) >= maxInFlight
+                        && !m_cancelled) {
+                        m_queueCondition.wait(&m_queueMutex, 50);
+                    }
+                }
+            }
+
+            if (m_cancelled) break;
+
+            // Periodic FD safety check (every 200 files)
+            if (fileIdx % 200 == 0) {
+                int fdAvail = availableFds();
+                if (fdAvail >= 0 && fdAvail < 100) {
+                    qWarning() << "Import aborted: only" << fdAvail
+                               << "file descriptors remaining";
+                    QMetaObject::invokeMethod(this, [this]() {
+                        emit errorOccurred(
+                            tr("Import abgebrochen: zu wenige freie Datei-Deskriptoren. "
+                               "Bitte 'ulimit -n 65536' setzen und erneut versuchen."));
+                    });
+                    m_cancelled = true;
+                    break;
+                }
+            }
+
+            const QString &filePath = photoFiles[fileIdx];
+            ++submitted;
+            ++photoRemaining;
             QtConcurrent::run(&pool, [this, filePath]() {
                 if (m_cancelled) return;
                 ImportResult result;
@@ -129,11 +215,8 @@ void PhotoImporter::doImport(const QString &path)
             });
         }
 
-        // Drain queue and write to DB on this thread
-        int photoRemaining = m_cancelled ? 0 : photoFiles.size();
-        m_db->beginTransaction();
-
-        while (photoRemaining > 0) {
+        // Drain remaining results
+        while (photoRemaining > 0 && !m_cancelled) {
             QMutexLocker lock(&m_queueMutex);
             while (m_resultQueue.isEmpty()) {
                 m_queueCondition.wait(&m_queueMutex, 100);
@@ -268,7 +351,8 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
     record.fileSize = fi.size();
     record.dateModified = fi.lastModified();
     record.mediaType = classifyFile(filePath);
-    record.mimeType = QMimeDatabase().mimeTypeForFile(filePath).name();
+    static thread_local QMimeDatabase mimeDb;
+    record.mimeType = mimeDb.mimeTypeForFile(filePath).name();
 
     // Try to find live video for HEIC files (iPhone Live Photos)
     if (record.mediaType == MediaType::Photo && HeicImageReader::isHeicFile(filePath)) {

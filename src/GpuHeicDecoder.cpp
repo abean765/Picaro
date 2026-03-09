@@ -122,17 +122,28 @@ static QImage frameToQImage(AVFrame *frame, int maxSize)
     return result;
 }
 
-// Thread-local HW context (each import thread gets its own)
-static thread_local HwContext t_hw = {};
-static thread_local bool t_hwInitialized = false;
+// RAII wrapper to ensure AVBufferRef is freed when the thread exits.
+struct ThreadHwContext {
+    HwContext hw;
+    bool initialized = false;
+
+    ~ThreadHwContext()
+    {
+        if (hw.deviceRef) {
+            av_buffer_unref(&hw.deviceRef);
+        }
+    }
+};
+
+static thread_local ThreadHwContext t_hwCtx;
 
 static HwContext &getThreadHw()
 {
-    if (!t_hwInitialized) {
-        t_hw = initHwDevice();
-        t_hwInitialized = true;
+    if (!t_hwCtx.initialized) {
+        t_hwCtx.hw = initHwDevice();
+        t_hwCtx.initialized = true;
     }
-    return t_hw;
+    return t_hwCtx.hw;
 }
 
 QImage decodeThumbnail(const QString &filePath, int maxSize)
