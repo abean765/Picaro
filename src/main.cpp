@@ -13,6 +13,8 @@
 #include "AppSettings.h"
 #include "StatsProvider.h"
 #include "TagModel.h"
+#include "NetworkManager.h"
+#include "PeerModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -53,6 +55,13 @@ int main(int argc, char *argv[])
     TagModel tagModel;
     tagModel.setDatabase(&db);
 
+    // Network manager for Local Send
+    NetworkManager networkManager(&db);
+
+    // Peer model for QML
+    PeerModel peerModel;
+    peerModel.setNetworkManager(&networkManager);
+
     // QML engine
     QQmlApplicationEngine engine;
 
@@ -66,6 +75,8 @@ int main(int argc, char *argv[])
     ctx->setContextProperty(QStringLiteral("appSettings"), &settings);
     ctx->setContextProperty(QStringLiteral("statsProvider"), &statsProvider);
     ctx->setContextProperty(QStringLiteral("tagModel"), &tagModel);
+    ctx->setContextProperty(QStringLiteral("networkManager"), &networkManager);
+    ctx->setContextProperty(QStringLiteral("peerModel"), &peerModel);
 
     // Reload model and stats after import finishes
     QObject::connect(&importer, &PhotoImporter::importFinished,

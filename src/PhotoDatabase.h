@@ -37,6 +37,7 @@ struct PhotoRecord {
     QString monthKey;  // "2024-01"
     bool hasExif = false;
     bool hasGeolocation = false;
+    QString owner;  // empty = own photo, otherwise sender name
 };
 
 struct PhotoStats {
@@ -94,6 +95,9 @@ public:
     // Video thumbnail regeneration
     QVector<QPair<qint64, QString>> loadVideoFilePaths() const;
     bool updateThumbnail(qint64 photoId, const QByteArray &thumbnail);
+
+    // Load a single photo record by ID
+    std::optional<PhotoRecord> loadRecord(qint64 photoId) const;
 
     // Soft-delete: mark photo as deleted (hidden from UI, kept in DB)
     bool markDeleted(qint64 photoId, bool deleted = true);

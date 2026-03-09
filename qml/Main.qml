@@ -435,6 +435,9 @@ ApplicationWindow {
                             var prevId = photoModel.previousPhotoId(root.selectedPhotoId)
                             if (prevId > 0) root.selectPhoto(prevId)
                         }
+                        onSendRequested: function(photoId) {
+                            sendSheet.open(photoId)
+                        }
                     }
                 }
 
@@ -467,6 +470,41 @@ ApplicationWindow {
                 path = path.replace("file://", "")
             }
             photoImporter.importDirectory(path)
+        }
+    }
+
+    // Send sheet overlay
+    SendSheet {
+        id: sendSheet
+        anchors.fill: parent
+        z: 100
+    }
+
+    // Receive dialog overlay
+    ReceiveDialog {
+        id: receiveDialogOverlay
+        anchors.fill: parent
+        z: 100
+    }
+
+    // Incoming transfer notification
+    Connections {
+        target: networkManager
+        function onIncomingTransfer(senderName, fileCount, totalSize) {
+            receiveDialogOverlay.show(senderName, fileCount, totalSize)
+        }
+        function onReceiveFinished(success, count, message) {
+            if (success && count > 0) {
+                photoModel.reload()
+                statsProvider.refresh()
+            }
+        }
+    }
+
+    // Auto-start discovery if network visible
+    Component.onCompleted: {
+        if (appSettings.networkVisible) {
+            networkManager.startDiscovery(appSettings.computerName)
         }
     }
 

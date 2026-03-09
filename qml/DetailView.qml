@@ -14,6 +14,7 @@ Rectangle {
     signal closed()
     signal navigateNext()
     signal navigatePrevious()
+    signal sendRequested(int photoId)
 
     // Derived properties from current photoId
     readonly property string filePath: photoId > 0 ? photoModel.filePathForId(photoId) : ""
@@ -269,6 +270,33 @@ Rectangle {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: detailView.navigateNext()
+        }
+    }
+
+    // Send button
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.rightMargin: 52
+        anchors.topMargin: 12
+        width: 32
+        height: 32
+        radius: 16
+        color: sendBtnArea.containsMouse ? "#60ffffff" : "#30ffffff"
+        visible: hasContent
+
+        Label {
+            anchors.centerIn: parent
+            text: "\u{1F4E4}"
+            font.pixelSize: 14
+        }
+
+        MouseArea {
+            id: sendBtnArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: detailView.sendRequested(detailView.photoId)
         }
     }
 

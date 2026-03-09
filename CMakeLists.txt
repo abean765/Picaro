@@ -11,6 +11,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Sql
     Concurrent
     Multimedia
+    Network
 )
 
 # Optional dependencies: libheif and exiv2
@@ -106,6 +107,9 @@ qt_add_executable(picaro
     src/TagModel.cpp
     src/GpuHeicDecoder.h
     src/GpuHeicDecoder.cpp
+    src/NetworkManager.h
+    src/NetworkManager.cpp
+    src/PeerModel.h
 )
 
 qt_add_qml_module(picaro
@@ -121,6 +125,8 @@ qt_add_qml_module(picaro
         qml/SettingsView.qml
         qml/ImportDialog.qml
         qml/TagsView.qml
+        qml/SendSheet.qml
+        qml/ReceiveDialog.qml
 )
 
 target_include_directories(picaro PRIVATE
@@ -135,6 +141,7 @@ target_link_libraries(picaro PRIVATE
     Qt6::Sql
     Qt6::Concurrent
     Qt6::Multimedia
+    Qt6::Network
 )
 
 if(HAVE_LIBHEIF)

@@ -10,6 +10,7 @@
 #include <QTemporaryDir>
 #include <QFile>
 #include <QtMath>
+#include <QHostInfo>
 #include "GpuHeicDecoder.h"
 
 class AppSettings : public QObject
@@ -18,6 +19,9 @@ class AppSettings : public QObject
     Q_PROPERTY(QString databasePath READ databasePath WRITE setDatabasePath NOTIFY databasePathChanged)
     Q_PROPERTY(QString defaultDatabasePath READ defaultDatabasePath CONSTANT)
     Q_PROPERTY(QColor accentColor READ accentColor WRITE setAccentColor NOTIFY accentColorChanged)
+    Q_PROPERTY(QString computerName READ computerName WRITE setComputerName NOTIFY computerNameChanged)
+    Q_PROPERTY(bool networkVisible READ networkVisible WRITE setNetworkVisible NOTIFY networkVisibleChanged)
+    Q_PROPERTY(QString receiveFolder READ receiveFolder WRITE setReceiveFolder NOTIFY receiveFolderChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -75,6 +79,73 @@ public:
         m_settings.remove(QStringLiteral("appearance/accentColor"));
         m_settings.sync();
         emit accentColorChanged();
+    }
+
+    // --- Local Send settings ---
+
+    QString computerName() const
+    {
+        return m_settings.value(
+            QStringLiteral("localsend/computerName"),
+            QHostInfo::localHostName()
+        ).toString();
+    }
+
+    void setComputerName(const QString &name)
+    {
+        if (name == computerName()) return;
+        m_settings.setValue(QStringLiteral("localsend/computerName"), name);
+        m_settings.sync();
+        emit computerNameChanged();
+    }
+
+    bool networkVisible() const
+    {
+        return m_settings.value(QStringLiteral("localsend/networkVisible"), false).toBool();
+    }
+
+    void setNetworkVisible(bool visible)
+    {
+        if (visible == networkVisible()) return;
+        m_settings.setValue(QStringLiteral("localsend/networkVisible"), visible);
+        m_settings.sync();
+        emit networkVisibleChanged();
+    }
+
+    QString receiveFolder() const
+    {
+        return m_settings.value(
+            QStringLiteral("localsend/receiveFolder"),
+            defaultReceiveFolder()
+        ).toString();
+    }
+
+    void setReceiveFolder(const QString &folder)
+    {
+        if (folder == receiveFolder()) return;
+        m_settings.setValue(QStringLiteral("localsend/receiveFolder"), folder);
+        m_settings.sync();
+        emit receiveFolderChanged();
+    }
+
+    QString defaultReceiveFolder() const
+    {
+        return QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+               + QStringLiteral("/Picaro Empfangen");
+    }
+
+    Q_INVOKABLE void resetComputerName()
+    {
+        m_settings.remove(QStringLiteral("localsend/computerName"));
+        m_settings.sync();
+        emit computerNameChanged();
+    }
+
+    Q_INVOKABLE void resetReceiveFolder()
+    {
+        m_settings.remove(QStringLiteral("localsend/receiveFolder"));
+        m_settings.sync();
+        emit receiveFolderChanged();
     }
 
     Q_INVOKABLE QString generateTestTone()
@@ -148,6 +219,9 @@ public:
 signals:
     void databasePathChanged();
     void accentColorChanged();
+    void computerNameChanged();
+    void networkVisibleChanged();
+    void receiveFolderChanged();
 
 private:
     QSettings m_settings;

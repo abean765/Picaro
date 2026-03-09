@@ -165,6 +165,212 @@ Item {
                 }
             }
 
+            // Local Send section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: localSendSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: localSendSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Local Send"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Fotos und Videos über das lokale Netzwerk an andere Picaro-Instanzen senden und empfangen."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    // Computer name
+                    Label {
+                        text: "Computername"
+                        color: "#cccccc"
+                        font.pixelSize: 13
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 36
+                            color: "#1e1e1e"
+                            border.color: "#444444"
+                            border.width: 1
+                            radius: 4
+
+                            TextInput {
+                                id: computerNameInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                verticalAlignment: Text.AlignVCenter
+                                color: "#cccccc"
+                                font.pixelSize: 13
+                                text: appSettings.computerName
+                                onAccepted: appSettings.computerName = text
+                                onEditingFinished: appSettings.computerName = text
+                            }
+                        }
+
+                        Button {
+                            text: "Standard"
+                            onClicked: {
+                                appSettings.resetComputerName()
+                                computerNameInput.text = appSettings.computerName
+                            }
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#333333"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#aaaaaa"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 12
+                                rightPadding: 12
+                            }
+                        }
+                    }
+
+                    // Network visibility toggle
+                    RowLayout {
+                        spacing: 12
+
+                        Switch {
+                            id: visibilitySwitch
+                            checked: appSettings.networkVisible
+                            onCheckedChanged: {
+                                appSettings.networkVisible = checked
+                                if (checked) {
+                                    networkManager.startDiscovery(appSettings.computerName)
+                                } else {
+                                    networkManager.stopDiscovery()
+                                }
+                            }
+                        }
+
+                        Label {
+                            text: visibilitySwitch.checked
+                                ? "Im lokalen Netzwerk sichtbar"
+                                : "Nicht sichtbar im Netzwerk"
+                            color: visibilitySwitch.checked ? "#22c55e" : "#999999"
+                            font.pixelSize: 13
+                        }
+                    }
+
+                    // Receive folder
+                    Label {
+                        text: "Empfangsordner"
+                        color: "#cccccc"
+                        font.pixelSize: 13
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 36
+                            color: "#1e1e1e"
+                            border.color: "#444444"
+                            border.width: 1
+                            radius: 4
+
+                            Label {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                text: appSettings.receiveFolder
+                                color: "#cccccc"
+                                font.pixelSize: 13
+                                elide: Text.ElideMiddle
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+
+                        Button {
+                            text: "Ändern..."
+                            onClicked: receiveFolderDialog.open()
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#ffffff"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 12
+                                rightPadding: 12
+                            }
+                        }
+
+                        Button {
+                            text: "Standard"
+                            onClicked: appSettings.resetReceiveFolder()
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#333333"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#aaaaaa"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 12
+                                rightPadding: 12
+                            }
+                        }
+                    }
+
+                    // Status info
+                    RowLayout {
+                        spacing: 8
+                        visible: networkManager.discoveryActive
+
+                        Rectangle {
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: "#22c55e"
+                        }
+
+                        Label {
+                            text: {
+                                var count = peerModel.count
+                                if (count === 0)
+                                    return "Aktiv \u2013 suche nach Geräten..."
+                                return "Aktiv \u2013 " + count + " Gerät" + (count !== 1 ? "e" : "") + " gefunden"
+                            }
+                            color: "#22c55e"
+                            font.pixelSize: 12
+                        }
+                    }
+                }
+            }
+
             // Audio section
             Rectangle {
                 Layout.fillWidth: true
@@ -497,6 +703,20 @@ Item {
         title: "Akzentfarbe wählen"
         selectedColor: appSettings.accentColor
         onAccepted: appSettings.accentColor = selectedColor
+    }
+
+    FolderDialog {
+        id: receiveFolderDialog
+        title: "Empfangsordner wählen"
+        onAccepted: {
+            var path = selectedFolder.toString()
+            if (Qt.platform.os === "windows") {
+                path = path.replace("file:///", "")
+            } else {
+                path = path.replace("file://", "")
+            }
+            appSettings.receiveFolder = path
+        }
     }
 
     FolderDialog {
