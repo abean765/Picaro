@@ -8,7 +8,8 @@ ListView {
     clip: true
     cacheBuffer: 4000
     reuseItems: true
-    rightPadding: 50   // leaves room for the wider scrollbar + 8 px gap
+    // Width available for photo content — keeps thumbnails clear of the scrollbar.
+    readonly property real _contentWidth: width - 50
 
     model: photoModel
 
@@ -100,10 +101,10 @@ ListView {
 
     delegate: Item {
         id: rowDelegate
-        width: gridView.width
+        width: gridView._contentWidth
         height: model.rowType === "header" ? 52 : cellHeight
 
-        readonly property real cellHeight: gridView.width / photoModel.photosPerRow
+        readonly property real cellHeight: gridView._contentWidth / photoModel.photosPerRow
         readonly property var rowCells: model.cells
 
         // Month header
@@ -129,7 +130,7 @@ ListView {
 
                 Item {
                     id: cellItem
-                    width: (gridView.width - (photoModel.photosPerRow - 1) * 2) / photoModel.photosPerRow
+                    width: (gridView._contentWidth - (photoModel.photosPerRow - 1) * 2) / photoModel.photosPerRow
                     height: rowDelegate.cellHeight
 
                     readonly property bool isVideo: modelData.mediaType === 1
