@@ -1,6 +1,5 @@
 #include "ThumbnailProvider.h"
 #include <QImage>
-#include <QRunnable>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QThread>
@@ -27,7 +26,6 @@ void ThumbnailCache::insert(qint64 photoId, const QImage &img)
 {
     QMutexLocker lock(&m_mutex);
     if (m_cache.size() >= m_maxEntries) {
-        // Simple eviction: clear half the cache when full
         m_cache.clear();
     }
     m_cache.insert(photoId, img);
@@ -35,7 +33,6 @@ void ThumbnailCache::insert(qint64 photoId, const QImage &img)
 
 // -- DB access (thread-local connections) --
 
-// Each thread gets its own SQLite connection, cached via thread-local connection name.
 static QByteArray loadThumbnailFromDb(const QString &dbPath, qint64 photoId)
 {
     QString connName = QStringLiteral("thumb_") +
@@ -49,9 +46,6 @@ static QByteArray loadThumbnailFromDb(const QString &dbPath, qint64 photoId)
             return {};
         }
         QSqlQuery pragma(db);
-        // Small read cache is sufficient for thumbnail blob lookups.
-        // mmap_size is intentionally omitted: the default (0 = disabled) avoids
-        // additional virtual-memory mappings on per-thread read-only connections.
         pragma.exec(QStringLiteral("PRAGMA cache_size=-4096"));
     }
 
@@ -69,63 +63,41 @@ static QByteArray loadThumbnailFromDb(const QString &dbPath, qint64 photoId)
     return {};
 }
 
-// -- ThumbnailRunnable --
-
-class ThumbnailRunnable : public QRunnable
-{
-public:
-    ThumbnailRunnable(qint64 photoId, const QString &dbPath,
-                      ThumbnailResponse *response, ThumbnailCache *cache)
-        : m_photoId(photoId), m_dbPath(dbPath), m_response(response), m_cache(cache)
-    {
-        setAutoDelete(true);
-    }
-
-    void run() override
-    {
-        QImage img;
-        QByteArray data = loadThumbnailFromDb(m_dbPath, m_photoId);
-        if (!data.isEmpty()) {
-            img.loadFromData(data, "JPEG");
-            m_cache->insert(m_photoId, img);
-        }
-        m_response->handleResult(std::move(img));
-    }
-
-private:
-    qint64 m_photoId;
-    QString m_dbPath;
-    ThumbnailResponse *m_response;
-    ThumbnailCache *m_cache;
-};
-
 // -- ThumbnailResponse --
 
-ThumbnailResponse::ThumbnailResponse(qint64 photoId, const QSize &requestedSize,
-                                     const QString &dbPath, QThreadPool *pool,
+ThumbnailResponse::ThumbnailResponse(qint64 photoId, const QString &dbPath,
                                      ThumbnailCache *cache)
+    : m_photoId(photoId), m_dbPath(dbPath), m_cache(cache)
 {
-    Q_UNUSED(requestedSize);
-
-    // Fast path: serve from in-memory cache (no thread pool needed)
-    QImage cached;
-    if (cache->lookup(photoId, cached)) {
-        m_image = std::move(cached);
-        // Emit finished on next event loop iteration (required by Qt API contract)
-        QMetaObject::invokeMethod(this, &ThumbnailResponse::finished, Qt::QueuedConnection);
-        return;
-    }
-
-    // Slow path: load from DB in background
-    auto *runnable = new ThumbnailRunnable(photoId, dbPath, this, cache);
-    pool->start(runnable);
+    // Prevent the thread pool from deleting this object after run() returns.
+    // Qt Quick owns the lifetime and will delete after finished() is emitted.
+    setAutoDelete(false);
 }
 
-void ThumbnailResponse::handleResult(QImage image)
+void ThumbnailResponse::setImage(QImage image)
 {
-    {
-        QMutexLocker lock(&m_mutex);
-        m_image = std::move(image);
+    m_image = std::move(image);
+}
+
+void ThumbnailResponse::cancel()
+{
+    m_cancelled.store(true, std::memory_order_relaxed);
+}
+
+void ThumbnailResponse::run()
+{
+    // Even if cancelled we always emit finished() so Qt Quick can clean up.
+    if (!m_cancelled.load(std::memory_order_relaxed)) {
+        QByteArray data = loadThumbnailFromDb(m_dbPath, m_photoId);
+        if (!data.isEmpty()) {
+            QImage img;
+            img.loadFromData(data, "JPEG");
+            if (!img.isNull()) {
+                m_cache->insert(m_photoId, img);
+                QMutexLocker lock(&m_mutex);
+                m_image = std::move(img);
+            }
+        }
     }
     emit finished();
 }
@@ -151,9 +123,26 @@ ThumbnailProvider::ThumbnailProvider(const QString &dbPath)
 QQuickImageResponse *ThumbnailProvider::requestImageResponse(
     const QString &id, const QSize &requestedSize)
 {
+    Q_UNUSED(requestedSize);
+
     bool ok = false;
     qint64 photoId = id.toLongLong(&ok);
     if (!ok) photoId = 0;
 
-    return new ThumbnailResponse(photoId, requestedSize, m_dbPath, &m_pool, &m_cache);
+    auto *response = new ThumbnailResponse(photoId, m_dbPath, &m_cache);
+
+    // Fast path: serve from in-memory cache without touching the thread pool.
+    QImage cached;
+    if (m_cache.lookup(photoId, cached)) {
+        response->setImage(std::move(cached));
+        // Qt API contract: finished() must not be emitted synchronously from
+        // requestImageResponse, so use a queued invocation.
+        QMetaObject::invokeMethod(response, &ThumbnailResponse::finished,
+                                  Qt::QueuedConnection);
+        return response;
+    }
+
+    // Slow path: load from DB in background.
+    m_pool.start(response);
+    return response;
 }
