@@ -14,6 +14,38 @@ ListView {
     flickDeceleration: 1500
     maximumFlickVelocity: 15000
 
+    // The cell that is currently being previewed (null when idle).
+    property Item _hoveredCell: null
+
+    // Single MediaPlayer for the entire grid — at most one cell can be hovered
+    // at a time, so there is no reason to keep one player per cell.
+    MediaPlayer {
+        id: sharedPlayer
+        videoOutput: overlayOutput
+    }
+
+    // Single VideoOutput overlay, parented directly to the ListView so it sits
+    // in viewport coordinates and is clipped by the ListView bounds.
+    // Its position tracks _hoveredCell; referencing gridView.contentY in the
+    // binding expression ensures it re-evaluates whenever the list scrolls.
+    VideoOutput {
+        id: overlayOutput
+        parent: gridView
+        z: 10
+        fillMode: VideoOutput.PreserveAspectCrop
+        visible: gridView._hoveredCell !== null &&
+                 sharedPlayer.playbackState === MediaPlayer.PlayingState
+
+        x: gridView._hoveredCell
+            ? gridView._hoveredCell.mapToItem(gridView, 0, 0).x + gridView.contentY * 0
+            : 0
+        y: gridView._hoveredCell
+            ? gridView._hoveredCell.mapToItem(gridView, 0, 0).y + gridView.contentY * 0
+            : 0
+        width:  gridView._hoveredCell ? gridView._hoveredCell.width  : 0
+        height: gridView._hoveredCell ? gridView._hoveredCell.height : 0
+    }
+
     // Faster mouse wheel scrolling
     WheelHandler {
         id: wheelHandler
@@ -102,9 +134,21 @@ ListView {
                     readonly property bool isVideo: modelData.mediaType === 1
                     readonly property bool isLivePhoto: modelData.mediaType === 2
                     readonly property bool hasVideo: isVideo || isLivePhoto
-                    property bool hovered: false
-                    // Tracks playback state across the Loader boundary
-                    property bool videoPlaying: false
+
+                    // True while the shared player is rendering this cell's video.
+                    readonly property bool videoPlaying:
+                        gridView._hoveredCell === cellItem &&
+                        sharedPlayer.playbackState === MediaPlayer.PlayingState
+
+                    // If this item is recycled by reuseItems, stop the preview
+                    // so the shared player does not keep playing a stale source.
+                    ListView.onPooled: {
+                        if (gridView._hoveredCell === cellItem) {
+                            sharedPlayer.stop();
+                            sharedPlayer.source = "";
+                            gridView._hoveredCell = null;
+                        }
+                    }
 
                     // Selection highlight
                     Rectangle {
@@ -138,65 +182,6 @@ ListView {
                         anchors.margins: 1
                         color: "#2a2a2a"
                         visible: thumbImage.status !== Image.Ready && !cellItem.videoPlaying
-                    }
-
-                    // Video player overlay — only created for video/live-photo cells.
-                    // Using a Loader prevents MediaPlayer (and its multimedia backend
-                    // file descriptors) from being instantiated for every photo cell,
-                    // which would exhaust the process fd limit on large galleries.
-                    Loader {
-                        id: videoLoader
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        active: cellItem.hasVideo
-
-                        // When deactivated (item reused for a non-video cell), reset state.
-                        onActiveChanged: {
-                            if (!active) {
-                                cellItem.hovered = false;
-                                cellItem.videoPlaying = false;
-                            }
-                        }
-
-                        sourceComponent: Component {
-                            Item {
-                                anchors.fill: parent
-
-                                MediaPlayer {
-                                    id: mediaPlayer
-                                    videoOutput: videoOutput
-                                    loops: cellItem.isLivePhoto ? MediaPlayer.Infinite : 1
-
-                                    onPlaybackStateChanged: {
-                                        cellItem.videoPlaying =
-                                            (playbackState === MediaPlayer.PlayingState);
-                                    }
-                                }
-
-                                VideoOutput {
-                                    id: videoOutput
-                                    anchors.fill: parent
-                                    fillMode: VideoOutput.PreserveAspectCrop
-                                    visible: cellItem.hovered &&
-                                             mediaPlayer.playbackState === MediaPlayer.PlayingState
-                                }
-
-                                function startPreview() {
-                                    let path = cellItem.isLivePhoto
-                                        ? (modelData.liveVideoPath || "")
-                                        : (modelData.filePath || "");
-                                    if (path === "") return;
-                                    mediaPlayer.source = "file:///" + path;
-                                    mediaPlayer.play();
-                                }
-
-                                function stopPreview() {
-                                    mediaPlayer.stop();
-                                    mediaPlayer.source = "";
-                                    cellItem.videoPlaying = false;
-                                }
-                            }
-                        }
                     }
 
                     // Video/Live Photo badge (hidden during playback)
@@ -257,7 +242,6 @@ ListView {
                         }
                     }
 
-                    // Hover area with delay to avoid accidental triggers
                     HoverHandler {
                         id: hoverHandler
                     }
@@ -267,8 +251,18 @@ ListView {
                         interval: 300
                         running: hoverHandler.hovered && cellItem.hasVideo
                         onTriggered: {
-                            cellItem.hovered = true;
-                            if (videoLoader.item) videoLoader.item.startPreview();
+                            let path = cellItem.isLivePhoto
+                                ? (modelData.liveVideoPath || "")
+                                : (modelData.filePath || "");
+                            if (path === "") return;
+
+                            // Stop any previous preview before reconfiguring.
+                            sharedPlayer.stop();
+                            sharedPlayer.loops = cellItem.isLivePhoto
+                                ? MediaPlayer.Infinite : 1;
+                            gridView._hoveredCell = cellItem;
+                            sharedPlayer.source = "file:///" + path;
+                            sharedPlayer.play();
                         }
                     }
 
@@ -277,15 +271,17 @@ ListView {
                         function onHoveredChanged() {
                             if (!hoverHandler.hovered) {
                                 hoverTimer.stop();
-                                cellItem.hovered = false;
-                                if (videoLoader.item) videoLoader.item.stopPreview();
+                                if (gridView._hoveredCell === cellItem) {
+                                    sharedPlayer.stop();
+                                    sharedPlayer.source = "";
+                                    gridView._hoveredCell = null;
+                                }
                             }
                         }
                     }
 
                     MouseArea {
                         anchors.fill: parent
-                        // Let HoverHandler handle hover; MouseArea handles clicks
                         hoverEnabled: false
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
