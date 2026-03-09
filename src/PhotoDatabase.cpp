@@ -304,7 +304,7 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
     q.exec(QStringLiteral(
         "SELECT id, file_path, file_name, date_taken, date_modified, "
         "       width, height, file_size, media_type, category, live_video_path, "
-        "       mime_type, duration, month_key "
+        "       mime_type, duration, month_key, owner "
         "FROM photos WHERE deleted = 0 ORDER BY date_taken DESC"
     ));
 
@@ -324,6 +324,7 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
         r.mimeType = q.value(11).toString();
         r.duration = q.value(12).toDouble();
         r.monthKey = q.value(13).toString();
+        r.owner = q.value(14).toString();
         records.append(std::move(r));
     }
 
@@ -338,7 +339,7 @@ QVector<PhotoRecord> PhotoDatabase::loadDeletedRecords() const
     q.exec(QStringLiteral(
         "SELECT id, file_path, file_name, date_taken, date_modified, "
         "       width, height, file_size, media_type, category, live_video_path, "
-        "       mime_type, duration, month_key "
+        "       mime_type, duration, month_key, owner "
         "FROM photos WHERE deleted = 1 ORDER BY date_taken DESC"
     ));
 
@@ -358,6 +359,7 @@ QVector<PhotoRecord> PhotoDatabase::loadDeletedRecords() const
         r.mimeType = q.value(11).toString();
         r.duration = q.value(12).toDouble();
         r.monthKey = q.value(13).toString();
+        r.owner = q.value(14).toString();
         records.append(std::move(r));
     }
 

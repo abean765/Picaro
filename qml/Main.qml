@@ -302,6 +302,230 @@ ApplicationWindow {
 
                     Item { Layout.fillWidth: true }
 
+                    // Search / filter by tag or sender
+                    Item {
+                        implicitWidth: 220
+                        implicitHeight: 28
+
+                        Rectangle {
+                            id: searchBox
+                            anchors.fill: parent
+                            color: searchInput.activeFocus ? "#3a3a3a" : "#333333"
+                            radius: 14
+                            border.color: searchInput.activeFocus ? root.accentColor : "#444444"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 6
+                                spacing: 4
+
+                                Label {
+                                    text: "\u{1F50D}"
+                                    font.pixelSize: 12
+                                    opacity: 0.6
+                                }
+
+                                TextInput {
+                                    id: searchInput
+                                    Layout.fillWidth: true
+                                    verticalAlignment: Text.AlignVCenter
+                                    color: "#ffffff"
+                                    font.pixelSize: 12
+                                    clip: true
+                                    selectByMouse: true
+
+                                    property bool suppressUpdate: false
+
+                                    onTextChanged: {
+                                        if (!suppressUpdate)
+                                            photoModel.updateSuggestions(text)
+                                    }
+
+                                    Keys.onReturnPressed: {
+                                        if (suggestionPopup.visible && suggestionList.currentIndex >= 0) {
+                                            applySuggestion(photoModel.filterSuggestions[suggestionList.currentIndex])
+                                        } else if (text.trim() !== "") {
+                                            photoModel.filterText = text.trim()
+                                            suggestionPopup.visible = false
+                                        }
+                                    }
+
+                                    Keys.onEscapePressed: {
+                                        if (suggestionPopup.visible) {
+                                            suggestionPopup.visible = false
+                                        } else {
+                                            text = ""
+                                            photoModel.clearFilter()
+                                            focus = false
+                                        }
+                                    }
+
+                                    Keys.onDownPressed: {
+                                        if (suggestionPopup.visible && suggestionList.currentIndex < suggestionList.count - 1) {
+                                            suggestionList.currentIndex++
+                                        }
+                                    }
+
+                                    Keys.onUpPressed: {
+                                        if (suggestionPopup.visible && suggestionList.currentIndex > 0) {
+                                            suggestionList.currentIndex--
+                                        }
+                                    }
+                                }
+
+                                // Clear button
+                                Rectangle {
+                                    width: 18
+                                    height: 18
+                                    radius: 9
+                                    color: clearFilterArea.containsMouse ? "#555555" : "transparent"
+                                    visible: searchInput.text.length > 0 || photoModel.filterText !== ""
+
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "\u2715"
+                                        color: "#888888"
+                                        font.pixelSize: 10
+                                    }
+
+                                    MouseArea {
+                                        id: clearFilterArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            searchInput.text = ""
+                                            photoModel.clearFilter()
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Placeholder text
+                            Label {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 28
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Tag oder Sender..."
+                                color: "#666666"
+                                font.pixelSize: 12
+                                visible: searchInput.text.length === 0 && !searchInput.activeFocus
+                            }
+                        }
+
+                        // Active filter indicator
+                        Rectangle {
+                            anchors.left: searchBox.right
+                            anchors.leftMargin: 6
+                            anchors.verticalCenter: searchBox.verticalCenter
+                            width: activeFilterLabel.implicitWidth + 20
+                            height: 22
+                            radius: 11
+                            color: root.accentColor
+                            visible: photoModel.filterText !== ""
+
+                            Label {
+                                id: activeFilterLabel
+                                anchors.centerIn: parent
+                                text: photoModel.filterText
+                                color: "#ffffff"
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    searchInput.text = ""
+                                    photoModel.clearFilter()
+                                }
+                            }
+                        }
+
+                        // Autocomplete popup
+                        Rectangle {
+                            id: suggestionPopup
+                            anchors.top: searchBox.bottom
+                            anchors.topMargin: 4
+                            anchors.left: searchBox.left
+                            width: searchBox.width
+                            height: Math.min(suggestionList.contentHeight + 8, 200)
+                            color: "#2a2a2a"
+                            radius: 8
+                            border.color: "#444444"
+                            border.width: 1
+                            visible: searchInput.activeFocus && photoModel.filterSuggestions.length > 0 && searchInput.text.length > 0
+                            z: 200
+                            clip: true
+
+                            ListView {
+                                id: suggestionList
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                model: photoModel.filterSuggestions
+                                currentIndex: -1
+                                clip: true
+
+                                delegate: Rectangle {
+                                    required property string modelData
+                                    required property int index
+
+                                    width: ListView.view.width
+                                    height: 30
+                                    radius: 4
+                                    color: index === suggestionList.currentIndex ? "#444444"
+                                         : suggItemArea.containsMouse ? "#383838" : "transparent"
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 8
+                                        spacing: 6
+
+                                        Label {
+                                            text: modelData.startsWith("Tag:") ? "\u{1F3F7}" : "\u{1F4E5}"
+                                            font.pixelSize: 12
+                                        }
+
+                                        Label {
+                                            text: modelData
+                                            color: "#cccccc"
+                                            font.pixelSize: 12
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: suggItemArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: applySuggestion(modelData)
+                                    }
+                                }
+                            }
+                        }
+
+                        function applySuggestion(suggestion) {
+                            // Extract the actual value after "Tag: " or "Sender: "
+                            var value = suggestion
+                            if (suggestion.startsWith("Tag: ")) {
+                                value = suggestion.substring(5)
+                            } else if (suggestion.startsWith("Sender: ")) {
+                                value = suggestion.substring(8)
+                            }
+                            searchInput.suppressUpdate = true
+                            searchInput.text = value
+                            searchInput.suppressUpdate = false
+                            photoModel.filterText = value
+                            suggestionPopup.visible = false
+                        }
+                    }
+
                     Label {
                         text: "Größe"
                         color: "#aaaaaa"

@@ -4,6 +4,7 @@
 #include <QVariantList>
 #include <QVector>
 #include <QString>
+#include <QSet>
 #include "PhotoDatabase.h"
 
 // The model provides a flat list of "rows" for a ListView.
@@ -33,6 +34,8 @@ class PhotoModel : public QAbstractListModel
     Q_PROPERTY(int timelineMaxCount READ timelineMaxCount NOTIFY modelReloaded)
     Q_PROPERTY(int mediaTypeFilter READ mediaTypeFilter WRITE setMediaTypeFilter NOTIFY mediaTypeFilterChanged)
     Q_PROPERTY(bool showDeleted READ showDeleted WRITE setShowDeleted NOTIFY showDeletedChanged)
+    Q_PROPERTY(QString filterText READ filterText WRITE setFilterText NOTIFY filterTextChanged)
+    Q_PROPERTY(QStringList filterSuggestions READ filterSuggestions NOTIFY filterSuggestionsChanged)
 
 public:
     enum Roles {
@@ -58,6 +61,11 @@ public:
     void setMediaTypeFilter(int filter);
     bool showDeleted() const { return m_showDeleted; }
     void setShowDeleted(bool show);
+    QString filterText() const { return m_filterText; }
+    void setFilterText(const QString &text);
+    QStringList filterSuggestions() const { return m_filterSuggestions; }
+    Q_INVOKABLE void updateSuggestions(const QString &input);
+    Q_INVOKABLE void clearFilter();
     QVariantList timelineData() const { return m_timelineData; }
     int timelineMaxCount() const { return m_timelineMaxCount; }
 
@@ -79,6 +87,8 @@ signals:
     void photosPerRowChanged();
     void mediaTypeFilterChanged();
     void showDeletedChanged();
+    void filterTextChanged();
+    void filterSuggestionsChanged();
     void modelReloaded();
 
 private:
@@ -93,6 +103,10 @@ private:
     int m_totalPhotos = 0;
     int m_mediaTypeFilter = -1;  // -1 = all, 0 = photos only, 1 = videos only
     bool m_showDeleted = false;
+    QString m_filterText;
+    QSet<qint64> m_filterPhotoIds;  // photo IDs matching the current tag/owner filter
+    bool m_filterActive = false;
+    QStringList m_filterSuggestions;
 
     QVariantList m_timelineData;
     QVector<int> m_headerRowIndices;    // row index for each timeline entry

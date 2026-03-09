@@ -3,6 +3,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QDebug>
+#include <QSqlQuery>
 #include <QElapsedTimer>
 
 PhotoModel::PhotoModel(QObject *parent)
@@ -128,6 +129,85 @@ void PhotoModel::setShowDeleted(bool show)
     }
 }
 
+void PhotoModel::setFilterText(const QString &text)
+{
+    if (text == m_filterText) return;
+    m_filterText = text;
+    emit filterTextChanged();
+
+    // Build the set of matching photo IDs
+    m_filterPhotoIds.clear();
+    m_filterActive = !text.isEmpty();
+
+    if (m_filterActive && m_db) {
+        QString lower = text.toLower();
+
+        // Match by tag name: find tags whose name matches, then get their photo IDs
+        auto allTags = m_db->loadAllTags();
+        for (const auto &tag : allTags) {
+            if (tag.name.toLower() == lower) {
+                auto ids = m_db->photoIdsForTag(tag.id);
+                for (qint64 id : ids) {
+                    m_filterPhotoIds.insert(id);
+                }
+            }
+        }
+
+        // Match by owner: find photos whose owner matches
+        for (const auto &photo : m_allPhotos) {
+            if (!photo.owner.isEmpty() && photo.owner.toLower() == lower) {
+                m_filterPhotoIds.insert(photo.id);
+            }
+        }
+    }
+
+    rebuildGrid();
+    buildTimelineData();
+    emit modelReloaded();
+}
+
+void PhotoModel::updateSuggestions(const QString &input)
+{
+    m_filterSuggestions.clear();
+
+    if (input.isEmpty() || !m_db) {
+        emit filterSuggestionsChanged();
+        return;
+    }
+
+    QString lower = input.toLower();
+
+    // Collect tag names
+    auto allTags = m_db->loadAllTags();
+    for (const auto &tag : allTags) {
+        if (tag.name.toLower().startsWith(lower) || tag.name.toLower().contains(lower)) {
+            QString entry = QStringLiteral("Tag: ") + tag.name;
+            if (!m_filterSuggestions.contains(entry))
+                m_filterSuggestions.append(entry);
+        }
+    }
+
+    // Collect unique owners
+    QSet<QString> seenOwners;
+    for (const auto &photo : m_allPhotos) {
+        if (!photo.owner.isEmpty() && !seenOwners.contains(photo.owner)) {
+            seenOwners.insert(photo.owner);
+            if (photo.owner.toLower().startsWith(lower) || photo.owner.toLower().contains(lower)) {
+                QString entry = QStringLiteral("Sender: ") + photo.owner;
+                if (!m_filterSuggestions.contains(entry))
+                    m_filterSuggestions.append(entry);
+            }
+        }
+    }
+
+    emit filterSuggestionsChanged();
+}
+
+void PhotoModel::clearFilter()
+{
+    setFilterText(QString());
+}
+
 void PhotoModel::rebuildGrid()
 {
     QElapsedTimer timer;
@@ -166,6 +246,10 @@ void PhotoModel::rebuildGrid()
     for (const auto &photo : m_allPhotos) {
         // Apply media type filter
         if (m_mediaTypeFilter >= 0 && static_cast<int>(photo.mediaType) != m_mediaTypeFilter)
+            continue;
+
+        // Apply text filter (tag/owner)
+        if (m_filterActive && !m_filterPhotoIds.contains(photo.id))
             continue;
 
         ++filteredCount;
