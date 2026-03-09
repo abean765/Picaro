@@ -68,8 +68,9 @@ public:
     qint64 insertPhoto(const PhotoRecord &record, const QByteArray &thumbnail);
     bool photoExists(const QString &filePath) const;
 
-    // Load all records sorted by date (no thumbnails - those are loaded on demand)
+    // Load records sorted by date (no thumbnails - those are loaded on demand)
     QVector<PhotoRecord> loadAllRecords() const;
+    QVector<PhotoRecord> loadDeletedRecords() const;
     int photoCount() const;
 
     // Statistics

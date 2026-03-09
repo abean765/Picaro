@@ -75,7 +75,7 @@ void PhotoModel::loadFromDatabase(PhotoDatabase *db)
     QElapsedTimer timer;
     timer.start();
 
-    m_allPhotos = db->loadAllRecords();
+    m_allPhotos = m_showDeleted ? db->loadDeletedRecords() : db->loadAllRecords();
 
     // Build id->index lookup
     m_idToPhotoIndex.clear();
@@ -116,6 +116,16 @@ void PhotoModel::setMediaTypeFilter(int filter)
     rebuildGrid();
     buildTimelineData();
     emit modelReloaded();
+}
+
+void PhotoModel::setShowDeleted(bool show)
+{
+    if (show == m_showDeleted) return;
+    m_showDeleted = show;
+    emit showDeletedChanged();
+    if (m_db) {
+        loadFromDatabase(m_db);
+    }
 }
 
 void PhotoModel::rebuildGrid()
@@ -274,6 +284,29 @@ void PhotoModel::deletePhoto(qint64 id)
         m_allPhotos.removeAt(idx);
 
         // Rebuild index map (indices shifted)
+        m_idToPhotoIndex.clear();
+        m_idToPhotoIndex.reserve(m_allPhotos.size());
+        for (int i = 0; i < m_allPhotos.size(); ++i) {
+            m_idToPhotoIndex[m_allPhotos[i].id] = i;
+        }
+
+        rebuildGrid();
+        buildTimelineData();
+        emit modelReloaded();
+    }
+}
+
+void PhotoModel::restorePhoto(qint64 id)
+{
+    if (!m_db) return;
+    if (!m_db->markDeleted(id, false)) return;
+
+    // Remove from in-memory data (same logic as deletePhoto — removes from current view)
+    auto it = m_idToPhotoIndex.constFind(id);
+    if (it != m_idToPhotoIndex.constEnd()) {
+        int idx = it.value();
+        m_allPhotos.removeAt(idx);
+
         m_idToPhotoIndex.clear();
         m_idToPhotoIndex.reserve(m_allPhotos.size());
         for (int i = 0; i < m_allPhotos.size(); ++i) {

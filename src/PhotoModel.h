@@ -32,6 +32,7 @@ class PhotoModel : public QAbstractListModel
     Q_PROPERTY(QVariantList timelineData READ timelineData NOTIFY modelReloaded)
     Q_PROPERTY(int timelineMaxCount READ timelineMaxCount NOTIFY modelReloaded)
     Q_PROPERTY(int mediaTypeFilter READ mediaTypeFilter WRITE setMediaTypeFilter NOTIFY mediaTypeFilterChanged)
+    Q_PROPERTY(bool showDeleted READ showDeleted WRITE setShowDeleted NOTIFY showDeletedChanged)
 
 public:
     enum Roles {
@@ -55,6 +56,8 @@ public:
     int totalPhotos() const { return m_totalPhotos; }
     int mediaTypeFilter() const { return m_mediaTypeFilter; }
     void setMediaTypeFilter(int filter);
+    bool showDeleted() const { return m_showDeleted; }
+    void setShowDeleted(bool show);
     QVariantList timelineData() const { return m_timelineData; }
     int timelineMaxCount() const { return m_timelineMaxCount; }
 
@@ -68,10 +71,12 @@ public:
     Q_INVOKABLE qint64 nextPhotoId(qint64 currentId) const;
     Q_INVOKABLE qint64 previousPhotoId(qint64 currentId) const;
     Q_INVOKABLE void deletePhoto(qint64 id);
+    Q_INVOKABLE void restorePhoto(qint64 id);
 
 signals:
     void photosPerRowChanged();
     void mediaTypeFilterChanged();
+    void showDeletedChanged();
     void modelReloaded();
 
 private:
@@ -85,6 +90,7 @@ private:
     int m_photosPerRow = 5;
     int m_totalPhotos = 0;
     int m_mediaTypeFilter = -1;  // -1 = all, 0 = photos only, 1 = videos only
+    bool m_showDeleted = false;
 
     QVariantList m_timelineData;
     QVector<int> m_headerRowIndices;    // row index for each timeline entry

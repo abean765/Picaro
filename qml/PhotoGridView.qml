@@ -189,7 +189,7 @@ ListView {
                         }
                     }
 
-                    // Delete button (trash icon, visible on hover)
+                    // Delete / Restore button (visible on hover)
                     Rectangle {
                         id: deleteBtn
                         visible: hoverHandler.hovered && !videoOutput.visible
@@ -199,12 +199,14 @@ ListView {
                         width: 28
                         height: 28
                         radius: 14
-                        color: deleteBtnArea.containsMouse ? "#dd3333" : "#90000000"
+                        color: deleteBtnArea.containsMouse
+                               ? (photoModel.showDeleted ? "#22c55e" : "#dd3333")
+                               : "#90000000"
                         z: 3
 
                         Label {
                             anchors.centerIn: parent
-                            text: "\uD83D\uDDD1"
+                            text: photoModel.showDeleted ? "\u21A9" : "\uD83D\uDDD1"
                             font.pixelSize: 14
                             color: "#ffffff"
                         }
@@ -216,7 +218,10 @@ ListView {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: function(mouse) {
                                 mouse.accepted = true
-                                photoModel.deletePhoto(modelData.id)
+                                if (photoModel.showDeleted)
+                                    photoModel.restorePhoto(modelData.id)
+                                else
+                                    photoModel.deletePhoto(modelData.id)
                             }
                         }
                     }

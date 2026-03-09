@@ -219,31 +219,23 @@ ApplicationWindow {
                             model: [
                                 { label: "Alle", filter: -1 },
                                 { label: "Fotos", filter: 0 },
-                                { label: "Videos", filter: 1 },
-                                { label: "Live", filter: 2 }
+                                { label: "Videos", filter: 1 }
                             ]
 
                             Rectangle {
                                 required property var modelData
                                 required property int index
                                 readonly property bool isFirst: index === 0
-                                readonly property bool isLast: index === filterRepeater.count - 1
+                                readonly property bool isActive: !photoModel.showDeleted && photoModel.mediaTypeFilter === modelData.filter
                                 width: filterLabel.implicitWidth + 20
                                 height: 26
-                                radius: isFirst || isLast ? 4 : 0
-                                color: photoModel.mediaTypeFilter === modelData.filter ? "#555555" : "#3a3a3a"
+                                radius: isFirst ? 4 : 0
+                                color: isActive ? "#555555" : "#3a3a3a"
 
-                                // Round only left corners for first, right for last
+                                // Round only left corners for first
                                 Rectangle {
                                     visible: isFirst
                                     anchors.right: parent.right
-                                    width: parent.width / 2
-                                    height: parent.height
-                                    color: parent.color
-                                }
-                                Rectangle {
-                                    visible: isLast
-                                    anchors.left: parent.left
                                     width: parent.width / 2
                                     height: parent.height
                                     color: parent.color
@@ -253,14 +245,49 @@ ApplicationWindow {
                                     id: filterLabel
                                     anchors.centerIn: parent
                                     text: modelData.label
-                                    color: photoModel.mediaTypeFilter === modelData.filter ? "#ffffff" : "#aaaaaa"
+                                    color: isActive ? "#ffffff" : "#aaaaaa"
                                     font.pixelSize: 12
                                 }
 
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: photoModel.mediaTypeFilter = modelData.filter
+                                    onClicked: {
+                                        photoModel.showDeleted = false
+                                        photoModel.mediaTypeFilter = modelData.filter
+                                    }
+                                }
+                            }
+                        }
+
+                        // Deleted filter (separate toggle)
+                        Rectangle {
+                            width: deletedLabel.implicitWidth + 20
+                            height: 26
+                            radius: 4
+                            color: photoModel.showDeleted ? "#664444" : "#3a3a3a"
+
+                            // Round only right corners
+                            Rectangle {
+                                anchors.left: parent.left
+                                width: parent.width / 2
+                                height: parent.height
+                                color: parent.color
+                            }
+
+                            Label {
+                                id: deletedLabel
+                                anchors.centerIn: parent
+                                text: "\uD83D\uDDD1 Gelöscht"
+                                color: photoModel.showDeleted ? "#ff8888" : "#aaaaaa"
+                                font.pixelSize: 12
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    photoModel.showDeleted = !photoModel.showDeleted
                                 }
                             }
                         }

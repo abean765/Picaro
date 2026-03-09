@@ -213,6 +213,40 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
     return records;
 }
 
+QVector<PhotoRecord> PhotoDatabase::loadDeletedRecords() const
+{
+    QVector<PhotoRecord> records;
+
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral(
+        "SELECT id, file_path, file_name, date_taken, date_modified, "
+        "       width, height, file_size, media_type, category, live_video_path, "
+        "       mime_type, duration, month_key "
+        "FROM photos WHERE deleted = 1 ORDER BY date_taken DESC"
+    ));
+
+    while (q.next()) {
+        PhotoRecord r;
+        r.id = q.value(0).toLongLong();
+        r.filePath = q.value(1).toString();
+        r.fileName = q.value(2).toString();
+        r.dateTaken = QDateTime::fromString(q.value(3).toString(), Qt::ISODate);
+        r.dateModified = QDateTime::fromString(q.value(4).toString(), Qt::ISODate);
+        r.width = q.value(5).toInt();
+        r.height = q.value(6).toInt();
+        r.fileSize = q.value(7).toLongLong();
+        r.mediaType = static_cast<MediaType>(q.value(8).toInt());
+        r.category = static_cast<PhotoCategory>(q.value(9).toInt());
+        r.liveVideoPath = q.value(10).toString();
+        r.mimeType = q.value(11).toString();
+        r.duration = q.value(12).toDouble();
+        r.monthKey = q.value(13).toString();
+        records.append(std::move(r));
+    }
+
+    return records;
+}
+
 int PhotoDatabase::photoCount() const
 {
     QSqlQuery q(m_db);
