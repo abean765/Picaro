@@ -14,7 +14,7 @@ Rectangle {
     property int intervalSeconds: 5
     property bool running: false
 
-    readonly property qint64 currentPhotoId: photoIds.length > 0 ? photoIds[currentIndex] : -1
+    readonly property int currentPhotoId: photoIds.length > 0 ? photoIds[currentIndex] : -1
     readonly property string filePath: currentPhotoId > 0 ? photoModel.filePathForId(currentPhotoId) : ""
     readonly property int mediaType: currentPhotoId > 0 ? photoModel.mediaTypeForId(currentPhotoId) : 0
     readonly property string liveVideoPath: currentPhotoId > 0 ? photoModel.liveVideoPathForId(currentPhotoId) : ""

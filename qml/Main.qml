@@ -775,7 +775,7 @@ ApplicationWindow {
             visible = false
         }
 
-        property qint64 ssSelectedTagId: -1
+        property int ssSelectedTagId: -1
 
         MouseArea {
             anchors.fill: parent
