@@ -15,6 +15,7 @@ struct PhotoCell {
     qint64 id = 0;
     MediaType mediaType = MediaType::Photo;
     QString filePath;
+    QString liveVideoPath;
 };
 
 struct GridRow {
@@ -111,5 +112,11 @@ private:
 
     QVariantList m_timelineData;
     QVector<int> m_headerRowIndices;    // row index for each timeline entry
+    QHash<QString, int> m_monthKeyToTimelineIndex; // monthKey -> timeline index (O(1) lookup)
     int m_timelineMaxCount = 1;
+
+    // Cached tag list to avoid repeated DB queries during filter/suggestions
+    QVector<TagRecord> m_cachedTags;
+    bool m_tagsCacheDirty = true;
+    void ensureTagsCache();
 };

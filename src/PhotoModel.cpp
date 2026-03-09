@@ -41,11 +41,7 @@ QVariant PhotoModel::data(const QModelIndex &index, int role) const
             m[QStringLiteral("id")] = cell.id;
             m[QStringLiteral("mediaType")] = static_cast<int>(cell.mediaType);
             m[QStringLiteral("filePath")] = cell.filePath;
-            // Look up liveVideoPath from the full record
-            auto it = m_idToPhotoIndex.constFind(cell.id);
-            if (it != m_idToPhotoIndex.constEnd()) {
-                m[QStringLiteral("liveVideoPath")] = m_allPhotos[it.value()].liveVideoPath;
-            }
+            m[QStringLiteral("liveVideoPath")] = cell.liveVideoPath;
             list.append(m);
         }
         return list;
@@ -95,6 +91,7 @@ void PhotoModel::loadFromDatabase(PhotoDatabase *db)
 void PhotoModel::reload()
 {
     if (m_db) {
+        m_tagsCacheDirty = true;
         loadFromDatabase(m_db);
     }
 }
@@ -143,8 +140,8 @@ void PhotoModel::setFilterText(const QString &text)
         QString lower = text.toLower();
 
         // Match by tag name: find tags whose name matches, then get their photo IDs
-        auto allTags = m_db->loadAllTags();
-        for (const auto &tag : allTags) {
+        ensureTagsCache();
+        for (const auto &tag : m_cachedTags) {
             if (tag.name.toLower() == lower) {
                 auto ids = m_db->photoIdsForTag(tag.id);
                 for (qint64 id : ids) {
@@ -178,8 +175,8 @@ void PhotoModel::updateSuggestions(const QString &input)
     QString lower = input.toLower();
 
     // Collect tag names
-    auto allTags = m_db->loadAllTags();
-    for (const auto &tag : allTags) {
+    ensureTagsCache();
+    for (const auto &tag : m_cachedTags) {
         if (tag.name.toLower().startsWith(lower) || tag.name.toLower().contains(lower)) {
             QString entry = QStringLiteral("Tag: ") + tag.name;
             if (!m_filterSuggestions.contains(entry))
@@ -280,6 +277,7 @@ void PhotoModel::rebuildGrid()
         cell.id = photo.id;
         cell.mediaType = photo.mediaType;
         cell.filePath = photo.filePath;
+        cell.liveVideoPath = photo.liveVideoPath;
         pendingCells.append(std::move(cell));
 
         if (pendingCells.size() >= m_photosPerRow) {
@@ -337,9 +335,12 @@ qint64 PhotoModel::nextPhotoId(qint64 currentId) const
     auto it = m_idToPhotoIndex.constFind(currentId);
     if (it == m_idToPhotoIndex.constEnd()) return -1;
     for (int idx = it.value() + 1; idx < m_allPhotos.size(); ++idx) {
-        if (m_mediaTypeFilter >= 0 && static_cast<int>(m_allPhotos[idx].mediaType) != m_mediaTypeFilter)
+        const auto &photo = m_allPhotos[idx];
+        if (m_mediaTypeFilter >= 0 && static_cast<int>(photo.mediaType) != m_mediaTypeFilter)
             continue;
-        return m_allPhotos[idx].id;
+        if (m_filterActive && !m_filterPhotoIds.contains(photo.id))
+            continue;
+        return photo.id;
     }
     return -1;
 }
@@ -349,9 +350,12 @@ qint64 PhotoModel::previousPhotoId(qint64 currentId) const
     auto it = m_idToPhotoIndex.constFind(currentId);
     if (it == m_idToPhotoIndex.constEnd()) return -1;
     for (int idx = it.value() - 1; idx >= 0; --idx) {
-        if (m_mediaTypeFilter >= 0 && static_cast<int>(m_allPhotos[idx].mediaType) != m_mediaTypeFilter)
+        const auto &photo = m_allPhotos[idx];
+        if (m_mediaTypeFilter >= 0 && static_cast<int>(photo.mediaType) != m_mediaTypeFilter)
             continue;
-        return m_allPhotos[idx].id;
+        if (m_filterActive && !m_filterPhotoIds.contains(photo.id))
+            continue;
+        return photo.id;
     }
     return -1;
 }
@@ -361,17 +365,16 @@ void PhotoModel::deletePhoto(qint64 id)
     if (!m_db) return;
     if (!m_db->markDeleted(id)) return;
 
-    // Remove from in-memory data and rebuild grid
     auto it = m_idToPhotoIndex.constFind(id);
     if (it != m_idToPhotoIndex.constEnd()) {
         int idx = it.value();
         m_allPhotos.removeAt(idx);
+        m_idToPhotoIndex.remove(id);
 
-        // Rebuild index map (indices shifted)
-        m_idToPhotoIndex.clear();
-        m_idToPhotoIndex.reserve(m_allPhotos.size());
-        for (int i = 0; i < m_allPhotos.size(); ++i) {
-            m_idToPhotoIndex[m_allPhotos[i].id] = i;
+        // Update only shifted indices (those after the removed element)
+        for (auto jt = m_idToPhotoIndex.begin(); jt != m_idToPhotoIndex.end(); ++jt) {
+            if (jt.value() > idx)
+                jt.value()--;
         }
 
         rebuildGrid();
@@ -385,16 +388,15 @@ void PhotoModel::restorePhoto(qint64 id)
     if (!m_db) return;
     if (!m_db->markDeleted(id, false)) return;
 
-    // Remove from in-memory data (same logic as deletePhoto — removes from current view)
     auto it = m_idToPhotoIndex.constFind(id);
     if (it != m_idToPhotoIndex.constEnd()) {
         int idx = it.value();
         m_allPhotos.removeAt(idx);
+        m_idToPhotoIndex.remove(id);
 
-        m_idToPhotoIndex.clear();
-        m_idToPhotoIndex.reserve(m_allPhotos.size());
-        for (int i = 0; i < m_allPhotos.size(); ++i) {
-            m_idToPhotoIndex[m_allPhotos[i].id] = i;
+        for (auto jt = m_idToPhotoIndex.begin(); jt != m_idToPhotoIndex.end(); ++jt) {
+            if (jt.value() > idx)
+                jt.value()--;
         }
 
         rebuildGrid();
@@ -415,6 +417,13 @@ void PhotoModel::setRating(qint64 id, int rating)
     m_db->setRating(id, rating);
 }
 
+void PhotoModel::ensureTagsCache()
+{
+    if (!m_tagsCacheDirty || !m_db) return;
+    m_cachedTags = m_db->loadAllTags();
+    m_tagsCacheDirty = false;
+}
+
 QVariantList PhotoModel::visiblePhotoIds() const
 {
     QVariantList ids;
@@ -433,6 +442,7 @@ void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();
     m_headerRowIndices.clear();
+    m_monthKeyToTimelineIndex.clear();
     m_timelineMaxCount = 1;
 
     QLocale locale(QStringLiteral("de_DE"));
@@ -480,6 +490,8 @@ void PhotoModel::buildTimelineData()
 
         m_timelineData.append(entry);
         m_headerRowIndices.append(i);
+        if (!monthKey.isEmpty())
+            m_monthKeyToTimelineIndex[monthKey] = m_timelineData.size() - 1;
 
         if (count > m_timelineMaxCount)
             m_timelineMaxCount = count;
@@ -499,10 +511,5 @@ int PhotoModel::timelineIndexForPhotoId(qint64 id) const
     if (it == m_idToPhotoIndex.constEnd()) return -1;
 
     const QString &monthKey = m_allPhotos[it.value()].monthKey;
-
-    for (int i = 0; i < m_timelineData.size(); ++i) {
-        if (m_timelineData[i].toMap().value(QStringLiteral("monthKey")).toString() == monthKey)
-            return i;
-    }
-    return -1;
+    return m_monthKeyToTimelineIndex.value(monthKey, -1);
 }

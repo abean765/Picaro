@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QHash>
 #include <QVector>
 #include "PhotoDatabase.h"
 
@@ -49,6 +50,9 @@ signals:
     void tagsChanged();
 
 private:
+    void rebuildIndex();
+
     PhotoDatabase *m_db = nullptr;
     QVector<TagRecord> m_tags;
+    QHash<qint64, int> m_tagIndex;  // tagId -> index in m_tags for O(1) lookup
 };

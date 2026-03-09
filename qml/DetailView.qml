@@ -90,7 +90,6 @@ Rectangle {
         source: hasContent && !isVideo ? "file:///" + filePath : ""
         fillMode: Image.PreserveAspectFit
         asynchronous: true
-        cache: false
 
         opacity: status === Image.Ready ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 150 } }
@@ -170,15 +169,13 @@ Rectangle {
 
             // Duration label
             Label {
-                text: {
-                    var pos = Math.floor(detailPlayer.position / 1000)
-                    var dur = Math.floor(detailPlayer.duration / 1000)
-                    var fm = function(s) {
-                        var m = Math.floor(s / 60)
-                        var sec = s % 60
-                        return m + ":" + (sec < 10 ? "0" : "") + sec
-                    }
-                    return fm(pos) + " / " + fm(dur)
+                text: formatTime(detailPlayer.position) + " / " + formatTime(detailPlayer.duration)
+
+                function formatTime(ms) {
+                    var s = Math.floor(ms / 1000)
+                    var m = Math.floor(s / 60)
+                    var sec = s % 60
+                    return m + ":" + (sec < 10 ? "0" : "") + sec
                 }
                 color: "#cccccc"
                 font.pixelSize: 12

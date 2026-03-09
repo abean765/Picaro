@@ -87,7 +87,13 @@ QStringList PhotoImporter::scanDirectory(const QString &path) const
     QStringList files;
     QDirIterator it(path, QDir::Files, QDirIterator::Subdirectories);
 
-    QStringList allExtensions = s_photoExtensions + s_videoExtensions;
+    // Use QSet for O(1) extension lookup instead of QStringList O(n)
+    static const QSet<QString> allExtensions = []() {
+        QSet<QString> s;
+        for (const auto &ext : s_photoExtensions) s.insert(ext);
+        for (const auto &ext : s_videoExtensions) s.insert(ext);
+        return s;
+    }();
 
     while (it.hasNext()) {
         it.next();

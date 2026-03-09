@@ -596,26 +596,37 @@ ApplicationWindow {
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
                         visible: photoModel.totalPhotos > 0
-                        activeIndex: {
-                            // Find which timeline month corresponds to current scroll position
-                            if (!photoGrid.count) return -1
-                            var topIdx = photoGrid.indexAt(0, photoGrid.contentY + 10)
-                            if (topIdx < 0) return -1
-                            // Walk backward to find nearest header
-                            var data = photoModel.timelineData
-                            var bestMatch = -1
-                            for (var i = 0; i < data.length; ++i) {
-                                if (data[i].rowIndex <= topIdx) {
-                                    bestMatch = i
-                                } else {
-                                    break
-                                }
-                            }
-                            return bestMatch
-                        }
                         onMonthClicked: function(timelineIndex, rowIndex) {
                             photoGrid.positionViewAtIndex(rowIndex, ListView.Beginning)
                         }
+                    }
+
+                    // Debounced timeline activeIndex update (avoids per-pixel recomputation during scroll)
+                    Timer {
+                        id: timelineUpdateTimer
+                        interval: 80
+                        onTriggered: {
+                            if (!photoGrid.count) { timelineView.activeIndex = -1; return }
+                            var topIdx = photoGrid.indexAt(0, photoGrid.contentY + 10)
+                            if (topIdx < 0) { timelineView.activeIndex = -1; return }
+                            // Binary search through headerRowIndices
+                            var data = photoModel.timelineData
+                            var lo = 0, hi = data.length - 1, best = -1
+                            while (lo <= hi) {
+                                var mid = (lo + hi) >> 1
+                                if (data[mid].rowIndex <= topIdx) {
+                                    best = mid
+                                    lo = mid + 1
+                                } else {
+                                    hi = mid - 1
+                                }
+                            }
+                            timelineView.activeIndex = best
+                        }
+                    }
+                    Connections {
+                        target: photoGrid
+                        function onContentYChanged() { timelineUpdateTimer.restart() }
                     }
 
                     PhotoGridView {

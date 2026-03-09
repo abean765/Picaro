@@ -121,7 +121,6 @@ Rectangle {
         source: hasContent && !isVideo ? "file:///" + filePath : ""
         fillMode: Image.PreserveAspectFit
         asynchronous: true
-        cache: false
 
         opacity: status === Image.Ready ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 300 } }

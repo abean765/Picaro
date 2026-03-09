@@ -49,8 +49,18 @@ void TagModel::reload()
     if (!m_db) return;
     beginResetModel();
     m_tags = m_db->loadAllTags();
+    rebuildIndex();
     endResetModel();
     emit tagsChanged();
+}
+
+void TagModel::rebuildIndex()
+{
+    m_tagIndex.clear();
+    m_tagIndex.reserve(m_tags.size());
+    for (int i = 0; i < m_tags.size(); ++i) {
+        m_tagIndex[m_tags[i].id] = i;
+    }
 }
 
 qint64 TagModel::createTag(const QString &name, const QString &color, const QString &icon)
@@ -105,25 +115,22 @@ bool TagModel::removeTagFromPhoto(qint64 photoId, qint64 tagId)
 
 QString TagModel::tagName(qint64 tagId) const
 {
-    for (const auto &t : m_tags) {
-        if (t.id == tagId) return t.name;
-    }
+    auto it = m_tagIndex.constFind(tagId);
+    if (it != m_tagIndex.constEnd()) return m_tags[it.value()].name;
     return {};
 }
 
 QString TagModel::tagColor(qint64 tagId) const
 {
-    for (const auto &t : m_tags) {
-        if (t.id == tagId) return t.color;
-    }
+    auto it = m_tagIndex.constFind(tagId);
+    if (it != m_tagIndex.constEnd()) return m_tags[it.value()].color;
     return QStringLiteral("#888888");
 }
 
 QString TagModel::tagIcon(qint64 tagId) const
 {
-    for (const auto &t : m_tags) {
-        if (t.id == tagId) return t.icon;
-    }
+    auto it = m_tagIndex.constFind(tagId);
+    if (it != m_tagIndex.constEnd()) return m_tags[it.value()].icon;
     return {};
 }
 

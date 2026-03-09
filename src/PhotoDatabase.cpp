@@ -112,75 +112,49 @@ void PhotoDatabase::createSchema()
 void PhotoDatabase::migrateSchema()
 {
     QSqlQuery q(m_db);
+
+    // Single PRAGMA call — collect all existing columns
     q.exec(QStringLiteral("PRAGMA table_info(photos)"));
-    bool hasCategory = false;
-    bool hasDeleted = false;
+    QSet<QString> existingCols;
     while (q.next()) {
-        const QString col = q.value(1).toString();
-        if (col == QStringLiteral("category")) hasCategory = true;
-        if (col == QStringLiteral("deleted")) hasDeleted = true;
+        existingCols.insert(q.value(1).toString());
     }
-    if (!hasCategory) {
+
+    if (!existingCols.contains(QStringLiteral("category"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN category INTEGER DEFAULT 0"));
         q.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_photos_category ON photos(category)"));
         qDebug() << "Migrated: added category column";
     }
-    if (!hasDeleted) {
+    if (!existingCols.contains(QStringLiteral("deleted"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN deleted INTEGER DEFAULT 0"));
         qDebug() << "Migrated: added deleted column";
     }
-
-    // Check for rating column
-    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
-    bool hasRating = false;
-    while (q.next()) {
-        if (q.value(1).toString() == QStringLiteral("rating")) hasRating = true;
-    }
-    if (!hasRating) {
+    if (!existingCols.contains(QStringLiteral("rating"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN rating INTEGER DEFAULT 0"));
         qDebug() << "Migrated: added rating column";
     }
-
-    // Check for has_exif and has_geolocation columns
-    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
-    bool hasExifCol = false;
-    bool hasGeoCol = false;
-    while (q.next()) {
-        const QString col = q.value(1).toString();
-        if (col == QStringLiteral("has_exif")) hasExifCol = true;
-        if (col == QStringLiteral("has_geolocation")) hasGeoCol = true;
-    }
-    if (!hasExifCol) {
+    if (!existingCols.contains(QStringLiteral("has_exif"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN has_exif INTEGER DEFAULT 0"));
         qDebug() << "Migrated: added has_exif column";
     }
-    if (!hasGeoCol) {
+    if (!existingCols.contains(QStringLiteral("has_geolocation"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN has_geolocation INTEGER DEFAULT 0"));
         qDebug() << "Migrated: added has_geolocation column";
     }
-
-    // Check for owner column
-    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
-    bool hasOwner = false;
-    while (q.next()) {
-        if (q.value(1).toString() == QStringLiteral("owner")) hasOwner = true;
-    }
-    if (!hasOwner) {
+    if (!existingCols.contains(QStringLiteral("owner"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN owner TEXT DEFAULT ''"));
         qDebug() << "Migrated: added owner column";
     }
-
-    // Check for phash column
-    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
-    bool hasPhash = false;
-    while (q.next()) {
-        if (q.value(1).toString() == QStringLiteral("phash")) hasPhash = true;
-    }
-    if (!hasPhash) {
+    if (!existingCols.contains(QStringLiteral("phash"))) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN phash TEXT DEFAULT ''"));
         q.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_photos_phash ON photos(phash)"));
         qDebug() << "Migrated: added phash column with index";
     }
+
+    // Composite index for the main query (deleted + date_taken sort)
+    q.exec(QStringLiteral(
+        "CREATE INDEX IF NOT EXISTS idx_photos_deleted_date ON photos(deleted, date_taken DESC)"
+    ));
 }
 
 void PhotoDatabase::close()
@@ -534,9 +508,10 @@ QVector<TagRecord> PhotoDatabase::loadAllTags() const
     QVector<TagRecord> tags;
     QSqlQuery q(m_db);
     q.exec(QStringLiteral(
-        "SELECT t.id, t.name, t.color, t.icon, "
-        "  (SELECT COUNT(*) FROM photo_tags pt WHERE pt.tag_id = t.id) "
-        "FROM tags t ORDER BY t.name"
+        "SELECT t.id, t.name, t.color, t.icon, COUNT(pt.photo_id) "
+        "FROM tags t LEFT JOIN photo_tags pt ON pt.tag_id = t.id "
+        "GROUP BY t.id, t.name, t.color, t.icon "
+        "ORDER BY t.name"
     ));
     while (q.next()) {
         TagRecord t;
