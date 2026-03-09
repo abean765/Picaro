@@ -1,4 +1,5 @@
 #include "ThumbnailProvider.h"
+#include <QCoreApplication>
 #include <QImage>
 #include <QMetaObject>
 #include <QPointer>
@@ -131,31 +132,29 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(
     QPointer<ThumbnailResponse> guardedResponse(response);
     QString dbPath = m_dbPath;
     ThumbnailCache *cache = &m_cache;
+    QPointer<QObject> appObject(QCoreApplication::instance());
 
-    m_pool.start([photoId, dbPath, cache, cancelled, guardedResponse]() {
-        if (cancelled->load(std::memory_order_relaxed)) {
-            if (guardedResponse) {
-                QMetaObject::invokeMethod(guardedResponse, &ThumbnailResponse::finished,
-                                          Qt::QueuedConnection);
-            }
-            return;
-        }
-
+    m_pool.start([photoId, dbPath, cache, cancelled, guardedResponse, appObject]() {
+        // NOTE: Do not read guardedResponse in this worker thread. QObject/QPointer
+        // lifetime changes happen on the GUI thread and are handled in the queued
+        // continuation below.
         QImage img;
-        QByteArray data = loadThumbnailFromDb(dbPath, photoId);
-        if (!data.isEmpty()) {
-            img.loadFromData(data, "JPEG");
-            if (!img.isNull()) {
-                cache->insert(photoId, img);
+        if (!cancelled->load(std::memory_order_relaxed)) {
+            QByteArray data = loadThumbnailFromDb(dbPath, photoId);
+            if (!data.isEmpty()) {
+                img.loadFromData(data, "JPEG");
+                if (!img.isNull()) {
+                    cache->insert(photoId, img);
+                }
             }
         }
 
-        if (!guardedResponse) {
+        if (!appObject) {
             return;
         }
 
         QMetaObject::invokeMethod(
-            guardedResponse,
+            appObject,
             [guardedResponse, cancelled, img = std::move(img)]() mutable {
                 if (!guardedResponse) {
                     return;
