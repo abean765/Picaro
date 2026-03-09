@@ -544,6 +544,30 @@ ApplicationWindow {
                             photoModel.photosPerRow = Math.round(value)
                         }
                     }
+
+                    // Slideshow button
+                    Rectangle {
+                        implicitWidth: ssStartLabel.implicitWidth + 20
+                        implicitHeight: 26
+                        radius: 4
+                        color: ssStartArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "#3a3a3a"
+
+                        Label {
+                            id: ssStartLabel
+                            anchors.centerIn: parent
+                            text: "\u25B6 Slideshow"
+                            color: ssStartArea.containsMouse ? "#ffffff" : "#aaaaaa"
+                            font.pixelSize: 12
+                        }
+
+                        MouseArea {
+                            id: ssStartArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: slideshowDialog.open()
+                        }
+                    }
                 }
             }
 
@@ -709,6 +733,316 @@ ApplicationWindow {
         id: receiveDialogOverlay
         anchors.fill: parent
         z: 100
+    }
+
+    // Slideshow view (fullscreen overlay)
+    SlideshowView {
+        id: slideshowOverlay
+        anchors.fill: parent
+        onClosed: {
+            // Return focus to grid
+            photoGrid.forceActiveFocus()
+        }
+    }
+
+    // Slideshow start dialog
+    Rectangle {
+        id: slideshowDialog
+        anchors.fill: parent
+        color: "#cc000000"
+        visible: false
+        z: 150
+
+        function open() {
+            ssIntervalSlider.value = 5
+            ssSelectedTagId = -1
+            visible = true
+            ssDialogContent.forceActiveFocus()
+        }
+
+        function close() {
+            visible = false
+        }
+
+        property qint64 ssSelectedTagId: -1
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: slideshowDialog.close()
+        }
+
+        Rectangle {
+            id: ssDialogContent
+            anchors.centerIn: parent
+            width: 420
+            height: ssDialogCol.implicitHeight + 48
+            color: "#2a2a2a"
+            radius: 12
+            border.color: "#444444"
+            border.width: 1
+            focus: true
+
+            Keys.onEscapePressed: slideshowDialog.close()
+
+            MouseArea {
+                anchors.fill: parent
+                // Prevent click-through
+            }
+
+            ColumnLayout {
+                id: ssDialogCol
+                anchors.fill: parent
+                anchors.margins: 24
+                spacing: 16
+
+                // Title
+                RowLayout {
+                    spacing: 8
+
+                    Label {
+                        text: "\u25B6"
+                        font.pixelSize: 20
+                    }
+                    Label {
+                        text: "Slideshow starten"
+                        color: "#ffffff"
+                        font.pixelSize: 20
+                        font.bold: true
+                    }
+                    Item { Layout.fillWidth: true }
+                    Label {
+                        text: "\u2715"
+                        color: "#888888"
+                        font.pixelSize: 16
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: slideshowDialog.close()
+                        }
+                    }
+                }
+
+                // Interval setting
+                RowLayout {
+                    spacing: 12
+
+                    Label {
+                        text: "Anzeigedauer:"
+                        color: "#aaaaaa"
+                        font.pixelSize: 13
+                    }
+
+                    Slider {
+                        id: ssIntervalSlider
+                        from: 2
+                        to: 30
+                        value: 5
+                        stepSize: 1
+                        Layout.fillWidth: true
+                    }
+
+                    Label {
+                        text: Math.round(ssIntervalSlider.value) + " Sek."
+                        color: "#ffffff"
+                        font.pixelSize: 13
+                        Layout.preferredWidth: 50
+                    }
+                }
+
+                // Tag selection
+                Label {
+                    text: "Tag auswählen:"
+                    color: "#aaaaaa"
+                    font.pixelSize: 13
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: Math.min(ssTagListCol.implicitHeight + 16, 250)
+                    color: "#1e1e1e"
+                    radius: 6
+                    clip: true
+
+                    Flickable {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        contentHeight: ssTagListCol.implicitHeight
+                        clip: true
+
+                        Column {
+                            id: ssTagListCol
+                            width: parent.width
+                            spacing: 4
+
+                            // "All photos" option
+                            Rectangle {
+                                width: ssTagListCol.width
+                                height: 40
+                                radius: 6
+                                color: slideshowDialog.ssSelectedTagId === -1 ? "#444444"
+                                     : ssAllArea.containsMouse ? "#333333" : "transparent"
+                                border.width: slideshowDialog.ssSelectedTagId === -1 ? 2 : 0
+                                border.color: root.accentColor
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    spacing: 10
+
+                                    Rectangle {
+                                        width: 28
+                                        height: 28
+                                        radius: 14
+                                        color: "#555555"
+
+                                        Label {
+                                            anchors.centerIn: parent
+                                            text: "\u{1F4F7}"
+                                            font.pixelSize: 14
+                                        }
+                                    }
+
+                                    Label {
+                                        text: "Alle Medien"
+                                        color: "#ffffff"
+                                        font.pixelSize: 14
+                                        font.bold: true
+                                        Layout.fillWidth: true
+                                    }
+
+                                    Label {
+                                        text: photoModel.totalPhotos + " Medien"
+                                        color: "#888888"
+                                        font.pixelSize: 12
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: ssAllArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: slideshowDialog.ssSelectedTagId = -1
+                                }
+                            }
+
+                            // Tag entries
+                            Repeater {
+                                model: tagModel
+
+                                Rectangle {
+                                    required property var tagId
+                                    required property string name
+                                    required property string tagColor
+                                    required property string tagIcon
+                                    required property int photoCount
+
+                                    width: ssTagListCol.width
+                                    height: 40
+                                    radius: 6
+                                    color: slideshowDialog.ssSelectedTagId === tagId ? "#444444"
+                                         : ssTagArea.containsMouse ? "#333333" : "transparent"
+                                    border.width: slideshowDialog.ssSelectedTagId === tagId ? 2 : 0
+                                    border.color: root.accentColor
+                                    visible: photoCount > 0
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        spacing: 10
+
+                                        Rectangle {
+                                            width: 28
+                                            height: 28
+                                            radius: 14
+                                            color: tagColor
+
+                                            Label {
+                                                anchors.centerIn: parent
+                                                text: tagIcon
+                                                font.pixelSize: 14
+                                            }
+                                        }
+
+                                        Label {
+                                            text: name
+                                            color: "#ffffff"
+                                            font.pixelSize: 14
+                                            font.bold: true
+                                            Layout.fillWidth: true
+                                        }
+
+                                        Label {
+                                            text: photoCount + " Medien"
+                                            color: "#888888"
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: ssTagArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: slideshowDialog.ssSelectedTagId = tagId
+                                    }
+                                }
+                            }
+
+                            // Empty state
+                            Label {
+                                visible: tagModel.count === 0
+                                text: "Keine Tags vorhanden"
+                                color: "#666666"
+                                font.pixelSize: 12
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                padding: 12
+                            }
+                        }
+                    }
+                }
+
+                // Start button
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 40
+                    radius: 8
+                    color: ssGoArea.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: "\u25B6  Slideshow starten"
+                        color: "#ffffff"
+                        font.pixelSize: 15
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        id: ssGoArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            var ids
+                            if (slideshowDialog.ssSelectedTagId === -1) {
+                                ids = photoModel.visiblePhotoIds()
+                            } else {
+                                ids = tagModel.photoIdsForTag(slideshowDialog.ssSelectedTagId)
+                            }
+
+                            if (ids.length > 0) {
+                                slideshowDialog.close()
+                                slideshowOverlay.start(ids, Math.round(ssIntervalSlider.value))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Incoming transfer notification

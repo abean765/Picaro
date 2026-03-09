@@ -415,6 +415,20 @@ void PhotoModel::setRating(qint64 id, int rating)
     m_db->setRating(id, rating);
 }
 
+QVariantList PhotoModel::visiblePhotoIds() const
+{
+    QVariantList ids;
+    for (const auto &row : m_rows) {
+        if (row.type == GridRow::PhotoRow) {
+            for (const auto &cell : row.cells) {
+                if (cell.id > 0)
+                    ids.append(cell.id);
+            }
+        }
+    }
+    return ids;
+}
+
 void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();
