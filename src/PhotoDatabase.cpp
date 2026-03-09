@@ -80,6 +80,33 @@ void PhotoDatabase::createSchema()
     q.exec(QStringLiteral(
         "CREATE INDEX IF NOT EXISTS idx_photos_category ON photos(category)"
     ));
+
+    // Tags tables
+    q.exec(QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS tags ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  name TEXT NOT NULL,"
+        "  color TEXT DEFAULT '#888888',"
+        "  icon TEXT DEFAULT ''"
+        ")"
+    ));
+
+    q.exec(QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS photo_tags ("
+        "  photo_id INTEGER NOT NULL,"
+        "  tag_id INTEGER NOT NULL,"
+        "  PRIMARY KEY (photo_id, tag_id),"
+        "  FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE,"
+        "  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE"
+        ")"
+    ));
+
+    q.exec(QStringLiteral(
+        "CREATE INDEX IF NOT EXISTS idx_photo_tags_photo ON photo_tags(photo_id)"
+    ));
+    q.exec(QStringLiteral(
+        "CREATE INDEX IF NOT EXISTS idx_photo_tags_tag ON photo_tags(tag_id)"
+    ));
 }
 
 void PhotoDatabase::migrateSchema()
@@ -372,5 +399,91 @@ bool PhotoDatabase::setRating(qint64 photoId, int rating)
     q.prepare(QStringLiteral("UPDATE photos SET rating = ? WHERE id = ?"));
     q.addBindValue(qBound(0, rating, 5));
     q.addBindValue(photoId);
+    return q.exec();
+}
+
+qint64 PhotoDatabase::createTag(const QString &name, const QString &color, const QString &icon)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("INSERT INTO tags (name, color, icon) VALUES (?, ?, ?)"));
+    q.addBindValue(name);
+    q.addBindValue(color);
+    q.addBindValue(icon);
+    if (!q.exec()) return -1;
+    return q.lastInsertId().toLongLong();
+}
+
+bool PhotoDatabase::updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("UPDATE tags SET name = ?, color = ?, icon = ? WHERE id = ?"));
+    q.addBindValue(name);
+    q.addBindValue(color);
+    q.addBindValue(icon);
+    q.addBindValue(tagId);
+    return q.exec();
+}
+
+bool PhotoDatabase::deleteTag(qint64 tagId)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("DELETE FROM photo_tags WHERE tag_id = ?"));
+    q.addBindValue(tagId);
+    q.exec();
+
+    q.prepare(QStringLiteral("DELETE FROM tags WHERE id = ?"));
+    q.addBindValue(tagId);
+    return q.exec();
+}
+
+QVector<TagRecord> PhotoDatabase::loadAllTags() const
+{
+    QVector<TagRecord> tags;
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral(
+        "SELECT t.id, t.name, t.color, t.icon, "
+        "  (SELECT COUNT(*) FROM photo_tags pt WHERE pt.tag_id = t.id) "
+        "FROM tags t ORDER BY t.name"
+    ));
+    while (q.next()) {
+        TagRecord t;
+        t.id = q.value(0).toLongLong();
+        t.name = q.value(1).toString();
+        t.color = q.value(2).toString();
+        t.icon = q.value(3).toString();
+        t.photoCount = q.value(4).toInt();
+        tags.append(std::move(t));
+    }
+    return tags;
+}
+
+QVector<qint64> PhotoDatabase::tagsForPhoto(qint64 photoId) const
+{
+    QVector<qint64> ids;
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT tag_id FROM photo_tags WHERE photo_id = ?"));
+    q.addBindValue(photoId);
+    q.exec();
+    while (q.next()) {
+        ids.append(q.value(0).toLongLong());
+    }
+    return ids;
+}
+
+bool PhotoDatabase::addTagToPhoto(qint64 photoId, qint64 tagId)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("INSERT OR IGNORE INTO photo_tags (photo_id, tag_id) VALUES (?, ?)"));
+    q.addBindValue(photoId);
+    q.addBindValue(tagId);
+    return q.exec();
+}
+
+bool PhotoDatabase::removeTagFromPhoto(qint64 photoId, qint64 tagId)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("DELETE FROM photo_tags WHERE photo_id = ? AND tag_id = ?"));
+    q.addBindValue(photoId);
+    q.addBindValue(tagId);
     return q.exec();
 }

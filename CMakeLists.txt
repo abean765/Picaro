@@ -102,6 +102,8 @@ qt_add_executable(picaro
     src/VideoFrameExtractor.cpp
     src/AppSettings.h
     src/StatsProvider.h
+    src/TagModel.h
+    src/TagModel.cpp
     src/GpuHeicDecoder.h
     src/GpuHeicDecoder.cpp
 )
@@ -118,6 +120,7 @@ qt_add_qml_module(picaro
         qml/OverviewView.qml
         qml/SettingsView.qml
         qml/ImportDialog.qml
+        qml/TagsView.qml
 )
 
 target_include_directories(picaro PRIVATE

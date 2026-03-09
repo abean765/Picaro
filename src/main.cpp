@@ -12,6 +12,7 @@
 #include "ThumbnailProvider.h"
 #include "AppSettings.h"
 #include "StatsProvider.h"
+#include "TagModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -48,6 +49,10 @@ int main(int argc, char *argv[])
     // Statistics provider
     StatsProvider statsProvider(&db);
 
+    // Tag model
+    TagModel tagModel;
+    tagModel.setDatabase(&db);
+
     // QML engine
     QQmlApplicationEngine engine;
 
@@ -60,6 +65,7 @@ int main(int argc, char *argv[])
     ctx->setContextProperty(QStringLiteral("photoImporter"), &importer);
     ctx->setContextProperty(QStringLiteral("appSettings"), &settings);
     ctx->setContextProperty(QStringLiteral("statsProvider"), &statsProvider);
+    ctx->setContextProperty(QStringLiteral("tagModel"), &tagModel);
 
     // Reload model and stats after import finishes
     QObject::connect(&importer, &PhotoImporter::importFinished,

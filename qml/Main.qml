@@ -77,6 +77,13 @@ ApplicationWindow {
                 }
 
                 SidebarButton {
+                    text: "Tags"
+                    icon: "\u{1F3F7}"
+                    active: currentView === "tags"
+                    onClicked: currentView = "tags"
+                }
+
+                SidebarButton {
                     text: "Übersicht"
                     icon: "\u25C9"
                     active: currentView === "overview"
@@ -321,8 +328,9 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: currentView === "photos" ? 0
-                            : currentView === "overview" ? 1
-                            : 2
+                            : currentView === "tags" ? 1
+                            : currentView === "overview" ? 2
+                            : 3
 
                 // Photos view with timeline + grid + splitter + detail
                 Item {
@@ -429,6 +437,8 @@ ApplicationWindow {
                         }
                     }
                 }
+
+                TagsView {}
 
                 OverviewView {}
 

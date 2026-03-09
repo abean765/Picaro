@@ -301,7 +301,7 @@ Rectangle {
     // Heart rating (1-5)
     Row {
         id: heartRow
-        anchors.bottom: fileInfoLabel.top
+        anchors.bottom: tagRow.top
         anchors.bottomMargin: 6
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 4
@@ -339,6 +339,215 @@ Rectangle {
                         var newRating = heartIndex === heartRow.currentRating ? 0 : heartIndex
                         photoModel.setRating(detailView.photoId, newRating)
                         heartRow.currentRating = newRating
+                    }
+                }
+            }
+        }
+    }
+
+    // Tag chips row
+    Row {
+        id: tagRow
+        anchors.bottom: fileInfoLabel.top
+        anchors.bottomMargin: 6
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 6
+        visible: hasContent
+
+        property var assignedTags: hasContent ? tagModel.tagsForPhoto(photoId) : []
+        property bool dropdownOpen: false
+
+        Connections {
+            target: detailView
+            function onPhotoIdChanged() {
+                tagRow.assignedTags = detailView.hasContent ? tagModel.tagsForPhoto(detailView.photoId) : []
+                tagRow.dropdownOpen = false
+            }
+        }
+
+        Connections {
+            target: tagModel
+            function onTagsChanged() {
+                if (detailView.hasContent)
+                    tagRow.assignedTags = tagModel.tagsForPhoto(detailView.photoId)
+            }
+        }
+
+        // Assigned tag chips
+        Repeater {
+            model: tagRow.assignedTags
+
+            Rectangle {
+                required property var modelData
+                implicitWidth: chipRow.implicitWidth + 12
+                implicitHeight: 24
+                radius: 12
+                color: tagModel.tagColor(modelData)
+
+                RowLayout {
+                    id: chipRow
+                    anchors.centerIn: parent
+                    spacing: 3
+
+                    Label {
+                        text: tagModel.tagIcon(modelData)
+                        font.pixelSize: 10
+                        visible: text !== ""
+                    }
+                    Label {
+                        text: tagModel.tagName(modelData)
+                        color: "#ffffff"
+                        font.pixelSize: 11
+                        font.bold: true
+                    }
+                    Label {
+                        text: "\u2715"
+                        color: "#dddddd"
+                        font.pixelSize: 9
+
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                tagModel.removeTagFromPhoto(detailView.photoId, modelData)
+                                tagRow.assignedTags = tagModel.tagsForPhoto(detailView.photoId)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add tag button
+        Rectangle {
+            implicitWidth: 24
+            implicitHeight: 24
+            radius: 12
+            color: addTagBtnArea.containsMouse ? "#555555" : "#3a3a3a"
+
+            Label {
+                anchors.centerIn: parent
+                text: "+"
+                color: "#aaaaaa"
+                font.pixelSize: 14
+            }
+
+            MouseArea {
+                id: addTagBtnArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: tagRow.dropdownOpen = !tagRow.dropdownOpen
+            }
+        }
+    }
+
+    // Tag dropdown
+    Rectangle {
+        visible: tagRow.dropdownOpen && hasContent
+        anchors.bottom: fileInfoLabel.top
+        anchors.bottomMargin: 36
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 220
+        height: Math.min(tagDropdownCol.implicitHeight + 16, 200)
+        radius: 8
+        color: "#2a2a2a"
+        border.width: 1
+        border.color: "#444444"
+        z: 20
+        clip: true
+
+        Flickable {
+            anchors.fill: parent
+            anchors.margins: 8
+            contentHeight: tagDropdownCol.implicitHeight
+            clip: true
+
+            Column {
+                id: tagDropdownCol
+                width: parent.width
+                spacing: 2
+
+                Label {
+                    visible: tagModel.count === 0
+                    text: "Keine Tags vorhanden"
+                    color: "#888888"
+                    font.pixelSize: 12
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    padding: 8
+                }
+
+                Repeater {
+                    model: tagModel
+
+                    Rectangle {
+                        required property var tagId
+                        required property string name
+                        required property string tagColor
+                        required property string tagIcon
+
+                        readonly property bool isAssigned: {
+                            for (var i = 0; i < tagRow.assignedTags.length; ++i) {
+                                if (tagRow.assignedTags[i] === tagId) return true
+                            }
+                            return false
+                        }
+
+                        width: tagDropdownCol.width
+                        height: 30
+                        radius: 4
+                        color: dropItemArea.containsMouse ? "#444444" : "transparent"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 6
+
+                            Rectangle {
+                                width: 14
+                                height: 14
+                                radius: 7
+                                color: tagColor
+                            }
+
+                            Label {
+                                text: tagIcon
+                                font.pixelSize: 11
+                                visible: text !== ""
+                            }
+
+                            Label {
+                                text: name
+                                color: "#ffffff"
+                                font.pixelSize: 12
+                                Layout.fillWidth: true
+                            }
+
+                            Label {
+                                text: isAssigned ? "\u2713" : ""
+                                color: root.accentColor
+                                font.pixelSize: 14
+                                font.bold: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: dropItemArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (isAssigned) {
+                                    tagModel.removeTagFromPhoto(detailView.photoId, tagId)
+                                } else {
+                                    tagModel.addTagToPhoto(detailView.photoId, tagId)
+                                }
+                                tagRow.assignedTags = tagModel.tagsForPhoto(detailView.photoId)
+                            }
+                        }
                     }
                 }
             }
