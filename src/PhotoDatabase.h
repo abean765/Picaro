@@ -82,6 +82,9 @@ public:
     QVector<QPair<qint64, QString>> loadVideoFilePaths() const;
     bool updateThumbnail(qint64 photoId, const QByteArray &thumbnail);
 
+    // Soft-delete: mark photo as deleted (hidden from UI, kept in DB)
+    bool markDeleted(qint64 photoId, bool deleted = true);
+
 private:
     void createSchema();
     void migrateSchema();

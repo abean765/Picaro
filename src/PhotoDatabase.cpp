@@ -84,20 +84,23 @@ void PhotoDatabase::createSchema()
 
 void PhotoDatabase::migrateSchema()
 {
-    // Add 'category' column if missing (for databases created before this field existed)
     QSqlQuery q(m_db);
     q.exec(QStringLiteral("PRAGMA table_info(photos)"));
     bool hasCategory = false;
+    bool hasDeleted = false;
     while (q.next()) {
-        if (q.value(1).toString() == QStringLiteral("category")) {
-            hasCategory = true;
-            break;
-        }
+        const QString col = q.value(1).toString();
+        if (col == QStringLiteral("category")) hasCategory = true;
+        if (col == QStringLiteral("deleted")) hasDeleted = true;
     }
     if (!hasCategory) {
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN category INTEGER DEFAULT 0"));
         q.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_photos_category ON photos(category)"));
         qDebug() << "Migrated: added category column";
+    }
+    if (!hasDeleted) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN deleted INTEGER DEFAULT 0"));
+        qDebug() << "Migrated: added deleted column";
     }
 }
 
@@ -175,7 +178,7 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
     QVector<PhotoRecord> records;
 
     QSqlQuery countQuery(m_db);
-    countQuery.exec(QStringLiteral("SELECT COUNT(*) FROM photos"));
+    countQuery.exec(QStringLiteral("SELECT COUNT(*) FROM photos WHERE deleted = 0"));
     if (countQuery.next()) {
         records.reserve(countQuery.value(0).toInt());
     }
@@ -185,7 +188,7 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
         "SELECT id, file_path, file_name, date_taken, date_modified, "
         "       width, height, file_size, media_type, category, live_video_path, "
         "       mime_type, duration, month_key "
-        "FROM photos ORDER BY date_taken DESC"
+        "FROM photos WHERE deleted = 0 ORDER BY date_taken DESC"
     ));
 
     while (q.next()) {
@@ -227,7 +230,7 @@ PhotoStats PhotoDatabase::loadStats() const
     QSqlQuery q(m_db);
     q.exec(QStringLiteral(
         "SELECT media_type, category, COUNT(*), COALESCE(SUM(file_size), 0) "
-        "FROM photos GROUP BY media_type, category"
+        "FROM photos WHERE deleted = 0 GROUP BY media_type, category"
     ));
 
     while (q.next()) {
@@ -295,6 +298,15 @@ bool PhotoDatabase::updateThumbnail(qint64 photoId, const QByteArray &thumbnail)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("UPDATE photos SET thumbnail = ? WHERE id = ?"));
     q.addBindValue(thumbnail);
+    q.addBindValue(photoId);
+    return q.exec();
+}
+
+bool PhotoDatabase::markDeleted(qint64 photoId, bool deleted)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("UPDATE photos SET deleted = ? WHERE id = ?"));
+    q.addBindValue(deleted ? 1 : 0);
     q.addBindValue(photoId);
     return q.exec();
 }

@@ -174,6 +174,38 @@ ListView {
                         }
                     }
 
+                    // Delete button (trash icon, visible on hover)
+                    Rectangle {
+                        id: deleteBtn
+                        visible: hoverHandler.hovered && !videoOutput.visible
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 6
+                        width: 28
+                        height: 28
+                        radius: 14
+                        color: deleteBtnArea.containsMouse ? "#dd3333" : "#90000000"
+                        z: 3
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "\uD83D\uDDD1"
+                            font.pixelSize: 14
+                            color: "#ffffff"
+                        }
+
+                        MouseArea {
+                            id: deleteBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: function(mouse) {
+                                mouse.accepted = true
+                                photoModel.deletePhoto(modelData.id)
+                            }
+                        }
+                    }
+
                     // Hover area with delay to avoid accidental triggers
                     HoverHandler {
                         id: hoverHandler

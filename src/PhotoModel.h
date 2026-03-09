@@ -67,6 +67,7 @@ public:
     Q_INVOKABLE QString resolutionForId(qint64 id) const;
     Q_INVOKABLE qint64 nextPhotoId(qint64 currentId) const;
     Q_INVOKABLE qint64 previousPhotoId(qint64 currentId) const;
+    Q_INVOKABLE void deletePhoto(qint64 id);
 
 signals:
     void photosPerRowChanged();

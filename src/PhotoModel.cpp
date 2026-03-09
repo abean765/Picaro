@@ -262,6 +262,30 @@ qint64 PhotoModel::previousPhotoId(qint64 currentId) const
     return -1;
 }
 
+void PhotoModel::deletePhoto(qint64 id)
+{
+    if (!m_db) return;
+    if (!m_db->markDeleted(id)) return;
+
+    // Remove from in-memory data and rebuild grid
+    auto it = m_idToPhotoIndex.constFind(id);
+    if (it != m_idToPhotoIndex.constEnd()) {
+        int idx = it.value();
+        m_allPhotos.removeAt(idx);
+
+        // Rebuild index map (indices shifted)
+        m_idToPhotoIndex.clear();
+        m_idToPhotoIndex.reserve(m_allPhotos.size());
+        for (int i = 0; i < m_allPhotos.size(); ++i) {
+            m_idToPhotoIndex[m_allPhotos[i].id] = i;
+        }
+
+        rebuildGrid();
+        buildTimelineData();
+        emit modelReloaded();
+    }
+}
+
 void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();
