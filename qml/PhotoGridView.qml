@@ -46,8 +46,23 @@ ListView {
     }
 
     ScrollBar.vertical: ScrollBar {
+        id: verticalScrollBar
         active: true
         policy: ScrollBar.AsNeeded
+
+        contentItem: Rectangle {
+            implicitWidth: 10
+            radius: 5
+            color: verticalScrollBar.pressed ? "#cccccc"
+                 : verticalScrollBar.hovered ? "#aaaaaa"
+                 : "#777777"
+        }
+
+        background: Rectangle {
+            implicitWidth: 14
+            color: verticalScrollBar.hovered ? "#1affffff" : "transparent"
+            radius: 7
+        }
     }
 
     delegate: Item {
