@@ -21,6 +21,12 @@ void NetworkManager::startDiscovery(const QString &computerName)
     if (m_discoveryActive)
         return;
 
+    // Guard against re-entrant/duplicate start calls from QML bindings.
+    // We flip the state immediately so a second call cannot create more sockets
+    // before the first call reaches the end of this function.
+    m_discoveryActive = true;
+    emit discoveryActiveChanged();
+
     m_computerName = computerName;
 
     // UDP socket for discovery broadcasts
@@ -30,6 +36,8 @@ void NetworkManager::startDiscovery(const QString &computerName)
         qWarning() << "Failed to bind UDP socket on port" << DISCOVERY_PORT;
         delete m_udpSocket;
         m_udpSocket = nullptr;
+        m_discoveryActive = false;
+        emit discoveryActiveChanged();
         emit errorOccurred(QStringLiteral("UDP-Port %1 konnte nicht geöffnet werden").arg(DISCOVERY_PORT));
         return;
     }
@@ -43,6 +51,8 @@ void NetworkManager::startDiscovery(const QString &computerName)
         m_udpSocket = nullptr;
         delete m_tcpServer;
         m_tcpServer = nullptr;
+        m_discoveryActive = false;
+        emit discoveryActiveChanged();
         emit errorOccurred(QStringLiteral("TCP-Server konnte nicht gestartet werden"));
         return;
     }
@@ -63,8 +73,6 @@ void NetworkManager::startDiscovery(const QString &computerName)
     // Send initial broadcast
     onBroadcastTimer();
 
-    m_discoveryActive = true;
-    emit discoveryActiveChanged();
 }
 
 void NetworkManager::stopDiscovery()
