@@ -8,6 +8,7 @@ ListView {
     clip: true
     cacheBuffer: 4000
     reuseItems: true
+    rightPadding: 50   // leaves room for the wider scrollbar + 8 px gap
 
     model: photoModel
 
@@ -83,17 +84,17 @@ ListView {
         policy: ScrollBar.AsNeeded
 
         contentItem: Rectangle {
-            implicitWidth: 10
-            radius: 5
+            implicitWidth: 30
+            radius: 15
             color: verticalScrollBar.pressed ? "#cccccc"
                  : verticalScrollBar.hovered ? "#aaaaaa"
                  : "#777777"
         }
 
         background: Rectangle {
-            implicitWidth: 14
+            implicitWidth: 42
             color: verticalScrollBar.hovered ? "#1affffff" : "transparent"
-            radius: 7
+            radius: 21
         }
     }
 
