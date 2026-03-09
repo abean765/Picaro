@@ -86,6 +86,10 @@ public:
     // Soft-delete: mark photo as deleted (hidden from UI, kept in DB)
     bool markDeleted(qint64 photoId, bool deleted = true);
 
+    // Rating (0 = unrated, 1-5 = hearts)
+    int getRating(qint64 photoId) const;
+    bool setRating(qint64 photoId, int rating);
+
 private:
     void createSchema();
     void migrateSchema();

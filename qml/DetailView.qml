@@ -298,8 +298,56 @@ Rectangle {
         }
     }
 
+    // Heart rating (1-5)
+    Row {
+        id: heartRow
+        anchors.bottom: fileInfoLabel.top
+        anchors.bottomMargin: 6
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 4
+        visible: hasContent
+
+        property int currentRating: hasContent ? photoModel.ratingForId(photoId) : 0
+
+        Connections {
+            target: detailView
+            function onPhotoIdChanged() {
+                heartRow.currentRating = detailView.hasContent ? photoModel.ratingForId(detailView.photoId) : 0
+            }
+        }
+
+        Repeater {
+            model: 5
+
+            Label {
+                required property int index
+                readonly property int heartIndex: index + 1
+                text: heartIndex <= heartRow.currentRating ? "\u2764" : "\u2661"
+                color: heartIndex <= heartRow.currentRating ? "#e53e3e" : "#666666"
+                font.pixelSize: 22
+                opacity: heartArea.containsMouse ? 1.0 : 0.85
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+
+                MouseArea {
+                    id: heartArea
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        var newRating = heartIndex === heartRow.currentRating ? 0 : heartIndex
+                        photoModel.setRating(detailView.photoId, newRating)
+                        heartRow.currentRating = newRating
+                    }
+                }
+            }
+        }
+    }
+
     // File name and resolution at bottom
     Label {
+        id: fileInfoLabel
         anchors.bottom: isVideo ? parent.bottom : parent.bottom
         anchors.bottomMargin: isVideo ? 56 : 12
         anchors.horizontalCenter: parent.horizontalCenter

@@ -319,6 +319,18 @@ void PhotoModel::restorePhoto(qint64 id)
     }
 }
 
+int PhotoModel::ratingForId(qint64 id) const
+{
+    if (!m_db) return 0;
+    return m_db->getRating(id);
+}
+
+void PhotoModel::setRating(qint64 id, int rating)
+{
+    if (!m_db) return;
+    m_db->setRating(id, rating);
+}
+
 void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();

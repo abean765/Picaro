@@ -72,6 +72,8 @@ public:
     Q_INVOKABLE qint64 previousPhotoId(qint64 currentId) const;
     Q_INVOKABLE void deletePhoto(qint64 id);
     Q_INVOKABLE void restorePhoto(qint64 id);
+    Q_INVOKABLE int ratingForId(qint64 id) const;
+    Q_INVOKABLE void setRating(qint64 id, int rating);
 
 signals:
     void photosPerRowChanged();

@@ -102,6 +102,17 @@ void PhotoDatabase::migrateSchema()
         q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN deleted INTEGER DEFAULT 0"));
         qDebug() << "Migrated: added deleted column";
     }
+
+    // Check for rating column
+    q.exec(QStringLiteral("PRAGMA table_info(photos)"));
+    bool hasRating = false;
+    while (q.next()) {
+        if (q.value(1).toString() == QStringLiteral("rating")) hasRating = true;
+    }
+    if (!hasRating) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN rating INTEGER DEFAULT 0"));
+        qDebug() << "Migrated: added rating column";
+    }
 }
 
 void PhotoDatabase::close()
@@ -341,6 +352,25 @@ bool PhotoDatabase::markDeleted(qint64 photoId, bool deleted)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("UPDATE photos SET deleted = ? WHERE id = ?"));
     q.addBindValue(deleted ? 1 : 0);
+    q.addBindValue(photoId);
+    return q.exec();
+}
+
+int PhotoDatabase::getRating(qint64 photoId) const
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT rating FROM photos WHERE id = ?"));
+    q.addBindValue(photoId);
+    if (q.exec() && q.next())
+        return q.value(0).toInt();
+    return 0;
+}
+
+bool PhotoDatabase::setRating(qint64 photoId, int rating)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("UPDATE photos SET rating = ? WHERE id = ?"));
+    q.addBindValue(qBound(0, rating, 5));
     q.addBindValue(photoId);
     return q.exec();
 }
