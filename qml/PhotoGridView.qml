@@ -9,7 +9,7 @@ ListView {
     cacheBuffer: 4000
     reuseItems: true
     // Width available for photo content — keeps thumbnails clear of the scrollbar.
-    readonly property real _contentWidth: width - 50
+    readonly property real _contentWidth: width - 44
 
     model: photoModel
 
@@ -83,19 +83,24 @@ ListView {
         id: verticalScrollBar
         active: true
         policy: ScrollBar.AsNeeded
+        topPadding: 2
+        bottomPadding: 2
+        rightPadding: 4
 
         contentItem: Rectangle {
-            implicitWidth: 30
-            radius: 15
-            color: verticalScrollBar.pressed ? "#cccccc"
-                 : verticalScrollBar.hovered ? "#aaaaaa"
-                 : "#777777"
+            implicitWidth: 22
+            radius: 11
+            color: verticalScrollBar.pressed
+                   ? Qt.lighter(root.accentColor, 1.2)
+                   : verticalScrollBar.hovered
+                     ? root.accentColor
+                     : Qt.darker(root.accentColor, 1.4)
         }
 
         background: Rectangle {
-            implicitWidth: 42
+            implicitWidth: 32
             color: verticalScrollBar.hovered ? "#1affffff" : "transparent"
-            radius: 21
+            radius: 16
         }
     }
 
