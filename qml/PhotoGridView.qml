@@ -147,8 +147,20 @@ ListView {
                         gridView._hoveredCell === cellItem &&
                         sharedPlayer.playbackState === MediaPlayer.PlayingState
 
-                    // If this item is recycled by reuseItems, stop the preview
-                    // so the shared player does not keep playing a stale source.
+                    // When this cellItem is destroyed (which happens when the
+                    // Repeater rebuilds its children after reuseItems reuses the
+                    // parent rowDelegate for a new model row), clear _hoveredCell.
+                    // Without this, _hoveredCell would be a dangling reference and
+                    // mapToItem() in the overlayOutput bindings would crash.
+                    Component.onDestruction: {
+                        if (gridView._hoveredCell === cellItem) {
+                            sharedPlayer.stop();
+                            sharedPlayer.source = "";
+                            gridView._hoveredCell = null;
+                        }
+                    }
+
+                    // Also clear on explicit ListView pooling (belt-and-suspenders).
                     ListView.onPooled: {
                         if (gridView._hoveredCell === cellItem) {
                             sharedPlayer.stop();
