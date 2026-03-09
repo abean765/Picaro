@@ -103,6 +103,8 @@ ListView {
                     readonly property bool isLivePhoto: modelData.mediaType === 2
                     readonly property bool hasVideo: isVideo || isLivePhoto
                     property bool hovered: false
+                    // Tracks playback state across the Loader boundary
+                    property bool videoPlaying: false
 
                     // Selection highlight
                     Rectangle {
@@ -124,7 +126,7 @@ ListView {
                         sourceSize.width: width
                         sourceSize.height: height
                         cache: true
-                        visible: !videoOutput.visible
+                        visible: !cellItem.videoPlaying
 
                         opacity: status === Image.Ready ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 100 } }
@@ -135,42 +137,71 @@ ListView {
                         anchors.fill: parent
                         anchors.margins: 1
                         color: "#2a2a2a"
-                        visible: thumbImage.status !== Image.Ready && !videoOutput.visible
+                        visible: thumbImage.status !== Image.Ready && !cellItem.videoPlaying
                     }
 
-                    // Video player overlay (created on hover for videos/live photos)
-                    MediaPlayer {
-                        id: mediaPlayer
-                        videoOutput: videoOutput
-                        loops: cellItem.isLivePhoto ? MediaPlayer.Infinite : 1
-
-                        function startPreview() {
-                            let path = cellItem.isLivePhoto
-                                ? (modelData.liveVideoPath || "")
-                                : (modelData.filePath || "");
-                            if (path === "") return;
-                            source = "file:///" + path;
-                            play();
-                        }
-
-                        function stopPreview() {
-                            stop();
-                            source = "";
-                        }
-                    }
-
-                    VideoOutput {
-                        id: videoOutput
+                    // Video player overlay — only created for video/live-photo cells.
+                    // Using a Loader prevents MediaPlayer (and its multimedia backend
+                    // file descriptors) from being instantiated for every photo cell,
+                    // which would exhaust the process fd limit on large galleries.
+                    Loader {
+                        id: videoLoader
                         anchors.fill: parent
                         anchors.margins: 1
-                        fillMode: VideoOutput.PreserveAspectCrop
-                        visible: cellItem.hovered && cellItem.hasVideo
-                                 && mediaPlayer.playbackState === MediaPlayer.PlayingState
+                        active: cellItem.hasVideo
+
+                        // When deactivated (item reused for a non-video cell), reset state.
+                        onActiveChanged: {
+                            if (!active) {
+                                cellItem.hovered = false;
+                                cellItem.videoPlaying = false;
+                            }
+                        }
+
+                        sourceComponent: Component {
+                            Item {
+                                anchors.fill: parent
+
+                                MediaPlayer {
+                                    id: mediaPlayer
+                                    videoOutput: videoOutput
+                                    loops: cellItem.isLivePhoto ? MediaPlayer.Infinite : 1
+
+                                    onPlaybackStateChanged: {
+                                        cellItem.videoPlaying =
+                                            (playbackState === MediaPlayer.PlayingState);
+                                    }
+                                }
+
+                                VideoOutput {
+                                    id: videoOutput
+                                    anchors.fill: parent
+                                    fillMode: VideoOutput.PreserveAspectCrop
+                                    visible: cellItem.hovered &&
+                                             mediaPlayer.playbackState === MediaPlayer.PlayingState
+                                }
+
+                                function startPreview() {
+                                    let path = cellItem.isLivePhoto
+                                        ? (modelData.liveVideoPath || "")
+                                        : (modelData.filePath || "");
+                                    if (path === "") return;
+                                    mediaPlayer.source = "file:///" + path;
+                                    mediaPlayer.play();
+                                }
+
+                                function stopPreview() {
+                                    mediaPlayer.stop();
+                                    mediaPlayer.source = "";
+                                    cellItem.videoPlaying = false;
+                                }
+                            }
+                        }
                     }
 
                     // Video/Live Photo badge (hidden during playback)
                     Rectangle {
-                        visible: modelData.mediaType > 0 && !videoOutput.visible
+                        visible: modelData.mediaType > 0 && !cellItem.videoPlaying
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.margins: 8
@@ -192,7 +223,7 @@ ListView {
                     // Delete / Restore button (visible on hover)
                     Rectangle {
                         id: deleteBtn
-                        visible: hoverHandler.hovered && !videoOutput.visible
+                        visible: hoverHandler.hovered && !cellItem.videoPlaying
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 6
@@ -237,7 +268,7 @@ ListView {
                         running: hoverHandler.hovered && cellItem.hasVideo
                         onTriggered: {
                             cellItem.hovered = true;
-                            mediaPlayer.startPreview();
+                            if (videoLoader.item) videoLoader.item.startPreview();
                         }
                     }
 
@@ -247,7 +278,7 @@ ListView {
                             if (!hoverHandler.hovered) {
                                 hoverTimer.stop();
                                 cellItem.hovered = false;
-                                mediaPlayer.stopPreview();
+                                if (videoLoader.item) videoLoader.item.stopPreview();
                             }
                         }
                     }

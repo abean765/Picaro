@@ -37,8 +37,9 @@ void PhotoDatabase::configurePragmas()
 {
     QSqlQuery q(m_db);
     q.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
-    q.exec(QStringLiteral("PRAGMA mmap_size=8589934592"));
-    q.exec(QStringLiteral("PRAGMA cache_size=-262144"));
+    // 64 MB read/write cache — sufficient for a photo-management workload.
+    // The previous value (256 MB) wasted RSS without measurable benefit.
+    q.exec(QStringLiteral("PRAGMA cache_size=-65536"));
     q.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
     q.exec(QStringLiteral("PRAGMA page_size=8192"));
     q.exec(QStringLiteral("PRAGMA temp_store=MEMORY"));

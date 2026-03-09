@@ -49,8 +49,10 @@ static QByteArray loadThumbnailFromDb(const QString &dbPath, qint64 photoId)
             return {};
         }
         QSqlQuery pragma(db);
-        pragma.exec(QStringLiteral("PRAGMA mmap_size=8589934592"));
-        pragma.exec(QStringLiteral("PRAGMA cache_size=-65536"));
+        // Small read cache is sufficient for thumbnail blob lookups.
+        // mmap_size is intentionally omitted: the default (0 = disabled) avoids
+        // additional virtual-memory mappings on per-thread read-only connections.
+        pragma.exec(QStringLiteral("PRAGMA cache_size=-4096"));
     }
 
     QSqlDatabase db = QSqlDatabase::database(connName, false);
@@ -140,6 +142,10 @@ ThumbnailProvider::ThumbnailProvider(const QString &dbPath)
     : m_dbPath(dbPath), m_cache(2000)
 {
     m_pool.setMaxThreadCount(4);
+    // Never expire idle threads: each thread keeps one SQLite connection open
+    // under its address-based name. If threads were recreated with different
+    // addresses the old connections would accumulate as unclosed fd leaks.
+    m_pool.setExpiryTimeout(-1);
 }
 
 QQuickImageResponse *ThumbnailProvider::requestImageResponse(
