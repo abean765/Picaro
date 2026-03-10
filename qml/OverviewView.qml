@@ -43,14 +43,14 @@ Item {
                 StatCard {
                     title: "Fotos"
                     value: statsProvider.normalPhotos
-                    icon: "🖼"
+                    icon: "\u25A3"
                     accentColor: root.accentColor
                 }
 
                 StatCard {
                     title: "Videos"
                     value: statsProvider.videos
-                    icon: "🎬"
+                    icon: "\u25B6"
                     accentColor: "#ff6b6b"
                 }
 
@@ -64,14 +64,14 @@ Item {
                 StatCard {
                     title: "Screenshots"
                     value: statsProvider.screenshots
-                    icon: "📱"
+                    icon: "\u25A6"
                     accentColor: "#69db7c"
                 }
 
                 StatCard {
                     title: "Selfies"
                     value: statsProvider.selfies
-                    icon: "🤳"
+                    icon: "\u25CE"
                     accentColor: "#da77f2"
                 }
 
@@ -81,7 +81,7 @@ Item {
                     subtitle: statsProvider.totalPhotos > 0
                         ? Math.round(statsProvider.withExif / statsProvider.totalPhotos * 100) + " %"
                         : ""
-                    icon: "\u{1F4CB}"
+                    icon: "\u2630"
                     accentColor: "#74c0fc"
                 }
 
@@ -91,7 +91,7 @@ Item {
                     subtitle: statsProvider.totalPhotos > 0
                         ? Math.round(statsProvider.withGeolocation / statsProvider.totalPhotos * 100) + " %"
                         : ""
-                    icon: "\u{1F4CD}"
+                    icon: "\u25C6"
                     accentColor: "#ff922b"
                     clickable: statsProvider.withGeolocation > 0
                     onClicked: {
@@ -104,7 +104,7 @@ Item {
                     title: "Gesamt"
                     value: statsProvider.totalPhotos
                     subtitle: statsProvider.totalSize
-                    icon: "\u{1F4CA}"
+                    icon: "\u25A0"
                     accentColor: "#ffffff"
                 }
             }
@@ -159,12 +159,7 @@ Item {
                     anchors.rightMargin: 8
 
                     Label {
-                        text: "\u{1F4CD}"
-                        font.pixelSize: 15
-                        font.family: "Noto Color Emoji"
-                    }
-                    Label {
-                        text: "%1 Fotos mit Standort".arg(overviewView.geoPoints.length)
+                        text: "\u25C6  %1 Fotos mit Standort".arg(overviewView.geoPoints.length)
                         color: "#ffffff"
                         font.pixelSize: 15
                         font.bold: true
@@ -228,7 +223,6 @@ Item {
                 Label {
                     text: icon
                     font.pixelSize: 20
-                    font.family: "Noto Color Emoji"
                 }
                 Label {
                     text: title
