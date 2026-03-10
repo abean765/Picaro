@@ -78,7 +78,7 @@ ApplicationWindow {
 
                 SidebarButton {
                     text: "Tags"
-                    icon: "\u{1F3F7}"
+                    icon: "\u25C6"
                     active: currentView === "tags"
                     onClicked: currentView = "tags"
                 }
@@ -99,7 +99,7 @@ ApplicationWindow {
 
                 SidebarButton {
                     text: "Tools"
-                    icon: "\u{1F527}"
+                    icon: "\u2692"
                     active: currentView === "tools"
                     onClicked: currentView = "tools"
                 }
@@ -292,7 +292,7 @@ ApplicationWindow {
                             Label {
                                 id: deletedLabel
                                 anchors.centerIn: parent
-                                text: "\uD83D\uDDD1 Gelöscht"
+                                text: "\u2715 Gelöscht"
                                 color: photoModel.showDeleted ? "#ff8888" : "#aaaaaa"
                                 font.pixelSize: 12
                             }
@@ -329,7 +329,7 @@ ApplicationWindow {
                                 spacing: 4
 
                                 Label {
-                                    text: "\u{1F50D}"
+                                    text: "\u25CB"
                                     font.pixelSize: 12
                                     opacity: 0.6
                                 }
@@ -501,7 +501,7 @@ ApplicationWindow {
                                         spacing: 6
 
                                         Label {
-                                            text: modelData.startsWith("Tag:") ? "\u{1F3F7}" : "\u{1F4E5}"
+                                            text: modelData.startsWith("Tag:") ? "\u25C6" : "\u2B07"
                                             font.pixelSize: 12
                                         }
 
@@ -939,7 +939,7 @@ ApplicationWindow {
 
                                         Label {
                                             anchors.centerIn: parent
-                                            text: "\u{1F4F7}"
+                                            text: "\u25A3"
                                             font.pixelSize: 14
                                         }
                                     }

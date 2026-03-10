@@ -49,7 +49,7 @@ Rectangle {
                 spacing: 8
 
                 Label {
-                    text: "\u{1F4E5}"
+                    text: "\u2B07"
                     font.pixelSize: 24
                 }
                 Label {

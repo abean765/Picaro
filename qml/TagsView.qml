@@ -19,17 +19,17 @@ Item {
     ]
 
     readonly property var presetIcons: [
-        "\u2764", "\u2B50", "\u{1F3E0}", "\u{1F4F7}",
-        "\u{1F3D6}", "\u{1F33F}", "\u{1F436}", "\u{1F431}",
-        "\u{1F37D}", "\u{1F3B5}", "\u{1F4BC}", "\u{1F381}",
-        "\u{1F30D}", "\u2708", "\u{1F3A8}", "\u26BD"
+        "\u2764", "\u2B50", "\u2302", "\u25A3",
+        "\u2600", "\u2698", "\u2665", "\u2663",
+        "\u266A", "\u266B", "\u25A0", "\u2726",
+        "\u25CF", "\u2708", "\u270E", "\u26BD"
     ]
 
     function startCreate() {
         editingTagId = 0
         editName = ""
         editColor = "#3182ce"
-        editIcon = "\u{1F3F7}"
+        editIcon = "\u25C6"
     }
 
     function startEdit(id, name, color, icon) {
@@ -389,7 +389,7 @@ Item {
 
                         Label {
                             anchors.centerIn: parent
-                            text: "\u{1F4E4}"
+                            text: "\u2B06"
                             font.pixelSize: 18
                         }
                         MouseArea {
@@ -437,7 +437,7 @@ Item {
 
                         Label {
                             anchors.centerIn: parent
-                            text: "\uD83D\uDDD1"
+                            text: "\u2715"
                             color: "#cccccc"
                             font.pixelSize: 18
                         }

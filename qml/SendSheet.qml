@@ -65,7 +65,7 @@ Rectangle {
                 spacing: 8
 
                 Label {
-                    text: "\u{1F4E4}"
+                    text: "\u2B06"
                     font.pixelSize: 20
                 }
                 Label {

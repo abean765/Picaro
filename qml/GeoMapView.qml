@@ -113,7 +113,7 @@ Item {
             z: 1
 
             Label {
-                text: "\u{1F4CD}"
+                text: "\u25CF"
                 font.pixelSize: 22
                 style: Text.Outline
                 styleColor: "#000000"

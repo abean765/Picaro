@@ -219,7 +219,7 @@ ListView {
 
                         Label {
                             anchors.centerIn: parent
-                            text: photoModel.showDeleted ? "\u21A9" : "\uD83D\uDDD1"
+                            text: photoModel.showDeleted ? "\u21A9" : "\u2715"
                             font.pixelSize: 14
                             color: "#ffffff"
                         }

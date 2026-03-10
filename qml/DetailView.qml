@@ -290,7 +290,7 @@ Rectangle {
 
         Label {
             anchors.centerIn: parent
-            text: "\u{1F4CD}"
+            text: "\u25CF"
             font.pixelSize: 14
         }
 
@@ -379,7 +379,7 @@ Rectangle {
             Label {
                 x: (256 + tileGrid.pinPxX) * tileGrid.scale - width / 2
                 y: (256 + tileGrid.pinPxY) * tileGrid.scale - height + 2
-                text: "\u{1F4CD}"
+                text: "\u25CF"
                 font.pixelSize: 28
                 style: Text.Outline
                 styleColor: "#000000"
@@ -438,7 +438,7 @@ Rectangle {
 
         Label {
             anchors.centerIn: parent
-            text: "\u{1F4E4}"
+            text: "\u2B06"
             font.pixelSize: 14
         }
 
