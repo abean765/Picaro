@@ -24,6 +24,12 @@ Rectangle {
     readonly property bool isLivePhoto: mediaType === 2
     readonly property bool hasContent: photoId > 0 && filePath !== ""
 
+    readonly property var gpsCoords: photoId > 0 ? photoModel.coordinatesForId(photoId) : null
+    readonly property bool hasGps: gpsCoords !== null && gpsCoords !== undefined && Object.keys(gpsCoords).length > 0
+
+    property bool mapVisible: false
+    onPhotoIdChanged: mapVisible = false
+
     // Stop video when photo changes or view closes
     // Query model directly to avoid stale derived properties (QML binding order is not guaranteed)
     onPhotoIdChanged: {
@@ -267,6 +273,154 @@ Rectangle {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: detailView.navigateNext()
+        }
+    }
+
+    // GPS map button (only visible for geotagged photos)
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.rightMargin: 92
+        anchors.topMargin: 12
+        width: 32
+        height: 32
+        radius: 16
+        color: mapVisible ? "#80ffffff" : (mapBtnArea.containsMouse ? "#60ffffff" : "#30ffffff")
+        visible: hasContent && hasGps
+
+        Label {
+            anchors.centerIn: parent
+            text: "\u{1F4CD}"
+            font.pixelSize: 14
+        }
+
+        MouseArea {
+            id: mapBtnArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: detailView.mapVisible = !detailView.mapVisible
+        }
+    }
+
+    // Map overlay panel
+    Rectangle {
+        id: mapPanel
+        visible: detailView.mapVisible && hasGps
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 52
+        anchors.rightMargin: 12
+        width: 300
+        height: 240
+        radius: 10
+        color: "#222222"
+        border.color: "#555555"
+        border.width: 1
+        z: 30
+        clip: true
+
+        // OSM tile map with 3×3 tile grid
+        Item {
+            id: tileGrid
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 200
+            clip: true
+
+            property int zoom: 14
+            property double lat: hasGps ? detailView.gpsCoords.lat : 0
+            property double lon: hasGps ? detailView.gpsCoords.lon : 0
+
+            // Tile coordinates of center tile
+            property int centerTileX: Math.floor((lon + 180) / 360 * Math.pow(2, zoom))
+            property int centerTileY: {
+                var lr = lat * Math.PI / 180
+                return Math.floor((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * Math.pow(2, zoom))
+            }
+
+            // Pixel offset of pin within center tile (0–256)
+            property double pinPxX: ((lon + 180) / 360 * Math.pow(2, zoom) - centerTileX) * 256
+            property double pinPxY: {
+                var lr = lat * Math.PI / 180
+                return ((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * Math.pow(2, zoom) - centerTileY) * 256
+            }
+
+            // Scale 3×3 tile grid (768×768) into the 300px wide panel
+            property double scale: tileGrid.width / 768
+
+            // Rendered 3×3 tile images
+            Repeater {
+                model: 9
+                Image {
+                    required property int index
+                    property int dx: (index % 3) - 1  // -1, 0, 1
+                    property int dy: Math.floor(index / 3) - 1  // -1, 0, 1
+                    x: (dx + 1) * 256 * tileGrid.scale
+                    y: (dy + 1) * 256 * tileGrid.scale
+                    width:  256 * tileGrid.scale
+                    height: 256 * tileGrid.scale
+                    source: "https://tile.openstreetmap.org/%1/%2/%3.png"
+                        .arg(tileGrid.zoom)
+                        .arg(tileGrid.centerTileX + dx)
+                        .arg(tileGrid.centerTileY + dy)
+                    fillMode: Image.Stretch
+                    // Grey placeholder while loading
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "#333333"
+                        visible: parent.status !== Image.Ready
+                    }
+                }
+            }
+
+            // Pin marker at exact GPS location
+            Label {
+                x: (256 + tileGrid.pinPxX) * tileGrid.scale - width / 2
+                y: (256 + tileGrid.pinPxY) * tileGrid.scale - height + 2
+                text: "\u{1F4CD}"
+                font.pixelSize: 28
+                style: Text.Outline
+                styleColor: "#000000"
+            }
+        }
+
+        // Coordinates + "Open in browser" row
+        RowLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 8
+            height: 32
+
+            Label {
+                text: hasGps
+                    ? "%1° %2,  %3° %4"
+                        .arg(Math.abs(detailView.gpsCoords.lat).toFixed(5))
+                        .arg(detailView.gpsCoords.lat >= 0 ? "N" : "S")
+                        .arg(Math.abs(detailView.gpsCoords.lon).toFixed(5))
+                        .arg(detailView.gpsCoords.lon >= 0 ? "E" : "W")
+                    : ""
+                color: "#aaaaaa"
+                font.pixelSize: 11
+                font.family: "Monospace"
+                Layout.fillWidth: true
+            }
+
+            Label {
+                text: "OpenStreetMap \u2197"
+                color: "#5588ff"
+                font.pixelSize: 11
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Qt.openUrlExternally(
+                        "https://www.openstreetmap.org/?mlat=%1&mlon=%2&zoom=14"
+                        .arg(detailView.gpsCoords.lat)
+                        .arg(detailView.gpsCoords.lon))
+                }
+            }
         }
     }
 

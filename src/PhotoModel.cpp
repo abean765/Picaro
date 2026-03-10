@@ -438,6 +438,18 @@ QVariantList PhotoModel::visiblePhotoIds() const
     return ids;
 }
 
+QVariantMap PhotoModel::coordinatesForId(qint64 id) const
+{
+    auto it = m_idToPhotoIndex.find(id);
+    if (it == m_idToPhotoIndex.end()) return {};
+    const PhotoRecord &r = m_allPhotos[it.value()];
+    if (!r.hasGeolocation) return {};
+    return {
+        { QStringLiteral("lat"), r.latitude  },
+        { QStringLiteral("lon"), r.longitude }
+    };
+}
+
 void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();

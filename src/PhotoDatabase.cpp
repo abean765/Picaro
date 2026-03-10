@@ -151,6 +151,14 @@ void PhotoDatabase::migrateSchema()
         q.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_photos_phash ON photos(phash)"));
         qDebug() << "Migrated: added phash column with index";
     }
+    if (!existingCols.contains(QStringLiteral("latitude"))) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN latitude REAL DEFAULT 0"));
+        qDebug() << "Migrated: added latitude column";
+    }
+    if (!existingCols.contains(QStringLiteral("longitude"))) {
+        q.exec(QStringLiteral("ALTER TABLE photos ADD COLUMN longitude REAL DEFAULT 0"));
+        qDebug() << "Migrated: added longitude column";
+    }
 
     // Composite index for the main query (deleted + date_taken sort)
     q.exec(QStringLiteral(
@@ -192,8 +200,8 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
         "INSERT OR IGNORE INTO photos "
         "(file_path, file_name, date_taken, date_modified, width, height, "
         " file_size, media_type, category, live_video_path, mime_type, duration, month_key, thumbnail, "
-        " has_exif, has_geolocation, owner, phash) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        " has_exif, has_geolocation, owner, phash, latitude, longitude) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ));
 
     q.addBindValue(record.filePath);
@@ -214,6 +222,8 @@ qint64 PhotoDatabase::insertPhoto(const PhotoRecord &record, const QByteArray &t
     q.addBindValue(record.hasGeolocation ? 1 : 0);
     q.addBindValue(record.owner);
     q.addBindValue(record.phash);
+    q.addBindValue(record.latitude);
+    q.addBindValue(record.longitude);
 
     if (!q.exec()) {
         qWarning() << "Insert failed:" << q.lastError().text();
@@ -279,7 +289,7 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
     q.exec(QStringLiteral(
         "SELECT id, file_path, file_name, date_taken, date_modified, "
         "       width, height, file_size, media_type, category, live_video_path, "
-        "       mime_type, duration, month_key, owner "
+        "       mime_type, duration, month_key, owner, has_geolocation, latitude, longitude "
         "FROM photos WHERE deleted = 0 ORDER BY date_taken DESC"
     ));
 
@@ -300,6 +310,9 @@ QVector<PhotoRecord> PhotoDatabase::loadAllRecords() const
         r.duration = q.value(12).toDouble();
         r.monthKey = q.value(13).toString();
         r.owner = q.value(14).toString();
+        r.hasGeolocation = q.value(15).toInt() != 0;
+        r.latitude = q.value(16).toDouble();
+        r.longitude = q.value(17).toDouble();
         records.append(std::move(r));
     }
 
@@ -460,7 +473,8 @@ bool PhotoDatabase::updateMetadata(qint64 photoId, const PhotoRecord &record)
         "UPDATE photos SET "
         "date_taken = ?, date_modified = ?, width = ?, height = ?, "
         "file_size = ?, media_type = ?, category = ?, live_video_path = ?, "
-        "mime_type = ?, month_key = ?, has_exif = ?, has_geolocation = ? "
+        "mime_type = ?, month_key = ?, has_exif = ?, has_geolocation = ?, "
+        "latitude = ?, longitude = ? "
         "WHERE id = ?"
     ));
     q.addBindValue(record.dateTaken.toString(Qt::ISODate));
@@ -475,6 +489,8 @@ bool PhotoDatabase::updateMetadata(qint64 photoId, const PhotoRecord &record)
     q.addBindValue(record.monthKey);
     q.addBindValue(record.hasExif ? 1 : 0);
     q.addBindValue(record.hasGeolocation ? 1 : 0);
+    q.addBindValue(record.latitude);
+    q.addBindValue(record.longitude);
     q.addBindValue(photoId);
     return q.exec();
 }

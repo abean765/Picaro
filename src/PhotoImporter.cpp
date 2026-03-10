@@ -551,11 +551,39 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
                 record.hasExif = true;
             }
 
-            // Check for GPS data
-            auto latIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"));
-            auto lonIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"));
+            // Check for and parse GPS data
+            auto latIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"));
+            auto latRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitudeRef"));
+            auto lonIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"));
+            auto lonRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitudeRef"));
             if (latIt != exifData.end() && lonIt != exifData.end()) {
                 record.hasGeolocation = true;
+
+                // Convert DMS rational triplet to decimal degrees
+                auto dmsToDecimal = [](const Exiv2::Value &val) -> double {
+                    double result = 0.0;
+                    if (val.count() >= 1) {
+                        auto r = val.toRational(0);
+                        if (r.second != 0) result += static_cast<double>(r.first) / r.second;
+                    }
+                    if (val.count() >= 2) {
+                        auto r = val.toRational(1);
+                        if (r.second != 0) result += static_cast<double>(r.first) / r.second / 60.0;
+                    }
+                    if (val.count() >= 3) {
+                        auto r = val.toRational(2);
+                        if (r.second != 0) result += static_cast<double>(r.first) / r.second / 3600.0;
+                    }
+                    return result;
+                };
+
+                record.latitude  = dmsToDecimal(latIt->value());
+                record.longitude = dmsToDecimal(lonIt->value());
+
+                if (latRefIt != exifData.end() && latRefIt->toString() == "S")
+                    record.latitude = -record.latitude;
+                if (lonRefIt != exifData.end() && lonRefIt->toString() == "W")
+                    record.longitude = -record.longitude;
             }
         }
     } catch (const Exiv2::Error &e) {

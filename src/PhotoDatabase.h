@@ -37,6 +37,8 @@ struct PhotoRecord {
     QString monthKey;  // "2024-01"
     bool hasExif = false;
     bool hasGeolocation = false;
+    double latitude = 0.0;   // decimal degrees, only valid if hasGeolocation
+    double longitude = 0.0;  // decimal degrees, only valid if hasGeolocation
     QString owner;  // empty = own photo, otherwise sender name
     QString phash;  // perceptual hash (dHash, 16 hex chars = 64 bits)
     QString exifError; // non-empty if EXIF parsing threw an exception (not persisted)
