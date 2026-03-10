@@ -230,13 +230,13 @@ QImage readHeicThumbnailOrScaled(const QString &filePath, int maxSize)
     return GpuHeicDecoder::decodeThumbnail(filePath, maxSize);
 }
 
-#endif // HAVE_LIBHEIF
-
 QByteArray readHeicExifBytes(const QString &filePath)
 {
     Q_UNUSED(filePath);
     return {};
 }
+
+#endif // HAVE_LIBHEIF
 
 bool isHeicFile(const QString &filePath)
 {
