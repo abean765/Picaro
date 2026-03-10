@@ -181,7 +181,7 @@ Item {
                                 Label {
                                     anchors.centerIn: parent
                                     text: modelData
-                                    font.pixelSize: 16
+                                    font.pixelSize: 20
                                 }
 
                                 MouseArea {
