@@ -28,11 +28,11 @@ Rectangle {
     readonly property bool hasGps: gpsCoords !== null && gpsCoords !== undefined && Object.keys(gpsCoords).length > 0
 
     property bool mapVisible: false
-    onPhotoIdChanged: mapVisible = false
 
     // Stop video when photo changes or view closes
     // Query model directly to avoid stale derived properties (QML binding order is not guaranteed)
     onPhotoIdChanged: {
+        mapVisible = false
         detailPlayer.stop()
         detailPlayer.source = ""
         if (photoId <= 0) return
