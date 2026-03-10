@@ -3,6 +3,7 @@
 #include <QSqlError>
 #include <QDebug>
 #include <QFileInfo>
+#include <QHash>
 
 PhotoDatabase::PhotoDatabase(QObject *parent)
     : QObject(parent)
@@ -613,30 +614,71 @@ bool PhotoDatabase::removeTagFromPhoto(qint64 photoId, qint64 tagId)
 
 QVector<QVector<qint64>> PhotoDatabase::findDuplicateGroups() const
 {
+    // Load all non-deleted photos with a valid, non-trivial perceptual hash.
+    // We exclude the all-zero hash ("0000000000000000") because uniform/dark/
+    // white images all produce it, causing unrelated photos to appear as dupes.
     QSqlQuery q(m_db);
     q.exec(QStringLiteral(
         "SELECT id, phash FROM photos "
-        "WHERE deleted = 0 AND phash != '' "
-        "  AND phash IN ("
-        "    SELECT phash FROM photos "
-        "    WHERE deleted = 0 AND phash != '' "
-        "    GROUP BY phash HAVING COUNT(*) > 1"
-        "  ) "
-        "ORDER BY phash, date_taken"
+        "WHERE deleted = 0 AND length(phash) = 16 AND phash != '0000000000000000' "
+        "ORDER BY id"
     ));
 
-    QVector<QVector<qint64>> groups;
-    QString currentHash;
+    struct Entry { qint64 id; quint64 hash; };
+    QVector<Entry> entries;
     while (q.next()) {
-        qint64 id = q.value(0).toLongLong();
-        QString hash = q.value(1).toString();
-        if (hash != currentHash) {
-            currentHash = hash;
-            groups.append(QVector<qint64>());
-        }
-        groups.last().append(id);
+        bool ok;
+        quint64 h = q.value(1).toString().toULongLong(&ok, 16);
+        if (ok)
+            entries.append({q.value(0).toLongLong(), h});
     }
-    return groups;
+
+    const int n = entries.size();
+    if (n < 2) return {};
+
+    // Union-Find with path halving
+    QVector<int> parent(n);
+    for (int i = 0; i < n; ++i) parent[i] = i;
+
+    auto find = [&](int x) {
+        while (parent[x] != x) {
+            parent[x] = parent[parent[x]]; // path halving
+            x = parent[x];
+        }
+        return x;
+    };
+
+    // Standard 64-bit dHash threshold: ≤ 8 differing bits out of 64
+    const int threshold = 8;
+
+    // Hamming distance via Brian Kernighan's bit-counting
+    auto hammingDist = [](quint64 a, quint64 b) {
+        quint64 x = a ^ b;
+        int c = 0;
+        while (x) { x &= x - 1; ++c; }
+        return c;
+    };
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (hammingDist(entries[i].hash, entries[j].hash) <= threshold) {
+                int pi = find(i), pj = find(j);
+                if (pi != pj) parent[pj] = pi;
+            }
+        }
+    }
+
+    // Collect groups with ≥ 2 members
+    QHash<int, QVector<qint64>> groupMap;
+    for (int i = 0; i < n; ++i)
+        groupMap[find(i)].append(entries[i].id);
+
+    QVector<QVector<qint64>> result;
+    for (const auto &g : groupMap) {
+        if (g.size() >= 2)
+            result.append(g);
+    }
+    return result;
 }
 
 QStringList PhotoDatabase::loadAllHashes() const
