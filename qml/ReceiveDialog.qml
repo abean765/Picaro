@@ -166,7 +166,7 @@ Rectangle {
                 Button {
                     text: "Annehmen"
                     onClicked: {
-                        networkManager.acceptTransfer(appSettings.receiveFolder)
+                        networkManager.acceptTransfer(appSettings.photoFolder)
                     }
 
                     background: Rectangle {

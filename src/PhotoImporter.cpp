@@ -3,6 +3,7 @@
 
 #include <QDir>
 #include <QDirIterator>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QImageReader>
@@ -61,7 +62,8 @@ PhotoImporter::PhotoImporter(PhotoDatabase *db, QObject *parent)
 {
 }
 
-void PhotoImporter::importDirectory(const QString &path, const QString &owner, const QVariantList &tagIds)
+void PhotoImporter::importDirectory(const QString &path, const QString &owner,
+                                    const QVariantList &tagIds, const QString &copyToFolder)
 {
     if (m_running) return;
 
@@ -76,8 +78,8 @@ void PhotoImporter::importDirectory(const QString &path, const QString &owner, c
     for (const auto &v : tagIds)
         tagIdVec.append(v.toLongLong());
 
-    Q_UNUSED(QtConcurrent::run([this, path, owner, tagIdVec]() {
-        doImport(path, owner, tagIdVec);
+    Q_UNUSED(QtConcurrent::run([this, path, owner, tagIdVec, copyToFolder]() {
+        doImport(path, owner, tagIdVec, copyToFolder);
     }));
 }
 
@@ -110,10 +112,30 @@ QStringList PhotoImporter::scanDirectory(const QString &path) const
     return files;
 }
 
-void PhotoImporter::doImport(const QString &path, const QString &owner, const QVector<qint64> &tagIds)
+void PhotoImporter::doImport(const QString &path, const QString &owner,
+                             const QVector<qint64> &tagIds, const QString &copyToFolder)
 {
     QElapsedTimer timer;
     timer.start();
+
+    // Helper: copy a file into copyToFolder if set, avoiding overwrites
+    auto copyToPhotoFolder = [&copyToFolder](const QString &srcPath, const QString &fileName) {
+        if (copyToFolder.isEmpty()) return;
+        QDir().mkpath(copyToFolder);
+        QString destPath = copyToFolder + QStringLiteral("/") + fileName;
+        if (QFile::exists(destPath)) {
+            QFileInfo fi(destPath);
+            QString base = fi.completeBaseName();
+            QString ext = fi.suffix();
+            int n = 1;
+            while (QFile::exists(destPath)) {
+                destPath = copyToFolder + QStringLiteral("/") + base
+                           + QStringLiteral("_%1.").arg(n) + ext;
+                ++n;
+            }
+        }
+        QFile::copy(srcPath, destPath);
+    };
 
     qDebug() << "Scanning directory:" << path;
     QMetaObject::invokeMethod(this, [this, path]() {
@@ -204,6 +226,7 @@ void PhotoImporter::doImport(const QString &path, const QString &owner, const QV
                         } else {
                             for (qint64 tagId : tagIds)
                                 m_db->addTagToPhoto(insertedId, tagId);
+                            copyToPhotoFolder(result.record.filePath, result.record.fileName);
                         }
                         ++imported;
                         --photoRemaining;
@@ -291,6 +314,7 @@ void PhotoImporter::doImport(const QString &path, const QString &owner, const QV
                 if (insertedId2 > 0) {
                     for (qint64 tagId : tagIds)
                         m_db->addTagToPhoto(insertedId2, tagId);
+                    copyToPhotoFolder(result.record.filePath, result.record.fileName);
                 }
                 ++imported;
                 --photoRemaining;
@@ -350,6 +374,7 @@ void PhotoImporter::doImport(const QString &path, const QString &owner, const QV
             } else {
                 for (qint64 tagId : tagIds)
                     m_db->addTagToPhoto(vidId, tagId);
+                copyToPhotoFolder(filePath, record.fileName);
             }
             ++imported;
 

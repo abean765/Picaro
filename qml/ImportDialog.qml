@@ -247,6 +247,31 @@ Rectangle {
                     }
                 }
 
+                // Copy to photo folder checkbox
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    spacing: 8
+
+                    CheckBox {
+                        id: copyToFolderCheck
+                        checked: false
+                        palette.windowText: "#cccccc"
+                    }
+
+                    Label {
+                        text: "Fotos in den Fotoordner kopieren"
+                        color: "#cccccc"
+                        font.pixelSize: 13
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: copyToFolderCheck.checked = !copyToFolderCheck.checked
+                        }
+                    }
+                }
+
                 // Buttons
                 RowLayout {
                     Layout.fillWidth: true
@@ -316,7 +341,8 @@ Rectangle {
     function startImport() {
         if (dirLabel.text === "") return
         appSettings.importOwner = ownerInput.text
-        photoImporter.importDirectory(dirLabel.text, ownerInput.text, importDlg.selectedTagIds)
+        var folder = copyToFolderCheck.checked ? appSettings.photoFolder : ""
+        photoImporter.importDirectory(dirLabel.text, ownerInput.text, importDlg.selectedTagIds, folder)
         importDlg.visible = false
     }
 }

@@ -38,7 +38,8 @@ public:
 
     Q_INVOKABLE void importDirectory(const QString &path,
                                      const QString &owner = QString(),
-                                     const QVariantList &tagIds = {});
+                                     const QVariantList &tagIds = {},
+                                     const QString &copyToFolder = QString());
     Q_INVOKABLE void regenerateVideoThumbnails();
     Q_INVOKABLE void rereadMetadata();
     Q_INVOKABLE void cancel();
@@ -53,7 +54,7 @@ signals:
     void logMessage(const QString &message);
 
 private:
-    void doImport(const QString &path, const QString &owner, const QVector<qint64> &tagIds);
+    void doImport(const QString &path, const QString &owner, const QVector<qint64> &tagIds, const QString &copyToFolder);
     PhotoRecord extractMetadata(const QString &filePath) const;
     QByteArray generateThumbnail(const QString &filePath, MediaType type);
     QByteArray imageToJpegBlob(const QImage &img) const;

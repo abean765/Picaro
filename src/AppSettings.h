@@ -24,6 +24,7 @@ class AppSettings : public QObject
     Q_PROPERTY(QString receiveFolder READ receiveFolder WRITE setReceiveFolder NOTIFY receiveFolderChanged)
     Q_PROPERTY(QString importDirectory READ importDirectory WRITE setImportDirectory NOTIFY importDirectoryChanged)
     Q_PROPERTY(QString importOwner READ importOwner WRITE setImportOwner NOTIFY importOwnerChanged)
+    Q_PROPERTY(QString photoFolder READ photoFolder WRITE setPhotoFolder NOTIFY photoFolderChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -181,6 +182,30 @@ public:
         emit importOwnerChanged();
     }
 
+    QString photoFolder() const
+    {
+        return m_settings.value(
+            QStringLiteral("storage/photoFolder"),
+            QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+                + QStringLiteral("/Picaro")
+        ).toString();
+    }
+
+    void setPhotoFolder(const QString &folder)
+    {
+        if (folder == photoFolder()) return;
+        m_settings.setValue(QStringLiteral("storage/photoFolder"), folder);
+        m_settings.sync();
+        emit photoFolderChanged();
+    }
+
+    Q_INVOKABLE void resetPhotoFolder()
+    {
+        m_settings.remove(QStringLiteral("storage/photoFolder"));
+        m_settings.sync();
+        emit photoFolderChanged();
+    }
+
     Q_INVOKABLE QString generateTestTone()
     {
         if (!m_tempDir.isValid())
@@ -257,6 +282,7 @@ signals:
     void receiveFolderChanged();
     void importDirectoryChanged();
     void importOwnerChanged();
+    void photoFolderChanged();
 
 private:
     QSettings m_settings;
