@@ -5,6 +5,9 @@ import QtQuick.Layouts
 Item {
     id: overviewView
 
+    property bool mapOverlayVisible: false
+    property var geoPoints: []
+
     Component.onCompleted: statsProvider.refresh()
 
     Connections {
@@ -90,6 +93,11 @@ Item {
                         : ""
                     icon: "\u{1F4CD}"
                     accentColor: "#ff922b"
+                    clickable: statsProvider.withGeolocation > 0
+                    onClicked: {
+                        overviewView.geoPoints = photoModel.allGeolocatedPhotos()
+                        overviewView.mapOverlayVisible = true
+                    }
                 }
 
                 StatCard {
@@ -105,6 +113,83 @@ Item {
         }
     }
 
+    // Fullscreen map overlay
+    Rectangle {
+        anchors.fill: parent
+        color: "#d0000000"
+        visible: overviewView.mapOverlayVisible
+        z: 100
+
+        MouseArea { anchors.fill: parent } // block clicks through
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 32
+            color: "#1a1a1a"
+            radius: 12
+            clip: true
+
+            GeoMapView {
+                id: geoMap
+                anchors.fill: parent
+                points: overviewView.geoPoints
+            }
+
+            // Header bar
+            Rectangle {
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 44
+                color: "#cc1a1a1a"
+                radius: 12
+
+                // Bottom corners not rounded
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 12
+                    color: parent.color
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 8
+
+                    Label {
+                        text: "\u{1F4CD}  %1 Fotos mit Standort".arg(overviewView.geoPoints.length)
+                        color: "#ffffff"
+                        font.pixelSize: 15
+                        font.bold: true
+                        Layout.fillWidth: true
+                    }
+
+                    Rectangle {
+                        width: 32; height: 32; radius: 16
+                        color: closeMapArea.containsMouse ? "#60ffffff" : "#30ffffff"
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "\u2715"
+                            color: "#ffffff"
+                            font.pixelSize: 16
+                        }
+
+                        MouseArea {
+                            id: closeMapArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: overviewView.mapOverlayVisible = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Inline component for stat cards
     component StatCard: Rectangle {
         property string title: ""
@@ -112,6 +197,9 @@ Item {
         property string subtitle: ""
         property string icon: ""
         property color accentColor: "#ffffff"
+        property bool clickable: false
+
+        signal clicked()
 
         Layout.fillWidth: true
         Layout.preferredHeight: 120
@@ -134,6 +222,14 @@ Item {
                     color: "#999999"
                     font.pixelSize: 14
                 }
+                Item { Layout.fillWidth: true }
+                Label {
+                    visible: parent.parent.parent.clickable
+                    text: "\u25B6"
+                    color: parent.parent.parent.accentColor
+                    font.pixelSize: 10
+                    opacity: 0.7
+                }
             }
 
             Label {
@@ -149,6 +245,21 @@ Item {
                 font.pixelSize: 12
                 visible: subtitle.length > 0
             }
+        }
+
+        // Hover highlight
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: cardArea.containsMouse && parent.clickable ? "#15ffffff" : "transparent"
+        }
+
+        MouseArea {
+            id: cardArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: parent.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: if (parent.clickable) parent.clicked()
         }
     }
 }

@@ -85,6 +85,7 @@ public:
     Q_INVOKABLE void setRating(qint64 id, int rating);
     Q_INVOKABLE QVariantList visiblePhotoIds() const;
     Q_INVOKABLE QVariantMap coordinatesForId(qint64 id) const;
+    Q_INVOKABLE QVariantList allGeolocatedPhotos() const;
 
 signals:
     void photosPerRowChanged();

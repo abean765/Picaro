@@ -450,6 +450,21 @@ QVariantMap PhotoModel::coordinatesForId(qint64 id) const
     };
 }
 
+QVariantList PhotoModel::allGeolocatedPhotos() const
+{
+    QVariantList result;
+    for (const auto &r : m_allPhotos) {
+        if (r.hasGeolocation) {
+            QVariantMap m;
+            m[QStringLiteral("lat")] = r.latitude;
+            m[QStringLiteral("lon")] = r.longitude;
+            m[QStringLiteral("id")]  = r.id;
+            result.append(m);
+        }
+    }
+    return result;
+}
+
 void PhotoModel::buildTimelineData()
 {
     m_timelineData.clear();

@@ -129,6 +129,7 @@ qt_add_qml_module(picaro
         qml/ReceiveDialog.qml
         qml/SlideshowView.qml
         qml/ToolsView.qml
+        qml/GeoMapView.qml
 )
 
 target_include_directories(picaro PRIVATE
