@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QVariantList>
 #include "PhotoDatabase.h"
 
 class StatsProvider : public QObject
@@ -47,6 +48,21 @@ public:
     {
         m_stats = m_db->loadStats();
         emit statsChanged();
+    }
+
+    Q_INVOKABLE QVariantList findDuplicateGroups() const
+    {
+        const auto groups = m_db->findDuplicateGroups();
+        QVariantList result;
+        result.reserve(groups.size());
+        for (const auto &group : groups) {
+            QVariantList g;
+            g.reserve(group.size());
+            for (qint64 id : group)
+                g.append(id);
+            result.append(g);
+        }
+        return result;
     }
 
 signals:

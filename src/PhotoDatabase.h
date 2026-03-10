@@ -125,6 +125,9 @@ public:
 
     // Perceptual hashing for duplicate detection
     QStringList loadAllHashes() const;
+    // Returns groups of photo IDs that share an identical phash
+    QVector<QVector<qint64>> findDuplicateGroups() const;
+
     QVector<qint64> photoIdsForTag(qint64 tagId) const;
 
 private:

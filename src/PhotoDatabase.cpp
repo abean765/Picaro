@@ -611,6 +611,34 @@ bool PhotoDatabase::removeTagFromPhoto(qint64 photoId, qint64 tagId)
     return q.exec();
 }
 
+QVector<QVector<qint64>> PhotoDatabase::findDuplicateGroups() const
+{
+    QSqlQuery q(m_db);
+    q.exec(QStringLiteral(
+        "SELECT id, phash FROM photos "
+        "WHERE deleted = 0 AND phash != '' "
+        "  AND phash IN ("
+        "    SELECT phash FROM photos "
+        "    WHERE deleted = 0 AND phash != '' "
+        "    GROUP BY phash HAVING COUNT(*) > 1"
+        "  ) "
+        "ORDER BY phash, date_taken"
+    ));
+
+    QVector<QVector<qint64>> groups;
+    QString currentHash;
+    while (q.next()) {
+        qint64 id = q.value(0).toLongLong();
+        QString hash = q.value(1).toString();
+        if (hash != currentHash) {
+            currentHash = hash;
+            groups.append(QVector<qint64>());
+        }
+        groups.last().append(id);
+    }
+    return groups;
+}
+
 QStringList PhotoDatabase::loadAllHashes() const
 {
     QStringList hashes;

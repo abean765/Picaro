@@ -6,6 +6,8 @@ Item {
     id: root
 
     property string logText: ""
+    property var dupGroups: []
+    property bool dupSearchDone: false
 
     Connections {
         target: photoImporter
@@ -31,6 +33,133 @@ Item {
                 color: "#ffffff"
                 font.pixelSize: 24
                 font.bold: true
+            }
+
+            // Duplicate finder card
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: dupCardContent.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: dupCardContent
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Duplikate finden"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Sucht nach Fotos mit identischem perceptual Hash (dHash). Zeigt Gruppen visuell ähnlicher oder identischer Bilder an."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        spacing: 12
+
+                        Button {
+                            text: "Duplikate suchen"
+                            onClicked: {
+                                dupGroups = statsProvider.findDuplicateGroups()
+                                dupSearchDone = true
+                            }
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#ffffff"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 16
+                                rightPadding: 16
+                            }
+                        }
+
+                        Label {
+                            visible: dupGroups.length > 0
+                            text: dupGroups.length + " Gruppe" + (dupGroups.length !== 1 ? "n" : "") + " gefunden"
+                            color: "#888888"
+                            font.pixelSize: 13
+                        }
+
+                        Label {
+                            visible: dupSearchDone && dupGroups.length === 0
+                            text: "Keine Duplikate gefunden"
+                            color: "#22c55e"
+                            font.pixelSize: 13
+                        }
+                    }
+
+                    // Results list
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        visible: dupGroups.length > 0
+
+                        Repeater {
+                            model: dupGroups
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                implicitHeight: groupRow.implicitHeight + 20
+                                color: "#1e1e1e"
+                                radius: 6
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 8
+
+                                    Label {
+                                        text: "Gruppe " + (index + 1) + "  ·  " + modelData.length + " Fotos"
+                                        color: "#888888"
+                                        font.pixelSize: 11
+                                    }
+
+                                    Row {
+                                        id: groupRow
+                                        spacing: 6
+
+                                        Repeater {
+                                            model: modelData
+
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                width: 100
+                                                height: 100
+                                                color: "#2a2a2a"
+                                                radius: 4
+                                                clip: true
+
+                                                Image {
+                                                    anchors.fill: parent
+                                                    source: "image://thumbnail/" + modelData
+                                                    fillMode: Image.PreserveAspectCrop
+                                                    asynchronous: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Metadata re-read card
