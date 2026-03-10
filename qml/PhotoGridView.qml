@@ -255,8 +255,7 @@ ListView {
 
                             // Stop any previous preview before reconfiguring.
                             sharedPlayer.stop();
-                            sharedPlayer.loops = cellItem.isLivePhoto
-                                ? MediaPlayer.Infinite : 1;
+                            sharedPlayer.loops = 1;
                             gridView._hoveredCell = cellItem;
                             sharedPlayer.source = (Qt.platform.os === "windows" ? "file:///" : "file://") + path;
                             sharedPlayer.play();
