@@ -259,7 +259,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: if (clickable) clicked()
+            onClicked: if (clickable) parent.clicked()
         }
     }
 }
