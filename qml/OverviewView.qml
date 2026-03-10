@@ -159,11 +159,15 @@ Item {
                     anchors.rightMargin: 8
 
                     Label {
-                        text: "\u{1F4CD}  %1 Fotos mit Standort".arg(overviewView.geoPoints.length)
+                        text: "\u{1F4CD}"
+                        font.pixelSize: 15
+                        font.family: "Noto Color Emoji"
+                    }
+                    Label {
+                        text: "%1 Fotos mit Standort".arg(overviewView.geoPoints.length)
                         color: "#ffffff"
                         font.pixelSize: 15
                         font.bold: true
-                        font.families: ["Noto Color Emoji", "sans-serif"]
                         Layout.fillWidth: true
                     }
 
