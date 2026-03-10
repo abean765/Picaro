@@ -88,13 +88,14 @@ Rectangle {
         }
     }
 
-    // Full-size image (photos and live photos)
+    // Full-size image (photos and live photos).
+    // Uses image://photo/<id> so that HEIC files are decoded via HeicImageReader.
     Image {
         id: fullImage
         anchors.fill: parent
         anchors.margins: 8
         visible: hasContent && !isVideo
-        source: hasContent && !isVideo ? "file:///" + filePath : ""
+        source: hasContent && !isVideo ? "image://photo/" + photoId : ""
         fillMode: Image.PreserveAspectFit
         asynchronous: true
 

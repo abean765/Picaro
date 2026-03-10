@@ -97,6 +97,8 @@ qt_add_executable(picaro
     src/PhotoImporter.cpp
     src/ThumbnailProvider.h
     src/ThumbnailProvider.cpp
+    src/PhotoImageProvider.h
+    src/PhotoImageProvider.cpp
     src/HeicImageReader.h
     src/HeicImageReader.cpp
     src/VideoFrameExtractor.h

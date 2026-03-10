@@ -10,6 +10,7 @@
 #include "PhotoModel.h"
 #include "PhotoImporter.h"
 #include "ThumbnailProvider.h"
+#include "PhotoImageProvider.h"
 #include "AppSettings.h"
 #include "StatsProvider.h"
 #include "TagModel.h"
@@ -72,6 +73,7 @@ int main(int argc, char *argv[])
 
     // Register thumbnail image provider (engine takes ownership)
     engine.addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider(dbPath));
+    engine.addImageProvider(QStringLiteral("photo"), new PhotoImageProvider(dbPath));
 
     // Expose C++ objects to QML
     QQmlContext *ctx = engine.rootContext();

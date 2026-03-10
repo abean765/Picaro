@@ -30,13 +30,16 @@ ListView {
     // in viewport coordinates and is clipped by the ListView bounds.
     // Its position tracks _hoveredCell; referencing gridView.contentY in the
     // binding expression ensures it re-evaluates whenever the list scrolls.
+    // Only shown once media is buffered (first frame ready) to avoid a black flash.
     VideoOutput {
         id: overlayOutput
         parent: gridView
         z: 10
         fillMode: VideoOutput.PreserveAspectCrop
         visible: gridView._hoveredCell !== null &&
-                 sharedPlayer.playbackState === MediaPlayer.PlayingState
+                 sharedPlayer.playbackState === MediaPlayer.PlayingState &&
+                 (sharedPlayer.mediaStatus === MediaPlayer.BufferedMedia ||
+                  sharedPlayer.mediaStatus === MediaPlayer.EndOfMedia)
 
         x: gridView._hoveredCell
             ? gridView._hoveredCell.mapToItem(gridView, 0, 0).x + gridView.contentY * 0
@@ -142,10 +145,14 @@ ListView {
                     readonly property bool isLivePhoto: modelData.mediaType === 2
                     readonly property bool hasVideo: isVideo || isLivePhoto
 
-                    // True while the shared player is rendering this cell's video.
+                    // True once the shared player has a buffered frame for this cell.
+                    // Using mediaStatus avoids the black-flash between thumbnail
+                    // disappearing and the first video frame being rendered.
                     readonly property bool videoPlaying:
                         gridView._hoveredCell === cellItem &&
-                        sharedPlayer.playbackState === MediaPlayer.PlayingState
+                        sharedPlayer.playbackState === MediaPlayer.PlayingState &&
+                        (sharedPlayer.mediaStatus === MediaPlayer.BufferedMedia ||
+                         sharedPlayer.mediaStatus === MediaPlayer.EndOfMedia)
 
                     // Selection highlight
                     Rectangle {
