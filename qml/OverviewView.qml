@@ -163,6 +163,7 @@ Item {
                         color: "#ffffff"
                         font.pixelSize: 15
                         font.bold: true
+                        font.families: ["Noto Color Emoji", "sans-serif"]
                         Layout.fillWidth: true
                     }
 
@@ -223,6 +224,7 @@ Item {
                 Label {
                     text: icon
                     font.pixelSize: 20
+                    font.family: "Noto Color Emoji"
                 }
                 Label {
                     text: title
