@@ -112,6 +112,9 @@ void PhotoImporter::doImport(const QString &path)
     timer.start();
 
     qDebug() << "Scanning directory:" << path;
+    QMetaObject::invokeMethod(this, [this, path]() {
+        emit logMessage(QStringLiteral("Scanne Verzeichnis: %1").arg(path));
+    });
 
     QStringList files = scanDirectory(path);
     m_totalFiles = files.size();
@@ -135,11 +138,23 @@ void PhotoImporter::doImport(const QString &path)
         }
     }
 
+    QMetaObject::invokeMethod(this, [this, total = m_totalFiles, skipped,
+                                     photos = photoFiles.size(), videos = videoFiles.size()]() {
+        emit logMessage(QStringLiteral("%1 Dateien gefunden  •  %2 neu (%3 Fotos, %4 Videos)  •  %5 bereits vorhanden")
+            .arg(total).arg(photos + videos).arg(photos).arg(videos).arg(skipped));
+    });
+
     int imported = 0;
     const int batchSize = 500;
+    int withExif = 0;
+    int withGps = 0;
 
     // Phase 2: Import photos in parallel (HEIC decode is CPU-bound)
     if (!photoFiles.isEmpty() && !m_cancelled) {
+        QMetaObject::invokeMethod(this, [this, n = photoFiles.size()]() {
+            emit logMessage(QStringLiteral("Importiere %1 Fotos...").arg(n));
+        });
+
         QThreadPool pool;
         const int threadCount = qMin(4, QThread::idealThreadCount());
         pool.setMaxThreadCount(threadCount);
@@ -168,6 +183,8 @@ void PhotoImporter::doImport(const QString &path)
                         ImportResult result = m_resultQueue.dequeue();
                         lock.unlock();
 
+                        if (result.record.hasExif) ++withExif;
+                        if (result.record.hasGeolocation) ++withGps;
                         m_db->insertPhoto(result.record, result.thumbnail);
                         ++imported;
                         --photoRemaining;
@@ -246,6 +263,8 @@ void PhotoImporter::doImport(const QString &path)
                 ImportResult result = m_resultQueue.dequeue();
                 lock.unlock();
 
+                if (result.record.hasExif) ++withExif;
+                if (result.record.hasGeolocation) ++withGps;
                 m_db->insertPhoto(result.record, result.thumbnail);
                 ++imported;
                 --photoRemaining;
@@ -276,6 +295,10 @@ void PhotoImporter::doImport(const QString &path)
 
     // Phase 3: Import videos sequentially (VideoFrameExtractor not thread-safe)
     if (!videoFiles.isEmpty() && !m_cancelled) {
+        QMetaObject::invokeMethod(this, [this, n = videoFiles.size()]() {
+            emit logMessage(QStringLiteral("Importiere %1 Videos...").arg(n));
+        });
+
         m_db->beginTransaction();
 
         for (int i = 0; i < videoFiles.size(); ++i) {
@@ -283,6 +306,8 @@ void PhotoImporter::doImport(const QString &path)
 
             const QString &filePath = videoFiles[i];
             PhotoRecord record = extractMetadata(filePath);
+            if (record.hasExif) ++withExif;
+            if (record.hasGeolocation) ++withGps;
             QByteArray thumbnail = generateThumbnail(filePath, record.mediaType);
             m_db->insertPhoto(record, thumbnail);
             ++imported;
@@ -301,10 +326,15 @@ void PhotoImporter::doImport(const QString &path)
 
     m_progress = skipped + imported;
     m_running = false;
+    int noExif = imported - withExif;
     qDebug() << "Import finished:" << imported << "imported," << skipped
              << "skipped in" << timer.elapsed() << "ms";
 
-    QMetaObject::invokeMethod(this, [this, imported, skipped]() {
+    QMetaObject::invokeMethod(this, [this, imported, skipped, withExif, withGps, noExif,
+                                     elapsed = (int)timer.elapsed()]() {
+        emit logMessage(QStringLiteral(
+            "Fertig: %1 importiert  •  %2 mit EXIF  •  %3 mit GPS  •  %4 ohne EXIF  •  %5 übersprungen  (%6 ms)")
+            .arg(imported).arg(withExif).arg(withGps).arg(noExif).arg(skipped).arg(elapsed));
         emit runningChanged();
         emit importFinished(imported, skipped);
     });
