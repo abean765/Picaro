@@ -382,17 +382,32 @@ Item {
 
                     // Send button
                     Rectangle {
-                        implicitWidth: 34
-                        implicitHeight: 34
-                        radius: 4
-                        color: sendTagArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "transparent"
+                        implicitWidth: sendBtnRow.implicitWidth + 20
+                        implicitHeight: 32
+                        radius: 6
+                        color: sendTagArea.containsMouse
+                            ? Qt.darker(root.accentColor, 1.2)
+                            : root.accentColor
                         visible: photoCount > 0
 
-                        Label {
+                        RowLayout {
+                            id: sendBtnRow
                             anchors.centerIn: parent
-                            text: "\u2B06"
-                            font.pixelSize: 18
+                            spacing: 5
+
+                            Label {
+                                text: "\u2B06"
+                                color: "#ffffff"
+                                font.pixelSize: 14
+                            }
+                            Label {
+                                text: "Senden"
+                                color: "#ffffff"
+                                font.pixelSize: 13
+                                font.bold: true
+                            }
                         }
+
                         MouseArea {
                             id: sendTagArea
                             anchors.fill: parent
