@@ -206,6 +206,13 @@ Item {
         color: "#2a2a2a"
         radius: 8
 
+        // Hover highlight (below content)
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: cardArea.containsMouse && clickable ? "#15ffffff" : "transparent"
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 16
@@ -224,9 +231,9 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 Label {
-                    visible: parent.parent.parent.clickable
+                    visible: clickable
                     text: "\u25B6"
-                    color: parent.parent.parent.accentColor
+                    color: accentColor
                     font.pixelSize: 10
                     opacity: 0.7
                 }
@@ -247,19 +254,12 @@ Item {
             }
         }
 
-        // Hover highlight
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: cardArea.containsMouse && parent.clickable ? "#15ffffff" : "transparent"
-        }
-
         MouseArea {
             id: cardArea
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: parent.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: if (parent.clickable) parent.clicked()
+            cursorShape: clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: if (clickable) clicked()
         }
     }
 }
