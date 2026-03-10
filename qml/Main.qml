@@ -352,9 +352,14 @@ ApplicationWindow {
                                         }
                                     }
 
+                                    onActiveFocusChanged: {
+                                        if (!activeFocus)
+                                            suggestionPopup.close()
+                                    }
+
                                     Keys.onEscapePressed: {
                                         if (suggestionPopup.visible) {
-                                            suggestionPopup.visible = false
+                                            suggestionPopup.close()
                                         } else {
                                             text = ""
                                             photoModel.clearFilter()
@@ -445,23 +450,26 @@ ApplicationWindow {
                             }
                         }
 
-                        // Autocomplete popup
-                        Rectangle {
+                        // Autocomplete popup - rendered in overlay above all content
+                        Popup {
                             id: suggestionPopup
-                            anchors.top: searchBox.bottom
-                            anchors.topMargin: 4
-                            anchors.left: searchBox.left
+                            x: 0
+                            y: searchBox.height + 4
                             width: searchBox.width
                             height: Math.min(suggestionList.contentHeight + 8, 200)
-                            color: "#2a2a2a"
-                            radius: 8
-                            border.color: "#444444"
-                            border.width: 1
-                            visible: searchInput.activeFocus && photoModel.filterSuggestions.length > 0 && searchInput.text.length > 0
-                            z: 200
-                            clip: true
+                            padding: 0
+                            modal: false
+                            focus: false
+                            closePolicy: Popup.NoAutoClose
 
-                            ListView {
+                            background: Rectangle {
+                                color: "#2a2a2a"
+                                radius: 8
+                                border.color: "#444444"
+                                border.width: 1
+                            }
+
+                            contentItem: ListView {
                                 id: suggestionList
                                 anchors.fill: parent
                                 anchors.margins: 4
@@ -510,6 +518,17 @@ ApplicationWindow {
                             }
                         }
 
+                        Connections {
+                            target: photoModel
+                            function onFilterSuggestionsChanged() {
+                                if (searchInput.text.length > 0 && photoModel.filterSuggestions.length > 0) {
+                                    suggestionPopup.open()
+                                } else {
+                                    suggestionPopup.close()
+                                }
+                            }
+                        }
+
                         function applySuggestion(suggestion) {
                             // Extract the actual value after "Tag: " or "Sender: "
                             var value = suggestion
@@ -522,7 +541,7 @@ ApplicationWindow {
                             searchInput.text = value
                             searchInput.suppressUpdate = false
                             photoModel.filterText = value
-                            suggestionPopup.visible = false
+                            suggestionPopup.close()
                         }
                     }
 
