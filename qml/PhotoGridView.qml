@@ -112,26 +112,6 @@ ListView {
         readonly property real cellHeight: gridView._contentWidth / photoModel.photosPerRow
         readonly property var rowCells: model.cells
 
-        // ListView.onPooled fires on the ROOT delegate item (here: rowDelegate).
-        // It does NOT propagate to nested Repeater children, so the onPooled
-        // handler on cellItem never fires.  When rowDelegate is pooled, it is
-        // moved out of the scene graph into an internal pool container.
-        // Any cellItem living inside it is still alive (not destroyed), but
-        // mapToItem(gridView, …) would traverse up past the pool container —
-        // a non-ancestor of gridView — and crash in Release builds.
-        // We therefore clear _hoveredCell here, where the signal actually fires.
-        ListView.onPooled: {
-            for (var i = 0; i < photoRepeater.count; ++i) {
-                var cell = photoRepeater.itemAt(i);
-                if (cell !== null && gridView._hoveredCell === cell) {
-                    sharedPlayer.stop();
-                    sharedPlayer.source = "";
-                    gridView._hoveredCell = null;
-                    break;
-                }
-            }
-        }
-
         // Month header
         Label {
             visible: model.rowType === "header"
@@ -151,7 +131,6 @@ ListView {
             spacing: 2
 
             Repeater {
-                id: photoRepeater
                 model: rowDelegate.rowCells
 
                 Item {
@@ -167,19 +146,6 @@ ListView {
                     readonly property bool videoPlaying:
                         gridView._hoveredCell === cellItem &&
                         sharedPlayer.playbackState === MediaPlayer.PlayingState
-
-                    // When this cellItem is destroyed (which happens when the
-                    // Repeater rebuilds its children after reuseItems reuses the
-                    // parent rowDelegate for a new model row), clear _hoveredCell.
-                    // Without this, _hoveredCell would be a dangling reference and
-                    // mapToItem() in the overlayOutput bindings would crash.
-                    Component.onDestruction: {
-                        if (gridView._hoveredCell === cellItem) {
-                            sharedPlayer.stop();
-                            sharedPlayer.source = "";
-                            gridView._hoveredCell = null;
-                        }
-                    }
 
                     // Selection highlight
                     Rectangle {
