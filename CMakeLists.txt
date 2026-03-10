@@ -128,6 +128,7 @@ qt_add_qml_module(picaro
         qml/SendSheet.qml
         qml/ReceiveDialog.qml
         qml/SlideshowView.qml
+        qml/ToolsView.qml
 )
 
 target_include_directories(picaro PRIVATE

@@ -97,6 +97,10 @@ public:
     QVector<QPair<qint64, QString>> loadVideoFilePaths() const;
     bool updateThumbnail(qint64 photoId, const QByteArray &thumbnail);
 
+    // Metadata re-read
+    QVector<QPair<qint64, QString>> loadAllFilePaths() const;
+    bool updateMetadata(qint64 photoId, const PhotoRecord &record);
+
     // Load a single photo record by ID
     std::optional<PhotoRecord> loadRecord(qint64 photoId) const;
 

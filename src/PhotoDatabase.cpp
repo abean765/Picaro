@@ -442,6 +442,43 @@ bool PhotoDatabase::updateThumbnail(qint64 photoId, const QByteArray &thumbnail)
     return q.exec();
 }
 
+QVector<QPair<qint64, QString>> PhotoDatabase::loadAllFilePaths() const
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT id, file_path FROM photos WHERE deleted = 0 ORDER BY id"));
+    if (!q.exec()) return {};
+    QVector<QPair<qint64, QString>> result;
+    while (q.next())
+        result.append({q.value(0).toLongLong(), q.value(1).toString()});
+    return result;
+}
+
+bool PhotoDatabase::updateMetadata(qint64 photoId, const PhotoRecord &record)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "UPDATE photos SET "
+        "date_taken = ?, date_modified = ?, width = ?, height = ?, "
+        "file_size = ?, media_type = ?, category = ?, live_video_path = ?, "
+        "mime_type = ?, month_key = ?, has_exif = ?, has_geolocation = ? "
+        "WHERE id = ?"
+    ));
+    q.addBindValue(record.dateTaken.toString(Qt::ISODate));
+    q.addBindValue(record.dateModified.toString(Qt::ISODate));
+    q.addBindValue(record.width);
+    q.addBindValue(record.height);
+    q.addBindValue(record.fileSize);
+    q.addBindValue(static_cast<int>(record.mediaType));
+    q.addBindValue(static_cast<int>(record.category));
+    q.addBindValue(record.liveVideoPath);
+    q.addBindValue(record.mimeType);
+    q.addBindValue(record.monthKey);
+    q.addBindValue(record.hasExif ? 1 : 0);
+    q.addBindValue(record.hasGeolocation ? 1 : 0);
+    q.addBindValue(photoId);
+    return q.exec();
+}
+
 bool PhotoDatabase::markDeleted(qint64 photoId, bool deleted)
 {
     QSqlQuery q(m_db);

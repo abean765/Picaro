@@ -361,6 +361,83 @@ void PhotoImporter::regenerateVideoThumbnails()
     }));
 }
 
+void PhotoImporter::rereadMetadata()
+{
+    if (m_running) return;
+
+    m_running = true;
+    m_cancelled = false;
+    m_progress = 0;
+    emit runningChanged();
+
+    Q_UNUSED(QtConcurrent::run([this]() {
+        QElapsedTimer timer;
+        timer.start();
+
+        auto allFiles = m_db->loadAllFilePaths();
+        m_totalFiles = allFiles.size();
+        QMetaObject::invokeMethod(this, [this]() { emit totalFilesChanged(); });
+
+        QMetaObject::invokeMethod(this, [this, n = m_totalFiles]() {
+            emit logMessage(QStringLiteral("Starte Metadaten-Neueinlesung für %1 Einträge...").arg(n));
+        });
+
+        int updated = 0;
+        int notFound = 0;
+        int withExif = 0;
+        int withGps = 0;
+
+        m_db->beginTransaction();
+
+        for (int i = 0; i < allFiles.size(); ++i) {
+            if (m_cancelled) break;
+
+            const auto &[id, filePath] = allFiles[i];
+
+            if (!QFileInfo::exists(filePath)) {
+                ++notFound;
+                QMetaObject::invokeMethod(this, [this, filePath]() {
+                    emit logMessage(QStringLiteral("[Nicht gefunden] %1").arg(filePath));
+                });
+                m_progress = i + 1;
+                QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
+                continue;
+            }
+
+            PhotoRecord record = extractMetadata(filePath);
+            record.id = id;
+
+            if (record.hasExif) ++withExif;
+            if (record.hasGeolocation) ++withGps;
+
+            m_db->updateMetadata(id, record);
+            ++updated;
+
+            m_progress = i + 1;
+            if (m_progress % 50 == 0 || m_progress == m_totalFiles)
+                QMetaObject::invokeMethod(this, [this]() { emit progressChanged(); });
+
+            if ((i + 1) % 500 == 0) {
+                QMetaObject::invokeMethod(this, [this, cur = i + 1, total = m_totalFiles]() {
+                    emit logMessage(QStringLiteral("Fortschritt: %1 / %2 ...").arg(cur).arg(total));
+                });
+            }
+        }
+
+        m_db->commitTransaction();
+        m_running = false;
+
+        int elapsed = static_cast<int>(timer.elapsed());
+        QMetaObject::invokeMethod(this, [this, updated, notFound, withExif, withGps, elapsed]() {
+            emit logMessage(QStringLiteral(
+                "Fertig: %1 aktualisiert  •  %2 mit EXIF  •  %3 mit GPS  •  %4 nicht gefunden  (%5 ms)")
+                .arg(updated).arg(withExif).arg(withGps).arg(notFound).arg(elapsed));
+            emit runningChanged();
+            emit importFinished(updated, 0);
+        });
+    }));
+}
+
 PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
 {
     QFileInfo fi(filePath);

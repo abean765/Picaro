@@ -97,6 +97,13 @@ ApplicationWindow {
                     onClicked: currentView = "settings"
                 }
 
+                SidebarButton {
+                    text: "Tools"
+                    icon: "\u{1F527}"
+                    active: currentView === "tools"
+                    onClicked: currentView = "tools"
+                }
+
                 Item { Layout.fillHeight: true }
 
                 // Import button at bottom of sidebar
@@ -597,7 +604,8 @@ ApplicationWindow {
                 currentIndex: currentView === "photos" ? 0
                             : currentView === "tags" ? 1
                             : currentView === "overview" ? 2
-                            : 3
+                            : currentView === "settings" ? 3
+                            : 4
 
                 // Photos view with timeline + grid + splitter + detail
                 Item {
@@ -724,6 +732,8 @@ ApplicationWindow {
                 OverviewView {}
 
                 SettingsView {}
+
+                ToolsView {}
             }
         }
     }

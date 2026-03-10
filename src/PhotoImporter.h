@@ -37,6 +37,7 @@ public:
 
     Q_INVOKABLE void importDirectory(const QString &path);
     Q_INVOKABLE void regenerateVideoThumbnails();
+    Q_INVOKABLE void rereadMetadata();
     Q_INVOKABLE void cancel();
 
 signals:
@@ -46,6 +47,7 @@ signals:
     void currentDirectoryChanged();
     void importFinished(int imported, int skipped);
     void errorOccurred(const QString &message);
+    void logMessage(const QString &message);
 
 private:
     void doImport(const QString &path);
