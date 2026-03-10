@@ -62,7 +62,10 @@ Rectangle {
 
             // Info
             Label {
-                text: "<b>" + senderName + "</b> möchte " + fileCount +
+                text: "<b>" + senderName.replace(/&/g, "&amp;")
+                                        .replace(/</g, "&lt;")
+                                        .replace(/>/g, "&gt;")
+                             + "</b> möchte " + fileCount +
                       " Datei" + (fileCount !== 1 ? "en" : "") + " senden."
                 textFormat: Text.RichText
                 color: "#cccccc"
