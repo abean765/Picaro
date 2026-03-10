@@ -605,73 +605,85 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
     record.dateTaken = record.dateModified;
 
 #ifdef HAVE_EXIV2
-    // Try EXIF data for actual date taken
-    try {
-        auto image = Exiv2::ImageFactory::open(filePath.toStdString());
-        if (image.get()) {
-            image->readMetadata();
-            const auto &exifData = image->exifData();
+    // Load EXIF: HEIC files require extraction via libheif because exiv2 cannot
+    // open the HEIF container directly. All other formats use exiv2 as usual.
+    Exiv2::ExifData exifData;
 
-            auto it = exifData.findKey(Exiv2::ExifKey("Exif.Photo.DateTimeOriginal"));
-            if (it == exifData.end()) {
-                it = exifData.findKey(Exiv2::ExifKey("Exif.Image.DateTime"));
-            }
-            if (it != exifData.end()) {
-                QString dateStr = QString::fromStdString(it->toString());
-                QDateTime dt = QDateTime::fromString(dateStr, QStringLiteral("yyyy:MM:dd HH:mm:ss"));
-                if (dt.isValid()) {
-                    record.dateTaken = dt;
-                }
-            }
-
-            auto wIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"));
-            auto hIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"));
-            if (wIt != exifData.end()) record.width = static_cast<int>(wIt->toLong());
-            if (hIt != exifData.end()) record.height = static_cast<int>(hIt->toLong());
-
-            // Mark as having EXIF data
-            if (!exifData.empty()) {
-                record.hasExif = true;
-            }
-
-            // Check for and parse GPS data
-            auto latIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"));
-            auto latRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitudeRef"));
-            auto lonIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"));
-            auto lonRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitudeRef"));
-            if (latIt != exifData.end() && lonIt != exifData.end()) {
-                record.hasGeolocation = true;
-
-                // Convert DMS rational triplet to decimal degrees
-                auto dmsToDecimal = [](const Exiv2::Value &val) -> double {
-                    double result = 0.0;
-                    if (val.count() >= 1) {
-                        auto r = val.toRational(0);
-                        if (r.second != 0) result += static_cast<double>(r.first) / r.second;
-                    }
-                    if (val.count() >= 2) {
-                        auto r = val.toRational(1);
-                        if (r.second != 0) result += static_cast<double>(r.first) / r.second / 60.0;
-                    }
-                    if (val.count() >= 3) {
-                        auto r = val.toRational(2);
-                        if (r.second != 0) result += static_cast<double>(r.first) / r.second / 3600.0;
-                    }
-                    return result;
-                };
-
-                record.latitude  = dmsToDecimal(latIt->value());
-                record.longitude = dmsToDecimal(lonIt->value());
-
-                if (latRefIt != exifData.end() && latRefIt->toString() == "S")
-                    record.latitude = -record.latitude;
-                if (lonRefIt != exifData.end() && lonRefIt->toString() == "W")
-                    record.longitude = -record.longitude;
+    if (HeicImageReader::isHeicFile(filePath)) {
+        QByteArray rawExif = HeicImageReader::readHeicExifBytes(filePath);
+        if (!rawExif.isEmpty()) {
+            try {
+                Exiv2::ExifParser::decode(
+                    exifData,
+                    reinterpret_cast<const Exiv2::byte *>(rawExif.constData()),
+                    static_cast<size_t>(rawExif.size()));
+            } catch (const Exiv2::Error &e) {
+                record.exifError = QString::fromStdString(e.what());
             }
         }
-    } catch (const Exiv2::Error &e) {
-        // EXIF extraction is best-effort; videos won't have EXIF
-        record.exifError = QString::fromStdString(e.what());
+    } else {
+        try {
+            auto image = Exiv2::ImageFactory::open(filePath.toStdString());
+            if (image.get()) {
+                image->readMetadata();
+                exifData = image->exifData();
+            }
+        } catch (const Exiv2::Error &e) {
+            // Best-effort; videos and unsupported formats will throw here.
+            record.exifError = QString::fromStdString(e.what());
+        }
+    }
+
+    if (!exifData.empty()) {
+        record.hasExif = true;
+
+        auto it = exifData.findKey(Exiv2::ExifKey("Exif.Photo.DateTimeOriginal"));
+        if (it == exifData.end())
+            it = exifData.findKey(Exiv2::ExifKey("Exif.Image.DateTime"));
+        if (it != exifData.end()) {
+            QString dateStr = QString::fromStdString(it->toString());
+            QDateTime dt = QDateTime::fromString(dateStr, QStringLiteral("yyyy:MM:dd HH:mm:ss"));
+            if (dt.isValid())
+                record.dateTaken = dt;
+        }
+
+        auto wIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"));
+        auto hIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"));
+        if (wIt != exifData.end()) record.width = static_cast<int>(wIt->toLong());
+        if (hIt != exifData.end()) record.height = static_cast<int>(hIt->toLong());
+
+        auto latIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"));
+        auto latRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitudeRef"));
+        auto lonIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"));
+        auto lonRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitudeRef"));
+        if (latIt != exifData.end() && lonIt != exifData.end()) {
+            record.hasGeolocation = true;
+
+            auto dmsToDecimal = [](const Exiv2::Value &val) -> double {
+                double result = 0.0;
+                if (val.count() >= 1) {
+                    auto r = val.toRational(0);
+                    if (r.second != 0) result += static_cast<double>(r.first) / r.second;
+                }
+                if (val.count() >= 2) {
+                    auto r = val.toRational(1);
+                    if (r.second != 0) result += static_cast<double>(r.first) / r.second / 60.0;
+                }
+                if (val.count() >= 3) {
+                    auto r = val.toRational(2);
+                    if (r.second != 0) result += static_cast<double>(r.first) / r.second / 3600.0;
+                }
+                return result;
+            };
+
+            record.latitude  = dmsToDecimal(latIt->value());
+            record.longitude = dmsToDecimal(lonIt->value());
+
+            if (latRefIt != exifData.end() && latRefIt->toString() == "S")
+                record.latitude = -record.latitude;
+            if (lonRefIt != exifData.end() && lonRefIt->toString() == "W")
+                record.longitude = -record.longitude;
+        }
     }
 #endif
 

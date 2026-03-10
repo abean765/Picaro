@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QImage>
 #include <QString>
 
@@ -20,5 +21,10 @@ QImage readHeicThumbnailOrScaled(const QString &filePath, int maxSize);
 
 // Check if libheif can handle this file
 bool isHeicFile(const QString &filePath);
+
+// Extract raw TIFF-format EXIF bytes from a HEIC/HEIF container via libheif.
+// The returned bytes are suitable for Exiv2::ExifParser::decode().
+// Returns an empty QByteArray if no EXIF metadata is present or libheif is unavailable.
+QByteArray readHeicExifBytes(const QString &filePath);
 
 }
