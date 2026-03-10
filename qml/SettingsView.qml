@@ -258,6 +258,107 @@ Item {
                 }
             }
 
+            // Database section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: dbSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: dbSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Datenbank"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Speicherort der SQLite-Datenbank (picaro.db). Hier werden alle Metadaten und Thumbnails gespeichert."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 36
+                            color: "#1e1e1e"
+                            border.color: "#444444"
+                            border.width: 1
+                            radius: 4
+
+                            Label {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                text: appSettings.databasePath
+                                color: "#cccccc"
+                                font.pixelSize: 13
+                                elide: Text.ElideMiddle
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+
+                        Button {
+                            text: "Ändern..."
+                            onClicked: dbFileDialog.open()
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#ffffff"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 12
+                                rightPadding: 12
+                            }
+                        }
+
+                        Button {
+                            text: "Standard"
+                            onClicked: appSettings.resetDatabasePath()
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#333333"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#aaaaaa"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 12
+                                rightPadding: 12
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: "Hinweis: Nach dem Ändern des Datenbankpfads muss die App neu gestartet werden."
+                        color: "#ffaa00"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                }
+            }
+
             // Local Send section
             Rectangle {
                 Layout.fillWidth: true
@@ -460,107 +561,6 @@ Item {
                                 rightPadding: 16
                             }
                         }
-                    }
-                }
-            }
-
-            // Database section
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: dbSection.implicitHeight + 32
-                color: "#2a2a2a"
-                radius: 8
-
-                ColumnLayout {
-                    id: dbSection
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 12
-
-                    Label {
-                        text: "Datenbank"
-                        color: "#ffffff"
-                        font.pixelSize: 18
-                        font.bold: true
-                    }
-
-                    Label {
-                        text: "Speicherort der SQLite-Datenbank (picaro.db). Hier werden alle Metadaten und Thumbnails gespeichert."
-                        color: "#999999"
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 36
-                            color: "#1e1e1e"
-                            border.color: "#444444"
-                            border.width: 1
-                            radius: 4
-
-                            Label {
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                text: appSettings.databasePath
-                                color: "#cccccc"
-                                font.pixelSize: 13
-                                elide: Text.ElideMiddle
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-
-                        Button {
-                            text: "Ändern..."
-                            onClicked: dbFileDialog.open()
-
-                            background: Rectangle {
-                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
-                                radius: 4
-                            }
-                            contentItem: Label {
-                                text: parent.text
-                                color: "#ffffff"
-                                font.pixelSize: 13
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 12
-                                rightPadding: 12
-                            }
-                        }
-
-                        Button {
-                            text: "Standard"
-                            onClicked: appSettings.resetDatabasePath()
-
-                            background: Rectangle {
-                                color: parent.hovered ? "#4a4a4a" : "#333333"
-                                radius: 4
-                            }
-                            contentItem: Label {
-                                text: parent.text
-                                color: "#aaaaaa"
-                                font.pixelSize: 13
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 12
-                                rightPadding: 12
-                            }
-                        }
-                    }
-
-                    Label {
-                        text: "Hinweis: Nach dem Ändern des Datenbankpfads muss die App neu gestartet werden."
-                        color: "#ffaa00"
-                        font.pixelSize: 12
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
                     }
                 }
             }
