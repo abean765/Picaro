@@ -39,6 +39,7 @@ struct PhotoRecord {
     bool hasGeolocation = false;
     QString owner;  // empty = own photo, otherwise sender name
     QString phash;  // perceptual hash (dHash, 16 hex chars = 64 bits)
+    QString exifError; // non-empty if EXIF parsing threw an exception (not persisted)
 };
 
 struct PhotoStats {

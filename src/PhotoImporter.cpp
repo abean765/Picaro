@@ -183,9 +183,18 @@ void PhotoImporter::doImport(const QString &path)
                         ImportResult result = m_resultQueue.dequeue();
                         lock.unlock();
 
+                        if (!result.record.exifError.isEmpty()) {
+                            QMetaObject::invokeMethod(this, [this, name = result.record.fileName, err = result.record.exifError]() {
+                                emit logMessage(QStringLiteral("[EXIF-Fehler] %1: %2").arg(name, err));
+                            });
+                        }
                         if (result.record.hasExif) ++withExif;
                         if (result.record.hasGeolocation) ++withGps;
-                        m_db->insertPhoto(result.record, result.thumbnail);
+                        if (m_db->insertPhoto(result.record, result.thumbnail) < 0) {
+                            QMetaObject::invokeMethod(this, [this, name = result.record.fileName]() {
+                                emit logMessage(QStringLiteral("[DB-Fehler] Konnte Foto nicht speichern: %1").arg(name));
+                            });
+                        }
                         ++imported;
                         --photoRemaining;
 
@@ -213,10 +222,11 @@ void PhotoImporter::doImport(const QString &path)
                 if (fdAvail >= 0 && fdAvail < 100) {
                     qWarning() << "Import aborted: only" << fdAvail
                                << "file descriptors remaining";
-                    QMetaObject::invokeMethod(this, [this]() {
-                        emit errorOccurred(
-                            tr("Import abgebrochen: zu wenige freie Datei-Deskriptoren. "
-                               "Bitte 'ulimit -n 65536' setzen und erneut versuchen."));
+                    QMetaObject::invokeMethod(this, [this, fdAvail]() {
+                        QString msg = tr("Import abgebrochen: zu wenige freie Datei-Deskriptoren. "
+                                         "Bitte 'ulimit -n 65536' setzen und erneut versuchen.");
+                        emit logMessage(QStringLiteral("[Fehler] %1 (noch %2 FDs frei)").arg(msg).arg(fdAvail));
+                        emit errorOccurred(msg);
                     });
                     m_cancelled = true;
                     break;
@@ -306,10 +316,19 @@ void PhotoImporter::doImport(const QString &path)
 
             const QString &filePath = videoFiles[i];
             PhotoRecord record = extractMetadata(filePath);
+            if (!record.exifError.isEmpty()) {
+                QMetaObject::invokeMethod(this, [this, name = record.fileName, err = record.exifError]() {
+                    emit logMessage(QStringLiteral("[EXIF-Fehler] %1: %2").arg(name, err));
+                });
+            }
             if (record.hasExif) ++withExif;
             if (record.hasGeolocation) ++withGps;
             QByteArray thumbnail = generateThumbnail(filePath, record.mediaType);
-            m_db->insertPhoto(record, thumbnail);
+            if (m_db->insertPhoto(record, thumbnail) < 0) {
+                QMetaObject::invokeMethod(this, [this, name = record.fileName]() {
+                    emit logMessage(QStringLiteral("[DB-Fehler] Konnte Video nicht speichern: %1").arg(name));
+                });
+            }
             ++imported;
 
             if (imported % batchSize == 0) {
@@ -437,10 +456,20 @@ void PhotoImporter::rereadMetadata()
             PhotoRecord record = extractMetadata(filePath);
             record.id = id;
 
+            if (!record.exifError.isEmpty()) {
+                QMetaObject::invokeMethod(this, [this, name = record.fileName, err = record.exifError]() {
+                    emit logMessage(QStringLiteral("[EXIF-Fehler] %1: %2").arg(name, err));
+                });
+            }
+
             if (record.hasExif) ++withExif;
             if (record.hasGeolocation) ++withGps;
 
-            m_db->updateMetadata(id, record);
+            if (!m_db->updateMetadata(id, record)) {
+                QMetaObject::invokeMethod(this, [this, name = record.fileName]() {
+                    emit logMessage(QStringLiteral("[DB-Fehler] Konnte Metadaten nicht schreiben: %1").arg(name));
+                });
+            }
             ++updated;
 
             m_progress = i + 1;
@@ -529,8 +558,9 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
                 record.hasGeolocation = true;
             }
         }
-    } catch (const Exiv2::Error &) {
+    } catch (const Exiv2::Error &e) {
         // EXIF extraction is best-effort; videos won't have EXIF
+        record.exifError = QString::fromStdString(e.what());
     }
 #endif
 
