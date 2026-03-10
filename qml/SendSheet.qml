@@ -207,7 +207,9 @@ Rectangle {
 
                                         Label {
                                             anchors.centerIn: parent
-                                            text: peerName.charAt(0).toUpperCase()
+                                            text: peerName.length > 0
+                                                ? String.fromCodePoint(peerName.codePointAt(0)).toUpperCase()
+                                                : ""
                                             color: "#ffffff"
                                             font.pixelSize: 16
                                             font.bold: true
