@@ -503,6 +503,16 @@ void PhotoImporter::rereadMetadata()
             PhotoRecord record = extractMetadata(filePath);
             record.id = id;
 
+            // Compute perceptual hash if not yet set (photos only)
+            if (record.mediaType != MediaType::Video) {
+                QImageReader hashReader(filePath);
+                hashReader.setAutoTransform(true);
+                QSize origSize = hashReader.size();
+                if (origSize.isValid())
+                    hashReader.setScaledSize(origSize.scaled(64, 64, Qt::KeepAspectRatio));
+                record.phash = computeDHash(hashReader.read());
+            }
+
             if (!record.exifError.isEmpty()) {
                 QMetaObject::invokeMethod(this, [this, name = record.fileName, err = record.exifError]() {
                     emit logMessage(QStringLiteral("[EXIF-Fehler] %1: %2").arg(name, err));

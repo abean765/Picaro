@@ -476,7 +476,7 @@ bool PhotoDatabase::updateMetadata(qint64 photoId, const PhotoRecord &record)
         "date_taken = ?, date_modified = ?, width = ?, height = ?, "
         "file_size = ?, media_type = ?, category = ?, live_video_path = ?, "
         "mime_type = ?, month_key = ?, has_exif = ?, has_geolocation = ?, "
-        "latitude = ?, longitude = ? "
+        "latitude = ?, longitude = ?, phash = ? "
         "WHERE id = ?"
     ));
     q.addBindValue(record.dateTaken.toString(Qt::ISODate));
@@ -493,6 +493,7 @@ bool PhotoDatabase::updateMetadata(qint64 photoId, const PhotoRecord &record)
     q.addBindValue(record.hasGeolocation ? 1 : 0);
     q.addBindValue(record.latitude);
     q.addBindValue(record.longitude);
+    q.addBindValue(record.phash);
     q.addBindValue(photoId);
     return q.exec();
 }
