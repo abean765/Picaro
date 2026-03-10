@@ -243,6 +243,15 @@ bool PhotoDatabase::photoExists(const QString &filePath) const
     return q.next();
 }
 
+bool PhotoDatabase::liveVideoExists(const QString &videoPath) const
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT 1 FROM photos WHERE live_video_path = ? LIMIT 1"));
+    q.addBindValue(videoPath);
+    q.exec();
+    return q.next();
+}
+
 std::optional<PhotoRecord> PhotoDatabase::loadRecord(qint64 photoId) const
 {
     QSqlQuery q(m_db);

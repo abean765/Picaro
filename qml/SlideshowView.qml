@@ -72,11 +72,12 @@ Rectangle {
 
         if (!hasContent) return
 
+        var filePrefix = Qt.platform.os === "windows" ? "file:///" : "file://"
         if (isVideo) {
-            ssPlayer.source = "file:///" + filePath
+            ssPlayer.source = filePrefix + filePath
             // Timer starts when video ends
         } else if (isLivePhoto && liveVideoPath !== "") {
-            ssPlayer.source = "file:///" + liveVideoPath
+            ssPlayer.source = filePrefix + liveVideoPath
             // Timer starts when live video ends
         } else {
             // Static photo — start timer

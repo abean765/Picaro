@@ -39,10 +39,11 @@ Rectangle {
         var mt = photoModel.mediaTypeForId(photoId)
         var fp = photoModel.filePathForId(photoId)
         var lvp = photoModel.liveVideoPathForId(photoId)
+        var filePrefix = Qt.platform.os === "windows" ? "file:///" : "file://"
         if (mt === 1 && fp !== "") {
-            detailPlayer.source = "file:///" + fp
+            detailPlayer.source = filePrefix + fp
         } else if (mt === 2 && lvp !== "") {
-            detailPlayer.source = "file:///" + lvp
+            detailPlayer.source = filePrefix + lvp
         }
     }
 

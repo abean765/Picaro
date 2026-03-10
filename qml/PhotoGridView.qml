@@ -258,7 +258,7 @@ ListView {
                             sharedPlayer.loops = cellItem.isLivePhoto
                                 ? MediaPlayer.Infinite : 1;
                             gridView._hoveredCell = cellItem;
-                            sharedPlayer.source = "file:///" + path;
+                            sharedPlayer.source = (Qt.platform.os === "windows" ? "file:///" : "file://") + path;
                             sharedPlayer.play();
                         }
                     }

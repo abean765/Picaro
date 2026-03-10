@@ -84,6 +84,7 @@ public:
 
     qint64 insertPhoto(const PhotoRecord &record, const QByteArray &thumbnail);
     bool photoExists(const QString &filePath) const;
+    bool liveVideoExists(const QString &videoPath) const;
 
     // Load records sorted by date (no thumbnails - those are loaded on demand)
     QVector<PhotoRecord> loadAllRecords() const;

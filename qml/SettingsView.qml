@@ -540,7 +540,7 @@ Item {
                             onClicked: {
                                 var path = appSettings.generateTestTone();
                                 if (path !== "") {
-                                    testPlayer.source = "file:///" + path;
+                                    testPlayer.source = (Qt.platform.os === "windows" ? "file:///" : "file://") + path;
                                     testPlayer.play();
                                 }
                             }

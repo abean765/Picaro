@@ -3,6 +3,7 @@
 
 #include <QDir>
 #include <QDirIterator>
+#include <QSet>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -153,11 +154,36 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
     QStringList videoFiles;
     int skipped = 0;
 
+    // Build a set of HEIC/HEIF file keys (dir + basename) to detect live photo companions.
+    // A MOV/MP4 with the same basename in the same directory is a live video, not a standalone video.
+    static const QSet<QString> heicSuffixes = {
+        QStringLiteral("heic"), QStringLiteral("heif"), QStringLiteral("hif")
+    };
+    static const QSet<QString> liveVideoSuffixes = {
+        QStringLiteral("mov"), QStringLiteral("mp4")
+    };
+    QSet<QString> heicKeys;
+    for (const QString &filePath : files) {
+        QFileInfo fi(filePath);
+        if (heicSuffixes.contains(fi.suffix().toLower()))
+            heicKeys.insert(fi.absolutePath() + QLatin1Char('/') + fi.completeBaseName().toLower());
+    }
+
     for (const QString &filePath : files) {
         if (m_cancelled) break;
         if (m_db->photoExists(filePath)) {
             ++skipped;
         } else if (classifyFile(filePath) == MediaType::Video) {
+            // Skip MOV/MP4 files that serve as live video companions for HEIC live photos,
+            // either in this batch or already imported in a previous session.
+            QFileInfo fi(filePath);
+            if (liveVideoSuffixes.contains(fi.suffix().toLower())) {
+                QString key = fi.absolutePath() + QLatin1Char('/') + fi.completeBaseName().toLower();
+                if (heicKeys.contains(key) || m_db->liveVideoExists(filePath)) {
+                    ++skipped;
+                    continue;
+                }
+            }
             videoFiles.append(filePath);
         } else {
             photoFiles.append(filePath);
