@@ -32,6 +32,10 @@ ApplicationWindow {
     property int selectedPhotoId: -1
 
     function selectPhoto(photoId) {
+        if (selectedPhotoId === photoId && photoId > 0) {
+            detailPanel.replay()
+            return
+        }
         selectedPhotoId = photoId
         if (photoId > 0) {
             detailPanel.forceActiveFocus()

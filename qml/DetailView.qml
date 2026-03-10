@@ -16,6 +16,15 @@ Rectangle {
     signal navigatePrevious()
     signal sendRequested(int photoId)
 
+    // Replay the current video/live photo from the start.
+    // Called by Main when the user clicks the same thumbnail a second time.
+    function replay() {
+        if (isVideo || isLivePhoto) {
+            detailPlayer.position = 0
+            detailPlayer.play()
+        }
+    }
+
     // Derived properties from current photoId
     readonly property string filePath: photoId > 0 ? photoModel.filePathForId(photoId) : ""
     readonly property int mediaType: photoId > 0 ? photoModel.mediaTypeForId(photoId) : 0
