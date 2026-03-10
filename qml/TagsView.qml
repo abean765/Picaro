@@ -381,16 +381,16 @@ Item {
 
                     // Send button
                     Rectangle {
-                        implicitWidth: 28
-                        implicitHeight: 28
+                        implicitWidth: 34
+                        implicitHeight: 34
                         radius: 4
                         color: sendTagArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "transparent"
-                        visible: tagItemArea.containsMouse && photoCount > 0
+                        visible: photoCount > 0
 
                         Label {
                             anchors.centerIn: parent
                             text: "\u{1F4E4}"
-                            font.pixelSize: 14
+                            font.pixelSize: 18
                         }
                         MouseArea {
                             id: sendTagArea
@@ -408,17 +408,16 @@ Item {
 
                     // Edit button
                     Rectangle {
-                        implicitWidth: 28
-                        implicitHeight: 28
+                        implicitWidth: 34
+                        implicitHeight: 34
                         radius: 4
                         color: editArea.containsMouse ? "#555555" : "transparent"
-                        visible: tagItemArea.containsMouse
 
                         Label {
                             anchors.centerIn: parent
                             text: "\u270E"
-                            color: "#aaaaaa"
-                            font.pixelSize: 14
+                            color: "#cccccc"
+                            font.pixelSize: 18
                         }
                         MouseArea {
                             id: editArea
@@ -431,17 +430,16 @@ Item {
 
                     // Delete button
                     Rectangle {
-                        implicitWidth: 28
-                        implicitHeight: 28
+                        implicitWidth: 34
+                        implicitHeight: 34
                         radius: 4
                         color: delArea.containsMouse ? "#aa3333" : "transparent"
-                        visible: tagItemArea.containsMouse
 
                         Label {
                             anchors.centerIn: parent
                             text: "\uD83D\uDDD1"
-                            color: "#aaaaaa"
-                            font.pixelSize: 14
+                            color: "#cccccc"
+                            font.pixelSize: 18
                         }
                         MouseArea {
                             id: delArea
