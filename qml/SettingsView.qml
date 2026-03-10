@@ -368,76 +368,6 @@ Item {
                         }
                     }
 
-                    // Receive folder
-                    Label {
-                        text: "Empfangsordner"
-                        color: "#cccccc"
-                        font.pixelSize: 13
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 36
-                            color: "#1e1e1e"
-                            border.color: "#444444"
-                            border.width: 1
-                            radius: 4
-
-                            Label {
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                text: appSettings.receiveFolder
-                                color: "#cccccc"
-                                font.pixelSize: 13
-                                elide: Text.ElideMiddle
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-
-                        Button {
-                            text: "Ändern..."
-                            onClicked: receiveFolderDialog.open()
-
-                            background: Rectangle {
-                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
-                                radius: 4
-                            }
-                            contentItem: Label {
-                                text: parent.text
-                                color: "#ffffff"
-                                font.pixelSize: 13
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 12
-                                rightPadding: 12
-                            }
-                        }
-
-                        Button {
-                            text: "Standard"
-                            onClicked: appSettings.resetReceiveFolder()
-
-                            background: Rectangle {
-                                color: parent.hovered ? "#4a4a4a" : "#333333"
-                                radius: 4
-                            }
-                            contentItem: Label {
-                                text: parent.text
-                                color: "#aaaaaa"
-                                font.pixelSize: 13
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 12
-                                rightPadding: 12
-                            }
-                        }
-                    }
-
                     // Status info
                     RowLayout {
                         spacing: 8
@@ -809,20 +739,6 @@ Item {
                 path = path.replace("file://", "")
             }
             appSettings.photoFolder = path
-        }
-    }
-
-    FolderDialog {
-        id: receiveFolderDialog
-        title: "Empfangsordner wählen"
-        onAccepted: {
-            var path = selectedFolder.toString()
-            if (Qt.platform.os === "windows") {
-                path = path.replace("file:///", "")
-            } else {
-                path = path.replace("file://", "")
-            }
-            appSettings.receiveFolder = path
         }
     }
 
