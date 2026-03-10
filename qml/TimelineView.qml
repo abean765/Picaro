@@ -21,13 +21,24 @@ Rectangle {
         model: photoModel.timelineData
         boundsBehavior: Flickable.StopAtBounds
 
-        // Sync timeline scroll to keep active month visible
+        // Sync timeline scroll to keep active month visible.
+        // IMPORTANT: positionViewAtIndex must NOT be called synchronously from
+        // within the activeIndexChanged signal chain.  Doing so causes Qt Quick
+        // to create new delegates while QQmlNotifier::emitNotify is still on the
+        // call stack.  QQuickItemPrivate::addChild then iterates the content
+        // item's children and calls z() on each to determine insertion order.
+        // If any previously-destroyed delegate's QQuickItem is still lingering
+        // in that children list (a transient Qt Quick internal state), z() on
+        // the freed pointer → SIGSEGV (reproducible in Release, hidden in Debug
+        // because freed memory is zeroed).  Qt.callLater defers the actual
+        // scroll to the next event-loop iteration, when all bindings and
+        // notifications from the property change have fully resolved.
         function ensureActiveVisible() {
             if (timeline.activeIndex >= 0 && timeline.activeIndex < count) {
-                // Only reposition if active item is not already visible
-                var item = itemAtIndex(timeline.activeIndex)
+                var idx = timeline.activeIndex
+                var item = itemAtIndex(idx)
                 if (!item || item.y < contentY || item.y + item.height > contentY + height) {
-                    positionViewAtIndex(timeline.activeIndex, ListView.Center)
+                    Qt.callLater(positionViewAtIndex, idx, ListView.Center)
                 }
             }
         }
