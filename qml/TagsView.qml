@@ -171,8 +171,8 @@ Item {
 
                             Rectangle {
                                 required property string modelData
-                                width: 32
-                                height: 32
+                                width: 40
+                                height: 40
                                 radius: 4
                                 color: tagsView.editIcon === modelData ? "#555555" : "#3a3a3a"
                                 border.width: tagsView.editIcon === modelData ? 2 : 0
@@ -181,7 +181,8 @@ Item {
                                 Label {
                                     anchors.centerIn: parent
                                     text: modelData
-                                    font.pixelSize: 20
+                                    color: "#ffffff"
+                                    font.pixelSize: 22
                                 }
 
                                 MouseArea {
