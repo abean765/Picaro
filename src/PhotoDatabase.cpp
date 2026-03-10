@@ -415,6 +415,7 @@ PhotoStats PhotoDatabase::loadStats() const
     // Count photos with geolocation
     q.exec(QStringLiteral(
         "SELECT COUNT(*) FROM photos WHERE deleted = 0 AND has_geolocation = 1"
+        " AND (latitude != 0 OR longitude != 0)"
     ));
     if (q.next()) stats.withGeolocation = q.value(0).toInt();
 

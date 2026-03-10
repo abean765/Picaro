@@ -444,6 +444,7 @@ QVariantMap PhotoModel::coordinatesForId(qint64 id) const
     if (it == m_idToPhotoIndex.end()) return {};
     const PhotoRecord &r = m_allPhotos[it.value()];
     if (!r.hasGeolocation) return {};
+    if (r.latitude == 0.0 && r.longitude == 0.0) return {};
     return {
         { QStringLiteral("lat"), r.latitude  },
         { QStringLiteral("lon"), r.longitude }
@@ -454,7 +455,7 @@ QVariantList PhotoModel::allGeolocatedPhotos() const
 {
     QVariantList result;
     for (const auto &r : m_allPhotos) {
-        if (r.hasGeolocation) {
+        if (r.hasGeolocation && (r.latitude != 0.0 || r.longitude != 0.0)) {
             QVariantMap m;
             m[QStringLiteral("lat")] = r.latitude;
             m[QStringLiteral("lon")] = r.longitude;

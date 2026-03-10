@@ -129,20 +129,16 @@ Item {
             radius: 12
             clip: true
 
-            GeoMapView {
-                id: geoMap
-                anchors.fill: parent
-                points: overviewView.geoPoints
-            }
-
-            // Header bar
+            // Header bar declared first so GeoMapView can anchor below it
             Rectangle {
+                id: mapHeader
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 44
                 color: "#cc1a1a1a"
                 radius: 12
+                z: 1
 
                 // Bottom corners not rounded
                 Rectangle {
@@ -186,6 +182,15 @@ Item {
                         }
                     }
                 }
+            }
+
+            GeoMapView {
+                id: geoMap
+                anchors.top: mapHeader.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                points: overviewView.geoPoints
             }
         }
     }
