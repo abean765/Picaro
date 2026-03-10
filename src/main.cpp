@@ -15,6 +15,7 @@
 #include "TagModel.h"
 #include "NetworkManager.h"
 #include "PeerModel.h"
+#include "OsmNamFactory.h"
 
 int main(int argc, char *argv[])
 {
@@ -64,6 +65,10 @@ int main(int argc, char *argv[])
 
     // QML engine
     QQmlApplicationEngine engine;
+
+    // Set a descriptive User-Agent so OSM tile servers do not block us
+    OsmNamFactory namFactory;
+    engine.setNetworkAccessManagerFactory(&namFactory);
 
     // Register thumbnail image provider (engine takes ownership)
     engine.addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider(dbPath));

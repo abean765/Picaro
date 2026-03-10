@@ -110,6 +110,8 @@ qt_add_executable(picaro
     src/NetworkManager.h
     src/NetworkManager.cpp
     src/PeerModel.h
+    src/OsmNamFactory.h
+    src/OsmNamFactory.cpp
 )
 
 qt_add_qml_module(picaro
