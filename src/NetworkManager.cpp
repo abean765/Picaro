@@ -252,10 +252,15 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
 
     connect(socket, &QTcpSocket::connected, this, [=]() {
         // Gather file info via loadRecord
-        struct FileEntry { QString path; QString name; qint64 size; QString hash; };
+        struct FileEntry { QString path; QString name; qint64 size; QString hash; QStringList tags; };
         QVector<FileEntry> entries;
         QJsonArray hashArray;
         qint64 totalSz = 0;
+
+        // Build tag-name lookup once
+        QHash<qint64, QString> tagIdToName;
+        for (const auto &t : m_db->loadAllTags())
+            tagIdToName[t.id] = t.name;
 
         for (const auto &idVar : photoIds) {
             qint64 id = idVar.toLongLong();
@@ -266,6 +271,11 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
                 e.name = rec->fileName;
                 e.size = rec->fileSize;
                 e.hash = rec->phash;
+                for (qint64 tid : m_db->tagsForPhoto(id)) {
+                    auto it = tagIdToName.constFind(tid);
+                    if (it != tagIdToName.constEnd())
+                        e.tags.append(it.value());
+                }
                 totalSz += e.size;
                 entries.append(e);
                 hashArray.append(e.hash);
@@ -376,11 +386,15 @@ void NetworkManager::sendPhotos(const QString &peerAddress, quint16 peerPort,
                     continue;
                 }
 
-                // File header: [4 bytes json length][json with name, size, hash]
+                // File header: [4 bytes json length][json with name, size, hash, tags]
                 QJsonObject fh;
                 fh[QStringLiteral("name")] = entry.name;
                 fh[QStringLiteral("size")] = entry.size;
                 fh[QStringLiteral("hash")] = entry.hash;
+                QJsonArray tagArr;
+                for (const auto &tn : entry.tags)
+                    tagArr.append(tn);
+                fh[QStringLiteral("tags")] = tagArr;
                 QByteArray fhData = QJsonDocument(fh).toJson(QJsonDocument::Compact);
 
                 QDataStream fs(socket);
@@ -564,6 +578,11 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
     QString senderName = m_incomingSender;
     int received = 0;
 
+    // Build local tag name→id map for create-or-find logic
+    QHash<QString, qint64> tagNameToId;
+    for (const auto &t : m_db->loadAllTags())
+        tagNameToId[t.name] = t.id;
+
     // Use a sequential read approach
     auto readExact = [socket](qint64 bytes) -> QByteArray {
         QByteArray result;
@@ -716,7 +735,25 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
             }
         }
 
-        m_db->insertPhoto(record, thumbnail);
+        qint64 newPhotoId = m_db->insertPhoto(record, thumbnail);
+
+        // Apply tags sent by the sender (create locally if not present)
+        if (newPhotoId > 0) {
+            const QJsonArray recvTags = fh.value(QStringLiteral("tags")).toArray();
+            for (const auto &tnVal : recvTags) {
+                QString tn = tnVal.toString().trimmed();
+                if (tn.isEmpty()) continue;
+                qint64 tid;
+                auto it = tagNameToId.constFind(tn);
+                if (it != tagNameToId.constEnd()) {
+                    tid = it.value();
+                } else {
+                    tid = m_db->createTag(tn, QStringLiteral("#888888"), QString());
+                    if (tid > 0) tagNameToId[tn] = tid;
+                }
+                if (tid > 0) m_db->addTagToPhoto(newPhotoId, tid);
+            }
+        }
 
         received++;
         m_receiveProgress = received;

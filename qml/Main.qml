@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Dialogs
 import QtQuick.Layouts
 
 ApplicationWindow {
@@ -133,7 +132,7 @@ ApplicationWindow {
                         cursorShape: photoImporter.running ? Qt.ArrowCursor : Qt.PointingHandCursor
                         onClicked: {
                             if (!photoImporter.running)
-                                folderDialog.open()
+                                importDlg.open()
                         }
                     }
                 }
@@ -746,19 +745,11 @@ ApplicationWindow {
         }
     }
 
-    // Folder picker dialog
-    FolderDialog {
-        id: folderDialog
-        title: "Foto-Ordner auswählen"
-        onAccepted: {
-            var path = selectedFolder.toString()
-            if (Qt.platform.os === "windows") {
-                path = path.replace("file:///", "")
-            } else {
-                path = path.replace("file://", "")
-            }
-            photoImporter.importDirectory(path)
-        }
+    // Import dialog overlay
+    ImportDialog {
+        id: importDlg
+        anchors.fill: parent
+        z: 200
     }
 
     // Send sheet overlay

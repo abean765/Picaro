@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QVariantList>
 #include <QMutex>
 #include <QWaitCondition>
 #include <QQueue>
@@ -35,7 +36,9 @@ public:
     int totalFiles() const { return m_totalFiles; }
     QString currentDirectory() const { return m_currentDirectory; }
 
-    Q_INVOKABLE void importDirectory(const QString &path);
+    Q_INVOKABLE void importDirectory(const QString &path,
+                                     const QString &owner = QString(),
+                                     const QVariantList &tagIds = {});
     Q_INVOKABLE void regenerateVideoThumbnails();
     Q_INVOKABLE void rereadMetadata();
     Q_INVOKABLE void cancel();
@@ -50,7 +53,7 @@ signals:
     void logMessage(const QString &message);
 
 private:
-    void doImport(const QString &path);
+    void doImport(const QString &path, const QString &owner, const QVector<qint64> &tagIds);
     PhotoRecord extractMetadata(const QString &filePath) const;
     QByteArray generateThumbnail(const QString &filePath, MediaType type);
     QByteArray imageToJpegBlob(const QImage &img) const;

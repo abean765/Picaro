@@ -22,6 +22,8 @@ class AppSettings : public QObject
     Q_PROPERTY(QString computerName READ computerName WRITE setComputerName NOTIFY computerNameChanged)
     Q_PROPERTY(bool networkVisible READ networkVisible WRITE setNetworkVisible NOTIFY networkVisibleChanged)
     Q_PROPERTY(QString receiveFolder READ receiveFolder WRITE setReceiveFolder NOTIFY receiveFolderChanged)
+    Q_PROPERTY(QString importDirectory READ importDirectory WRITE setImportDirectory NOTIFY importDirectoryChanged)
+    Q_PROPERTY(QString importOwner READ importOwner WRITE setImportOwner NOTIFY importOwnerChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -148,6 +150,37 @@ public:
         emit receiveFolderChanged();
     }
 
+    // --- Import settings ---
+
+    QString importDirectory() const
+    {
+        return m_settings.value(
+            QStringLiteral("import/directory"),
+            QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+        ).toString();
+    }
+
+    void setImportDirectory(const QString &dir)
+    {
+        if (dir == importDirectory()) return;
+        m_settings.setValue(QStringLiteral("import/directory"), dir);
+        m_settings.sync();
+        emit importDirectoryChanged();
+    }
+
+    QString importOwner() const
+    {
+        return m_settings.value(QStringLiteral("import/owner"), QString()).toString();
+    }
+
+    void setImportOwner(const QString &owner)
+    {
+        if (owner == importOwner()) return;
+        m_settings.setValue(QStringLiteral("import/owner"), owner);
+        m_settings.sync();
+        emit importOwnerChanged();
+    }
+
     Q_INVOKABLE QString generateTestTone()
     {
         if (!m_tempDir.isValid())
@@ -222,6 +255,8 @@ signals:
     void computerNameChanged();
     void networkVisibleChanged();
     void receiveFolderChanged();
+    void importDirectoryChanged();
+    void importOwnerChanged();
 
 private:
     QSettings m_settings;

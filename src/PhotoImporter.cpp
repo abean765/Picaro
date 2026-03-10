@@ -61,7 +61,7 @@ PhotoImporter::PhotoImporter(PhotoDatabase *db, QObject *parent)
 {
 }
 
-void PhotoImporter::importDirectory(const QString &path)
+void PhotoImporter::importDirectory(const QString &path, const QString &owner, const QVariantList &tagIds)
 {
     if (m_running) return;
 
@@ -72,8 +72,12 @@ void PhotoImporter::importDirectory(const QString &path)
     emit runningChanged();
     emit currentDirectoryChanged();
 
-    Q_UNUSED(QtConcurrent::run([this, path]() {
-        doImport(path);
+    QVector<qint64> tagIdVec;
+    for (const auto &v : tagIds)
+        tagIdVec.append(v.toLongLong());
+
+    Q_UNUSED(QtConcurrent::run([this, path, owner, tagIdVec]() {
+        doImport(path, owner, tagIdVec);
     }));
 }
 
@@ -106,7 +110,7 @@ QStringList PhotoImporter::scanDirectory(const QString &path) const
     return files;
 }
 
-void PhotoImporter::doImport(const QString &path)
+void PhotoImporter::doImport(const QString &path, const QString &owner, const QVector<qint64> &tagIds)
 {
     QElapsedTimer timer;
     timer.start();
@@ -190,10 +194,16 @@ void PhotoImporter::doImport(const QString &path)
                         }
                         if (result.record.hasExif) ++withExif;
                         if (result.record.hasGeolocation) ++withGps;
-                        if (m_db->insertPhoto(result.record, result.thumbnail) < 0) {
+                        if (!owner.isEmpty())
+                            result.record.owner = owner;
+                        qint64 insertedId = m_db->insertPhoto(result.record, result.thumbnail);
+                        if (insertedId < 0) {
                             QMetaObject::invokeMethod(this, [this, name = result.record.fileName]() {
                                 emit logMessage(QStringLiteral("[DB-Fehler] Konnte Foto nicht speichern: %1").arg(name));
                             });
+                        } else {
+                            for (qint64 tagId : tagIds)
+                                m_db->addTagToPhoto(insertedId, tagId);
                         }
                         ++imported;
                         --photoRemaining;
@@ -275,7 +285,13 @@ void PhotoImporter::doImport(const QString &path)
 
                 if (result.record.hasExif) ++withExif;
                 if (result.record.hasGeolocation) ++withGps;
-                m_db->insertPhoto(result.record, result.thumbnail);
+                if (!owner.isEmpty())
+                    result.record.owner = owner;
+                qint64 insertedId2 = m_db->insertPhoto(result.record, result.thumbnail);
+                if (insertedId2 > 0) {
+                    for (qint64 tagId : tagIds)
+                        m_db->addTagToPhoto(insertedId2, tagId);
+                }
                 ++imported;
                 --photoRemaining;
 
@@ -323,11 +339,17 @@ void PhotoImporter::doImport(const QString &path)
             }
             if (record.hasExif) ++withExif;
             if (record.hasGeolocation) ++withGps;
+            if (!owner.isEmpty())
+                record.owner = owner;
             QByteArray thumbnail = generateThumbnail(filePath, record.mediaType);
-            if (m_db->insertPhoto(record, thumbnail) < 0) {
+            qint64 vidId = m_db->insertPhoto(record, thumbnail);
+            if (vidId < 0) {
                 QMetaObject::invokeMethod(this, [this, name = record.fileName]() {
                     emit logMessage(QStringLiteral("[DB-Fehler] Konnte Video nicht speichern: %1").arg(name));
                 });
+            } else {
+                for (qint64 tagId : tagIds)
+                    m_db->addTagToPhoto(vidId, tagId);
             }
             ++imported;
 
