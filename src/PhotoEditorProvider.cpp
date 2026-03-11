@@ -34,6 +34,7 @@ EditParams EditParams::fromQuery(const QString &qs)
         else if (key == QLatin1String("sp")) p.sharpness     = val;
         else if (key == QLatin1String("nr")) p.noiseReduction= val;
         else if (key == QLatin1String("vg")) p.vignette      = val;
+        else if (key == QLatin1String("gr")) p.grain         = val;
         else if (key == QLatin1String("r"))  p.rotation      = static_cast<int>(val);
         else if (key == QLatin1String("fh")) p.flipH         = static_cast<int>(val) != 0;
     }
@@ -57,6 +58,7 @@ EditParams EditParams::fromMap(const QVariantMap &m)
     p.sharpness      = m.value(QStringLiteral("sharpness"),      0.0).toFloat();
     p.noiseReduction = m.value(QStringLiteral("noiseReduction"), 0.0).toFloat();
     p.vignette       = m.value(QStringLiteral("vignette"),       0.0).toFloat();
+    p.grain          = m.value(QStringLiteral("grain"),          0.0).toFloat();
     p.rotation       = m.value(QStringLiteral("rotation"),       0).toInt();
     p.flipH          = m.value(QStringLiteral("flipH"),      false).toBool();
     return p;
@@ -344,6 +346,39 @@ static QImage applySharpen(QImage img, float strength)
     return img;
 }
 
+// ─── Film grain (deterministic per-pixel monochromatic noise) ────────────────
+
+static QImage applyGrain(QImage img, float strength)
+{
+    if (strength < 0.01f) return img;
+    img = img.convertToFormat(QImage::Format_RGBA8888);
+    const int W = img.width(), H = img.height();
+
+    for (int y = 0; y < H; ++y) {
+        uchar *line = img.scanLine(y);
+        for (int x = 0; x < W; ++x) {
+            // Deterministic xorshift hash for this pixel position
+            quint32 h = static_cast<quint32>(y * 1000003u + static_cast<quint32>(x));
+            h ^= h << 13u; h ^= h >> 17u; h ^= h << 5u;
+            // Signed noise in -1 … +1
+            const float noise = static_cast<float>(h & 0xFFFFu) / 32767.5f - 1.f;
+            // Luminance of the current pixel (before grain)
+            const float lum = (0.2126f * line[x*4+0] +
+                               0.7152f * line[x*4+1] +
+                               0.0722f * line[x*4+2]) / 255.f;
+            // Film grain is strongest in midtones, weaker in deep shadows/highlights
+            const float lumWeight = std::max(0.f, 1.f - std::abs(lum - 0.5f) * 1.8f);
+            // Monochromatic delta (same for R/G/B → looks like silver-halide grain)
+            const int delta = static_cast<int>(noise * strength * lumWeight * 48.f);
+            for (int c = 0; c < 3; ++c) {
+                const int v = static_cast<int>(line[x*4+c]) + delta;
+                line[x*4+c] = static_cast<uchar>(v < 0 ? 0 : (v > 255 ? 255 : v));
+            }
+        }
+    }
+    return img;
+}
+
 // ─── applyEdits (public) ──────────────────────────────────────────────────────
 
 QImage applyEdits(const QImage &src, const EditParams &p, const QSize &targetSize)
@@ -385,6 +420,10 @@ QImage applyEdits(const QImage &src, const EditParams &p, const QSize &targetSiz
 
     if (p.sharpness > 0.01f)
         img = applySharpen(std::move(img), p.sharpness);
+
+    // Grain goes last so it sits on top of all other edits
+    if (p.grain > 0.01f)
+        img = applyGrain(std::move(img), p.grain);
 
     return img;
 }

@@ -30,6 +30,7 @@ struct EditParams {
     float noiseReduction = 0.f; // 0 … 1 (smoothing / noise reduction)
     // ── Effekte ───────────────────────────────────────────────────────────────
     float vignette   = 0.f;  // -1 … +1  (negative = darken edges, positive = lighten)
+    float grain      = 0.f;  // 0 … 1    (film-grain / noise overlay)
     // ── Geometrie ─────────────────────────────────────────────────────────────
     int   rotation   = 0;    // 0 / 90 / 180 / 270
     bool  flipH      = false;

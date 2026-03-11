@@ -33,6 +33,7 @@ Rectangle {
     property real noiseReduction:  0.0
     // Effekte
     property real vignette:   0.0
+    property real grain:      0.0
     // Geometrie
     property int  rotation:   0      // 0 / 90 / 180 / 270
     property bool flipH:      false
@@ -55,12 +56,60 @@ Rectangle {
         forceActiveFocus()
     }
 
+    // Active filter name (for chip highlighting)
+    property string activeFilter: "Original"
+
+    // ── Instagram-style retro filter presets ─────────────────────────────────
+    readonly property var filterPresets: [
+        { name: "Original",  brightness:0,     contrast:0,     highlights:0,    shadows:0,    blacks:0,     whites:0,    saturation:0,    vibrance:0,    warmth:0,     tint:0,     clarity:0,     sharpness:0,  noiseReduction:0,   vignette:0,    grain:0    },
+        // ── warm & faded ──
+        { name: "Nashville", brightness:0.05,  contrast:-0.1,  highlights:0.1,  shadows:0.15, blacks:-0.05, whites:0,    saturation:-0.1, vibrance:0,    warmth:0.30,  tint:0.15,  clarity:0,     sharpness:0,  noiseReduction:0,   vignette:-0.15, grain:0.12 },
+        { name: "1977",      brightness:0.05,  contrast:0.05,  highlights:0,    shadows:0.2,  blacks:-0.05, whites:0,    saturation:-0.1, vibrance:0,    warmth:0.20,  tint:0.10,  clarity:0,     sharpness:0,  noiseReduction:0,   vignette:-0.2,  grain:0.20 },
+        { name: "Earlybird", brightness:0.05,  contrast:-0.1,  highlights:0.05, shadows:0.2,  blacks:0,     whites:0,    saturation:-0.2, vibrance:0,    warmth:0.30,  tint:0.10,  clarity:0,     sharpness:0,  noiseReduction:0.1, vignette:-0.30, grain:0.15 },
+        { name: "Rise",      brightness:0.10,  contrast:-0.1,  highlights:0.05, shadows:0.25, blacks:-0.05, whites:0.05, saturation:-0.1, vibrance:0.10, warmth:0.35,  tint:0.05,  clarity:0,     sharpness:0,  noiseReduction:0,   vignette:-0.15, grain:0.08 },
+        { name: "Valencia",  brightness:0.05,  contrast:0.05,  highlights:0.10, shadows:0.10, blacks:-0.05, whites:0.05, saturation:-0.05,vibrance:0.15, warmth:0.20,  tint:0,     clarity:0,     sharpness:0,  noiseReduction:0,   vignette:-0.10, grain:0.05 },
+        // ── rich & vivid ──
+        { name: "Lo-Fi",     brightness:-0.05, contrast:0.30,  highlights:-0.1, shadows:-0.2, blacks:0.10,  whites:0,    saturation:0.30, vibrance:0.20, warmth:0,     tint:0,     clarity:0.20,  sharpness:0.2,noiseReduction:0,   vignette:-0.70, grain:0    },
+        { name: "Hefe",      brightness:0,     contrast:0.25,  highlights:0,    shadows:-0.1, blacks:0.15,  whites:0,    saturation:0.15, vibrance:0.20, warmth:0.25,  tint:0,     clarity:0.10,  sharpness:0.1,noiseReduction:0,   vignette:-0.30, grain:0.05 },
+        { name: "X-Pro II",  brightness:-0.05, contrast:0.40,  highlights:0,    shadows:0.05, blacks:0.10,  whites:0,    saturation:0.25, vibrance:0.10, warmth:0.10,  tint:0,     clarity:0,     sharpness:0.1,noiseReduction:0,   vignette:-0.80, grain:0    },
+        { name: "Toaster",   brightness:0,     contrast:0.20,  highlights:0,    shadows:-0.1, blacks:0.20,  whites:0,    saturation:-0.1, vibrance:0,    warmth:0.40,  tint:0,     clarity:0,     sharpness:0,  noiseReduction:0,   vignette:-0.90, grain:0.10 },
+        // ── cool & faded ──
+        { name: "Brannan",   brightness:0,     contrast:0.30,  highlights:-0.05,shadows:0,    blacks:0.10,  whites:0,    saturation:-0.1, vibrance:0,    warmth:-0.20, tint:-0.05, clarity:0,     sharpness:0.2,noiseReduction:0,   vignette:-0.50, grain:0.08 },
+        { name: "Hudson",    brightness:0.10,  contrast:0.05,  highlights:0.05, shadows:0.10, blacks:-0.05, whites:0.10, saturation:-0.15,vibrance:0,    warmth:-0.25, tint:0,     clarity:0,     sharpness:0,  noiseReduction:0,   vignette:-0.20, grain:0    },
+        { name: "Walden",    brightness:0.05,  contrast:-0.05, highlights:0.05, shadows:0.20, blacks:-0.05, whites:0.05, saturation:-0.15,vibrance:0,    warmth:-0.10, tint:-0.05, clarity:0,     sharpness:0,  noiseReduction:0.1, vignette:-0.10, grain:0.10 },
+        // ── matte & soft ──
+        { name: "Sierra",    brightness:0,     contrast:-0.15, highlights:0.05, shadows:0.20, blacks:-0.10, whites:0.05, saturation:-0.15,vibrance:0,    warmth:0.05,  tint:0,     clarity:-0.05, sharpness:0,  noiseReduction:0.1, vignette:-0.15, grain:0.08 },
+        { name: "Sutro",     brightness:-0.10, contrast:0.10,  highlights:-0.1, shadows:0.10, blacks:0.05,  whites:0,    saturation:-0.3, vibrance:0,    warmth:0.10,  tint:0.05,  clarity:0.10,  sharpness:0,  noiseReduction:0.1, vignette:-0.60, grain:0.12 },
+        // ── black & white ──
+        { name: "Inkwell",   brightness:0,     contrast:0.10,  highlights:0,    shadows:0,    blacks:0,     whites:0,    saturation:-1.0, vibrance:0,    warmth:0,     tint:0,     clarity:0.10,  sharpness:0.1,noiseReduction:0,   vignette:-0.15, grain:0.10 },
+    ]
+
+    function applyFilter(f) {
+        brightness    = f.brightness
+        contrast      = f.contrast
+        highlights    = f.highlights
+        shadows       = f.shadows
+        blacks        = f.blacks
+        whites        = f.whites
+        saturation    = f.saturation
+        vibrance      = f.vibrance
+        warmth        = f.warmth
+        tint          = f.tint
+        clarity       = f.clarity
+        sharpness     = f.sharpness
+        noiseReduction = f.noiseReduction
+        vignette      = f.vignette
+        grain         = f.grain
+        activeFilter  = f.name
+    }
+
     function resetAll() {
         brightness = 0; contrast  = 0; highlights = 0; shadows = 0
         blacks     = 0; whites    = 0; saturation = 0; vibrance = 0
         warmth     = 0; tint      = 0; clarity    = 0; sharpness = 0
-        noiseReduction = 0; vignette = 0
+        noiseReduction = 0; vignette = 0; grain = 0
         rotation   = 0; flipH     = false
+        activeFilter = "Original"
         editVersion = 0
     }
 
@@ -79,6 +128,7 @@ Rectangle {
     onSharpnessChanged:     updateTimer.restart()
     onNoiseReductionChanged: updateTimer.restart()
     onVignetteChanged:      updateTimer.restart()
+    onGrainChanged:         updateTimer.restart()
     onRotationChanged:      updateTimer.restart()
     onFlipHChanged:         updateTimer.restart()
 
@@ -107,6 +157,7 @@ Rectangle {
             + "&sp=" + sharpness.toFixed(3)
             + "&nr=" + noiseReduction.toFixed(3)
             + "&vg=" + vignette.toFixed(3)
+            + "&gr=" + grain.toFixed(3)
             + "&r="  + rotation
             + "&fh=" + (flipH ? 1 : 0)
     }
@@ -205,6 +256,7 @@ Rectangle {
                         sharpness:     editView.sharpness,
                         noiseReduction: editView.noiseReduction,
                         vignette:      editView.vignette,
+                        grain:         editView.grain,
                         rotation:      editView.rotation,
                         flipH:         editView.flipH
                     }
@@ -292,6 +344,72 @@ Rectangle {
                 id: controlCol
                 width: controlPanel.width
                 spacing: 0
+
+                // ── Filter presets ────────────────────────────────────────────
+                Item { width: controlCol.width; height: 12; visible: editView.mediaType !== 1 }
+
+                Label {
+                    leftPadding: 20
+                    text: "Filter"
+                    color: "#888888"
+                    font.pixelSize: 11
+                    font.bold: true
+                    font.capitalization: Font.AllUppercase
+                    width: controlCol.width
+                    visible: editView.mediaType !== 1
+                }
+                Item { width: controlCol.width; height: 8; visible: editView.mediaType !== 1 }
+
+                // Horizontally scrollable filter chip row
+                Flickable {
+                    width: controlCol.width
+                    height: 62
+                    contentWidth: filterRow.implicitWidth + 32
+                    clip: true
+                    flickableDirection: Flickable.HorizontalFlick
+                    visible: editView.mediaType !== 1
+
+                    Row {
+                        id: filterRow
+                        x: 16
+                        spacing: 8
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Repeater {
+                            model: editView.filterPresets
+
+                            delegate: Rectangle {
+                                width:  chipLbl.implicitWidth + 20
+                                height: 46
+                                radius: 8
+                                color:  editView.activeFilter === modelData.name
+                                        ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.25)
+                                        : (chipArea.containsMouse ? "#333333" : "#252525")
+                                border.color: editView.activeFilter === modelData.name
+                                              ? root.accentColor : "transparent"
+                                border.width: 1.5
+
+                                Label {
+                                    id: chipLbl
+                                    anchors.centerIn: parent
+                                    text: modelData.name
+                                    font.pixelSize: 11
+                                    color: editView.activeFilter === modelData.name
+                                           ? root.accentColor : "#cccccc"
+                                }
+                                MouseArea {
+                                    id: chipArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape:  Qt.PointingHandCursor
+                                    onClicked:    editView.applyFilter(modelData)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item { width: controlCol.width; height: 4; visible: editView.mediaType !== 1 }
 
                 // Section: Drehen & Spiegeln
                 Rectangle {
@@ -595,6 +713,13 @@ Rectangle {
                         from:    -1.0; to: 1.0
                         onMoved: editView.vignette = value
                         onReset: editView.vignette = 0
+                    }
+                    EditSlider {
+                        label:   "Körnung"
+                        value:   editView.grain
+                        from:    0.0; to: 1.0
+                        onMoved: editView.grain = value
+                        onReset: editView.grain = 0
                     }
                 }
 
