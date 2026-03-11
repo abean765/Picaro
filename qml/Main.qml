@@ -453,35 +453,6 @@ ApplicationWindow {
                             }
                         }
 
-                        // Active filter indicator
-                        Rectangle {
-                            anchors.left: searchBox.right
-                            anchors.leftMargin: 6
-                            anchors.verticalCenter: searchBox.verticalCenter
-                            width: activeFilterLabel.implicitWidth + 20
-                            height: 22
-                            radius: 11
-                            color: root.accentColor
-                            visible: photoModel.filterText !== ""
-
-                            Label {
-                                id: activeFilterLabel
-                                anchors.centerIn: parent
-                                text: photoModel.filterText
-                                color: "#ffffff"
-                                font.pixelSize: 11
-                                font.bold: true
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    searchInput.text = ""
-                                    photoModel.clearFilter()
-                                }
-                            }
-                        }
 
                         Connections {
                             target: photoModel
