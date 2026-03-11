@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QQuickStyle>
+#include <QSettings>
 
 #include "PhotoDatabase.h"
 #include "PhotoModel.h"
@@ -23,6 +24,14 @@ int main(int argc, char *argv[])
 {
     QElapsedTimer startupTimer;
     startupTimer.start();
+
+    // Apply UI scale factor before QGuiApplication (QT_SCALE_FACTOR must be set early)
+    {
+        QSettings earlySettings(QStringLiteral("Picaro"), QStringLiteral("Picaro"));
+        double scale = earlySettings.value(QStringLiteral("appearance/uiScale"), 1.0).toDouble();
+        if (!qFuzzyCompare(scale, 1.0))
+            qputenv("QT_SCALE_FACTOR", QByteArray::number(scale));
+    }
 
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Picaro"));

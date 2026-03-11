@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 
 Item {
     id: root
@@ -327,6 +328,153 @@ Item {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Display settings card
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: displayCardContent.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: displayCardContent
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 16
+
+                    Label {
+                        text: "Anzeige"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    // Fullscreen
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
+                        ColumnLayout {
+                            spacing: 4
+                            Layout.fillWidth: true
+
+                            Label {
+                                text: "Vollbild"
+                                color: "#ffffff"
+                                font.pixelSize: 14
+                            }
+                            Label {
+                                text: "Fensterrahmen und Titelleiste ausblenden (F11)"
+                                color: "#777777"
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        Button {
+                            property bool isFullscreen: Window.window && Window.window.visibility === Window.FullScreen
+                            text: isFullscreen ? "Vollbild beenden" : "Vollbild aktivieren"
+                            onClicked: {
+                                if (Window.window.visibility === Window.FullScreen)
+                                    Window.window.showNormal()
+                                else
+                                    Window.window.showFullScreen()
+                            }
+
+                            background: Rectangle {
+                                color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
+                                radius: 4
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: "#ffffff"
+                                font.pixelSize: 13
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 16
+                                rightPadding: 16
+                            }
+                        }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: "#333333" }
+
+                    // UI Scale
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        RowLayout {
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                spacing: 4
+                                Layout.fillWidth: true
+
+                                Label {
+                                    text: "UI-Skalierung"
+                                    color: "#ffffff"
+                                    font.pixelSize: 14
+                                }
+                                Label {
+                                    text: "Vergrößert alle UI-Elemente (z. B. für hochauflösende Displays). Neustart erforderlich."
+                                    color: "#777777"
+                                    font.pixelSize: 12
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                }
+                            }
+                        }
+
+                        // Scale preset buttons
+                        RowLayout {
+                            spacing: 6
+
+                            Repeater {
+                                model: [
+                                    { label: "100%", value: 1.0 },
+                                    { label: "125%", value: 1.25 },
+                                    { label: "150%", value: 1.5 },
+                                    { label: "175%", value: 1.75 },
+                                    { label: "200%", value: 2.0 }
+                                ]
+
+                                delegate: Button {
+                                    required property var modelData
+                                    property bool isActive: Math.abs(appSettings.uiScale - modelData.value) < 0.01
+                                    text: modelData.label
+                                    onClicked: appSettings.uiScale = modelData.value
+
+                                    background: Rectangle {
+                                        color: isActive
+                                            ? appSettings.accentColor
+                                            : (parent.hovered ? "#4a4a4a" : "#333333")
+                                        radius: 4
+                                        border.color: isActive ? "transparent" : "#444444"
+                                        border.width: 1
+                                    }
+                                    contentItem: Label {
+                                        text: parent.text
+                                        color: "#ffffff"
+                                        font.pixelSize: 13
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        leftPadding: 14
+                                        rightPadding: 14
+                                    }
+                                }
+                            }
+                        }
+
+                        // Restart hint — shown when saved scale differs from currently active scale
+                        Label {
+                            visible: Math.abs(appSettings.uiScale - appSettings.effectiveUiScale) >= 0.01
+                            text: "Neustart erforderlich, damit die Skalierung wirksam wird."
+                            color: "#f59e0b"
+                            font.pixelSize: 12
                         }
                     }
                 }

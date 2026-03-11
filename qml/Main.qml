@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 
 ApplicationWindow {
     id: root
@@ -45,6 +46,17 @@ ApplicationWindow {
     function closeDetail() {
         selectedPhotoId = -1
         photoGrid.forceActiveFocus()
+    }
+
+    // F11 toggles fullscreen
+    Shortcut {
+        sequence: "F11"
+        onActivated: {
+            if (root.visibility === Window.FullScreen)
+                root.showNormal()
+            else
+                root.showFullScreen()
+        }
     }
 
     RowLayout {

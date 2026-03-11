@@ -19,6 +19,8 @@ class AppSettings : public QObject
     Q_PROPERTY(QString databasePath READ databasePath WRITE setDatabasePath NOTIFY databasePathChanged)
     Q_PROPERTY(QString defaultDatabasePath READ defaultDatabasePath CONSTANT)
     Q_PROPERTY(QColor accentColor READ accentColor WRITE setAccentColor NOTIFY accentColorChanged)
+    Q_PROPERTY(qreal uiScale READ uiScale WRITE setUiScale NOTIFY uiScaleChanged)
+    Q_PROPERTY(qreal effectiveUiScale READ effectiveUiScale CONSTANT)
     Q_PROPERTY(QString computerName READ computerName WRITE setComputerName NOTIFY computerNameChanged)
     Q_PROPERTY(bool networkVisible READ networkVisible WRITE setNetworkVisible NOTIFY networkVisibleChanged)
     Q_PROPERTY(QString receiveFolder READ receiveFolder WRITE setReceiveFolder NOTIFY receiveFolderChanged)
@@ -82,6 +84,26 @@ public:
         m_settings.remove(QStringLiteral("appearance/accentColor"));
         m_settings.sync();
         emit accentColorChanged();
+    }
+
+    qreal uiScale() const
+    {
+        return m_settings.value(QStringLiteral("appearance/uiScale"), 1.0).toDouble();
+    }
+
+    void setUiScale(qreal scale)
+    {
+        if (qFuzzyCompare(scale, uiScale())) return;
+        m_settings.setValue(QStringLiteral("appearance/uiScale"), scale);
+        m_settings.sync();
+        emit uiScaleChanged();
+    }
+
+    // Scale factor that was actually applied at startup (via QT_SCALE_FACTOR)
+    qreal effectiveUiScale() const
+    {
+        QByteArray env = qgetenv("QT_SCALE_FACTOR");
+        return env.isEmpty() ? 1.0 : env.toDouble();
     }
 
     // --- Local Send settings ---
@@ -289,6 +311,7 @@ public:
 signals:
     void databasePathChanged();
     void accentColorChanged();
+    void uiScaleChanged();
     void computerNameChanged();
     void networkVisibleChanged();
     void receiveFolderChanged();
