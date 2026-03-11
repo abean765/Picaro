@@ -17,6 +17,7 @@
 #include "NetworkManager.h"
 #include "PeerModel.h"
 #include "OsmNamFactory.h"
+#include "PhotoEditorProvider.h"
 
 int main(int argc, char *argv[])
 {
@@ -75,6 +76,9 @@ int main(int argc, char *argv[])
     engine.addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider(dbPath));
     engine.addImageProvider(QStringLiteral("photo"), new PhotoImageProvider(dbPath));
 
+    // Register photo-editor image provider for live preview (engine takes ownership)
+    engine.addImageProvider(QStringLiteral("editor"), new PhotoEditorProvider(dbPath));
+
     // Expose C++ objects to QML
     QQmlContext *ctx = engine.rootContext();
     ctx->setContextProperty(QStringLiteral("photoModel"), &photoModel);
@@ -84,6 +88,10 @@ int main(int argc, char *argv[])
     ctx->setContextProperty(QStringLiteral("tagModel"), &tagModel);
     ctx->setContextProperty(QStringLiteral("networkManager"), &networkManager);
     ctx->setContextProperty(QStringLiteral("peerModel"), &peerModel);
+
+    // Photo editor (save path) – exposed as "photoEditor" to QML
+    PhotoEditor photoEditor(dbPath);
+    ctx->setContextProperty(QStringLiteral("photoEditor"), &photoEditor);
 
     // Reload model and stats after import finishes
     QObject::connect(&importer, &PhotoImporter::importFinished,

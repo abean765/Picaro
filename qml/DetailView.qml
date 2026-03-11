@@ -15,6 +15,7 @@ Rectangle {
     signal navigateNext()
     signal navigatePrevious()
     signal sendRequested(int photoId)
+    signal editRequested(int photoId, string filePath, int mediaType)
 
     // Replay the current video/live photo from the start.
     // Called by Main when the user clicks the same thumbnail a second time.
@@ -287,11 +288,41 @@ Rectangle {
         }
     }
 
-    // GPS map button (only visible for geotagged photos)
+    // Edit button
     Rectangle {
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.rightMargin: 92
+        anchors.topMargin: 12
+        width: 32
+        height: 32
+        radius: 16
+        color: editBtnArea.containsMouse ? "#60ffffff" : "#30ffffff"
+        visible: hasContent && !isVideo
+
+        Label {
+            anchors.centerIn: parent
+            text: "\u270E"      // ✎ pencil
+            font.pixelSize: 14
+            color: "#ffffff"
+        }
+
+        MouseArea {
+            id: editBtnArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: detailView.editRequested(detailView.photoId,
+                                                detailView.filePath,
+                                                detailView.mediaType)
+        }
+    }
+
+    // GPS map button (only visible for geotagged photos)
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.rightMargin: 132
         anchors.topMargin: 12
         width: 32
         height: 32

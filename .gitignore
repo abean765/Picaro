@@ -2,6 +2,10 @@
 build/
 build-*/
 cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
 
 # Qt Creator files
 *.user

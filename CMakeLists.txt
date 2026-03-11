@@ -114,6 +114,8 @@ qt_add_executable(picaro
     src/PeerModel.h
     src/OsmNamFactory.h
     src/OsmNamFactory.cpp
+    src/PhotoEditorProvider.h
+    src/PhotoEditorProvider.cpp
 )
 
 qt_add_qml_module(picaro
@@ -134,6 +136,8 @@ qt_add_qml_module(picaro
         qml/SlideshowView.qml
         qml/ToolsView.qml
         qml/GeoMapView.qml
+        qml/PhotoEditView.qml
+        qml/EditSlider.qml
 )
 
 target_include_directories(picaro PRIVATE
