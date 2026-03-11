@@ -723,6 +723,9 @@ ApplicationWindow {
                         onSendRequested: function(photoId) {
                             sendSheet.open(photoId)
                         }
+                        onEditRequested: function(photoId, filePath, mediaType) {
+                            photoEditOverlay.open(photoId, filePath, mediaType)
+                        }
                     }
                 }
 
@@ -764,6 +767,20 @@ ApplicationWindow {
         id: receiveDialogOverlay
         anchors.fill: parent
         z: 100
+    }
+
+    // Photo edit view (fullscreen overlay)
+    PhotoEditView {
+        id: photoEditOverlay
+        anchors.fill: parent
+        z: 180
+        onClosed: {
+            photoEditOverlay.visible = false
+            photoGrid.forceActiveFocus()
+        }
+        onSavedAndReload: function(photoId) {
+            photoModel.reload()
+        }
     }
 
     // Slideshow view (fullscreen overlay)
