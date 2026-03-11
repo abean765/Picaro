@@ -12,22 +12,29 @@
 
 // All edit parameters passed from QML to the provider / saver.
 struct EditParams {
+    // ── Licht ─────────────────────────────────────────────────────────────────
     float brightness = 0.f;  // -1 … +1  (additive exposure shift)
     float contrast   = 0.f;  // -1 … +1
-    float saturation = 0.f;  // -1 … +1  (multiplicative delta on HSL saturation)
-    float warmth     = 0.f;  // -1 … +1  (colour temperature, blue↔warm)
     float highlights = 0.f;  // -1 … +1  (bright-tone adjustment)
     float shadows    = 0.f;  // -1 … +1  (dark-tone adjustment)
-    float blacks     = 0.f;  // -1 … +1  (black-point adjustment)
+    float blacks     = 0.f;  // -1 … +1  (black-point)
+    float whites     = 0.f;  // -1 … +1  (white-point, complement to blacks)
+    // ── Farbe ─────────────────────────────────────────────────────────────────
+    float saturation = 0.f;  // -1 … +1  (multiplicative delta on HSL saturation)
+    float vibrance   = 0.f;  // -1 … +1  (smart saturation, less on already-saturated)
+    float warmth     = 0.f;  // -1 … +1  (colour temperature, blue↔warm)
+    float tint       = 0.f;  // -1 … +1  (green↔magenta perpendicular to temperature)
+    // ── Details ───────────────────────────────────────────────────────────────
+    float clarity    = 0.f;  // -1 … +1  (midtone local contrast)
     float sharpness  = 0.f;  // 0 … 1    (unsharp-mask strength)
+    float noiseReduction = 0.f; // 0 … 1 (smoothing / noise reduction)
+    // ── Effekte ───────────────────────────────────────────────────────────────
+    float vignette   = 0.f;  // -1 … +1  (negative = darken edges, positive = lighten)
+    // ── Geometrie ─────────────────────────────────────────────────────────────
     int   rotation   = 0;    // 0 / 90 / 180 / 270
     bool  flipH      = false;
 
-    // Parse from the query-string portion of the provider URL
-    // (?b=…&c=…&s=…&w=…&hl=…&sh=…&bl=…&sp=…&r=…&fh=…)
     static EditParams fromQuery(const QString &queryStr);
-
-    // Build from a QVariantMap (used by the save path from QML)
     static EditParams fromMap(const QVariantMap &m);
 };
 

@@ -15,14 +15,25 @@ Rectangle {
     property int    mediaType: 0   // 0=Photo, 1=Video, 2=LivePhoto
 
     // ── edit state ──────────────────────────────────────────────────────────
+    // Licht
     property real brightness: 0.0
     property real contrast:   0.0
-    property real saturation: 0.0
-    property real warmth:     0.0
     property real highlights: 0.0
     property real shadows:    0.0
     property real blacks:     0.0
-    property real sharpness:  0.0
+    property real whites:     0.0
+    // Farbe
+    property real saturation: 0.0
+    property real vibrance:   0.0
+    property real warmth:     0.0
+    property real tint:       0.0
+    // Details
+    property real clarity:         0.0
+    property real sharpness:       0.0
+    property real noiseReduction:  0.0
+    // Effekte
+    property real vignette:   0.0
+    // Geometrie
     property int  rotation:   0      // 0 / 90 / 180 / 270
     property bool flipH:      false
 
@@ -45,23 +56,31 @@ Rectangle {
     }
 
     function resetAll() {
-        brightness = 0; contrast  = 0; saturation = 0; warmth     = 0
-        highlights = 0; shadows   = 0; blacks     = 0; sharpness  = 0
+        brightness = 0; contrast  = 0; highlights = 0; shadows = 0
+        blacks     = 0; whites    = 0; saturation = 0; vibrance = 0
+        warmth     = 0; tint      = 0; clarity    = 0; sharpness = 0
+        noiseReduction = 0; vignette = 0
         rotation   = 0; flipH     = false
         editVersion = 0
     }
 
     // Trigger debounced preview refresh whenever any param changes
-    onBrightnessChanged: updateTimer.restart()
-    onContrastChanged:   updateTimer.restart()
-    onSaturationChanged: updateTimer.restart()
-    onWarmthChanged:     updateTimer.restart()
-    onHighlightsChanged: updateTimer.restart()
-    onShadowsChanged:    updateTimer.restart()
-    onBlacksChanged:     updateTimer.restart()
-    onSharpnessChanged:  updateTimer.restart()
-    onRotationChanged:   updateTimer.restart()
-    onFlipHChanged:      updateTimer.restart()
+    onBrightnessChanged:    updateTimer.restart()
+    onContrastChanged:      updateTimer.restart()
+    onHighlightsChanged:    updateTimer.restart()
+    onShadowsChanged:       updateTimer.restart()
+    onBlacksChanged:        updateTimer.restart()
+    onWhitesChanged:        updateTimer.restart()
+    onSaturationChanged:    updateTimer.restart()
+    onVibranceChanged:      updateTimer.restart()
+    onWarmthChanged:        updateTimer.restart()
+    onTintChanged:          updateTimer.restart()
+    onClarityChanged:       updateTimer.restart()
+    onSharpnessChanged:     updateTimer.restart()
+    onNoiseReductionChanged: updateTimer.restart()
+    onVignetteChanged:      updateTimer.restart()
+    onRotationChanged:      updateTimer.restart()
+    onFlipHChanged:         updateTimer.restart()
 
     Timer {
         id: updateTimer
@@ -76,12 +95,18 @@ Rectangle {
             + photoId + "_v" + editVersion
             + "?b="  + brightness.toFixed(3)
             + "&c="  + contrast.toFixed(3)
-            + "&s="  + saturation.toFixed(3)
-            + "&w="  + warmth.toFixed(3)
             + "&hl=" + highlights.toFixed(3)
             + "&sh=" + shadows.toFixed(3)
             + "&bl=" + blacks.toFixed(3)
+            + "&wp=" + whites.toFixed(3)
+            + "&s="  + saturation.toFixed(3)
+            + "&vi=" + vibrance.toFixed(3)
+            + "&w="  + warmth.toFixed(3)
+            + "&ti=" + tint.toFixed(3)
+            + "&cl=" + clarity.toFixed(3)
             + "&sp=" + sharpness.toFixed(3)
+            + "&nr=" + noiseReduction.toFixed(3)
+            + "&vg=" + vignette.toFixed(3)
             + "&r="  + rotation
             + "&fh=" + (flipH ? 1 : 0)
     }
@@ -166,16 +191,22 @@ Rectangle {
                     if (saving) return
                     saving = true
                     var p = {
-                        brightness: editView.brightness,
-                        contrast:   editView.contrast,
-                        saturation: editView.saturation,
-                        warmth:     editView.warmth,
-                        highlights: editView.highlights,
-                        shadows:    editView.shadows,
-                        blacks:     editView.blacks,
-                        sharpness:  editView.sharpness,
-                        rotation:   editView.rotation,
-                        flipH:      editView.flipH
+                        brightness:    editView.brightness,
+                        contrast:      editView.contrast,
+                        highlights:    editView.highlights,
+                        shadows:       editView.shadows,
+                        blacks:        editView.blacks,
+                        whites:        editView.whites,
+                        saturation:    editView.saturation,
+                        vibrance:      editView.vibrance,
+                        warmth:        editView.warmth,
+                        tint:          editView.tint,
+                        clarity:       editView.clarity,
+                        sharpness:     editView.sharpness,
+                        noiseReduction: editView.noiseReduction,
+                        vignette:      editView.vignette,
+                        rotation:      editView.rotation,
+                        flipH:         editView.flipH
                     }
                     photoEditor.saveEdits(editView.photoId, p)
                 }
@@ -420,6 +451,13 @@ Rectangle {
                         onMoved: editView.blacks = value
                         onReset: editView.blacks = 0
                     }
+                    EditSlider {
+                        label:   "Weißpunkt"
+                        value:   editView.whites
+                        from:    -1.0; to: 1.0
+                        onMoved: editView.whites = value
+                        onReset: editView.whites = 0
+                    }
                 }
 
                 Rectangle {
@@ -448,6 +486,13 @@ Rectangle {
                     visible: editView.mediaType !== 1
 
                     EditSlider {
+                        label:   "Lebendigkeit"
+                        value:   editView.vibrance
+                        from:    -1.0; to: 1.0
+                        onMoved: editView.vibrance = value
+                        onReset: editView.vibrance = 0
+                    }
+                    EditSlider {
                         label:   "Sättigung"
                         value:   editView.saturation
                         from:    -1.0; to: 1.0
@@ -460,6 +505,13 @@ Rectangle {
                         from:    -1.0; to: 1.0
                         onMoved: editView.warmth = value
                         onReset: editView.warmth = 0
+                    }
+                    EditSlider {
+                        label:   "Tönung"
+                        value:   editView.tint
+                        from:    -1.0; to: 1.0
+                        onMoved: editView.tint = value
+                        onReset: editView.tint = 0
                     }
                 }
 
@@ -489,11 +541,60 @@ Rectangle {
                     visible: editView.mediaType !== 1
 
                     EditSlider {
+                        label:   "Klarheit"
+                        value:   editView.clarity
+                        from:    -1.0; to: 1.0
+                        onMoved: editView.clarity = value
+                        onReset: editView.clarity = 0
+                    }
+                    EditSlider {
                         label:   "Schärfe"
                         value:   editView.sharpness
                         from:    0.0; to: 1.0
                         onMoved: editView.sharpness = value
                         onReset: editView.sharpness = 0
+                    }
+                    EditSlider {
+                        label:   "Rauschreduzierung"
+                        value:   editView.noiseReduction
+                        from:    0.0; to: 1.0
+                        onMoved: editView.noiseReduction = value
+                        onReset: editView.noiseReduction = 0
+                    }
+                }
+
+                // ── Effekte section ───────────────────────────────────────────
+                Rectangle {
+                    width:  controlCol.width
+                    height: 1
+                    color:  "#2a2a2a"
+                    visible: editView.mediaType !== 1
+                }
+                Item { width: controlCol.width; height: 16; visible: editView.mediaType !== 1 }
+
+                Label {
+                    leftPadding: 20
+                    text: "Effekte"
+                    color: "#888888"
+                    font.pixelSize: 11
+                    font.bold: true
+                    font.capitalization: Font.AllUppercase
+                    width: controlCol.width
+                    visible: editView.mediaType !== 1
+                }
+                Item { width: controlCol.width; height: 8; visible: editView.mediaType !== 1 }
+
+                Column {
+                    width: controlCol.width
+                    spacing: 0
+                    visible: editView.mediaType !== 1
+
+                    EditSlider {
+                        label:   "Vignette"
+                        value:   editView.vignette
+                        from:    -1.0; to: 1.0
+                        onMoved: editView.vignette = value
+                        onReset: editView.vignette = 0
                     }
                 }
 
