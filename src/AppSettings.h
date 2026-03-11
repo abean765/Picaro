@@ -206,6 +206,18 @@ public:
         emit photoFolderChanged();
     }
 
+    Q_INVOKABLE bool deleteAllData()
+    {
+        bool ok = true;
+        QString dbPath = databasePath();
+        if (QFile::exists(dbPath))
+            ok = QFile::remove(dbPath) && ok;
+        QString folder = photoFolder();
+        if (QDir(folder).exists())
+            ok = QDir(folder).removeRecursively() && ok;
+        return ok;
+    }
+
     Q_INVOKABLE QString generateTestTone()
     {
         if (!m_tempDir.isValid())

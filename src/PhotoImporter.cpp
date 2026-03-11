@@ -119,9 +119,10 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
     QElapsedTimer timer;
     timer.start();
 
-    // Helper: copy a file into copyToFolder if set, avoiding overwrites
-    auto copyToPhotoFolder = [&copyToFolder](const QString &srcPath, const QString &fileName) {
-        if (copyToFolder.isEmpty()) return;
+    // Helper: copy a file into copyToFolder if set, avoiding overwrites.
+    // Returns the destination path, or an empty string if no copy was made.
+    auto copyToPhotoFolder = [&copyToFolder](const QString &srcPath, const QString &fileName) -> QString {
+        if (copyToFolder.isEmpty()) return {};
         QDir().mkpath(copyToFolder);
         QString destPath = copyToFolder + QStringLiteral("/") + fileName;
         if (QFile::exists(destPath)) {
@@ -136,6 +137,7 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
             }
         }
         QFile::copy(srcPath, destPath);
+        return destPath;
     };
 
     qDebug() << "Scanning directory:" << path;
@@ -244,6 +246,11 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
                         if (result.record.hasGeolocation) ++withGps;
                         if (!owner.isEmpty())
                             result.record.owner = owner;
+                        QString copiedPath = copyToPhotoFolder(result.record.filePath, result.record.fileName);
+                        if (!copiedPath.isEmpty()) {
+                            result.record.filePath = copiedPath;
+                            result.record.fileName = QFileInfo(copiedPath).fileName();
+                        }
                         qint64 insertedId = m_db->insertPhoto(result.record, result.thumbnail);
                         if (insertedId < 0) {
                             QMetaObject::invokeMethod(this, [this, name = result.record.fileName]() {
@@ -252,7 +259,6 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
                         } else {
                             for (qint64 tagId : tagIds)
                                 m_db->addTagToPhoto(insertedId, tagId);
-                            copyToPhotoFolder(result.record.filePath, result.record.fileName);
                         }
                         ++imported;
                         --photoRemaining;
@@ -336,11 +342,15 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
                 if (result.record.hasGeolocation) ++withGps;
                 if (!owner.isEmpty())
                     result.record.owner = owner;
+                QString copiedPath2 = copyToPhotoFolder(result.record.filePath, result.record.fileName);
+                if (!copiedPath2.isEmpty()) {
+                    result.record.filePath = copiedPath2;
+                    result.record.fileName = QFileInfo(copiedPath2).fileName();
+                }
                 qint64 insertedId2 = m_db->insertPhoto(result.record, result.thumbnail);
                 if (insertedId2 > 0) {
                     for (qint64 tagId : tagIds)
                         m_db->addTagToPhoto(insertedId2, tagId);
-                    copyToPhotoFolder(result.record.filePath, result.record.fileName);
                 }
                 ++imported;
                 --photoRemaining;
@@ -392,6 +402,11 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
             if (!owner.isEmpty())
                 record.owner = owner;
             QByteArray thumbnail = generateThumbnail(filePath, record.mediaType);
+            QString copiedVideoPath = copyToPhotoFolder(filePath, record.fileName);
+            if (!copiedVideoPath.isEmpty()) {
+                record.filePath = copiedVideoPath;
+                record.fileName = QFileInfo(copiedVideoPath).fileName();
+            }
             qint64 vidId = m_db->insertPhoto(record, thumbnail);
             if (vidId < 0) {
                 QMetaObject::invokeMethod(this, [this, name = record.fileName]() {
@@ -400,7 +415,6 @@ void PhotoImporter::doImport(const QString &path, const QString &owner,
             } else {
                 for (qint64 tagId : tagIds)
                     m_db->addTagToPhoto(vidId, tagId);
-                copyToPhotoFolder(filePath, record.fileName);
             }
             ++imported;
 

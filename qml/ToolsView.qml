@@ -8,12 +8,109 @@ Item {
     property string logText: ""
     property var dupGroups: []
     property bool dupSearchDone: false
+    property bool showDeleteConfirm: false
 
     Connections {
         target: photoImporter
         function onLogMessage(message) {
             logText += message + "\n"
             logArea.cursorPosition = logArea.length
+        }
+    }
+
+    // Confirmation dialog for delete
+    Rectangle {
+        anchors.fill: parent
+        color: "#cc000000"
+        visible: root.showDeleteConfirm
+        z: 10
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 420
+            implicitHeight: confirmContent.implicitHeight + 40
+            color: "#2a2a2a"
+            radius: 10
+            border.color: "#5a2020"
+            border.width: 1
+
+            ColumnLayout {
+                id: confirmContent
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    margins: 24
+                }
+                spacing: 16
+
+                Label {
+                    text: "Wirklich alles löschen?"
+                    color: "#ffffff"
+                    font.pixelSize: 17
+                    font.bold: true
+                    Layout.topMargin: 8
+                }
+
+                Label {
+                    text: "Datenbank und Import-Ordner werden unwiderruflich gelöscht. Die App muss danach neu gestartet werden."
+                    color: "#aaaaaa"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+                    Layout.bottomMargin: 4
+
+                    Item { Layout.fillWidth: true }
+
+                    Button {
+                        text: "Abbrechen"
+                        onClicked: root.showDeleteConfirm = false
+
+                        background: Rectangle {
+                            color: parent.hovered ? "#3a3a3a" : "transparent"
+                            radius: 4
+                            border.color: "#444444"
+                            border.width: 1
+                        }
+                        contentItem: Label {
+                            text: parent.text
+                            color: "#888888"
+                            font.pixelSize: 13
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 16
+                            rightPadding: 16
+                        }
+                    }
+
+                    Button {
+                        text: "Löschen"
+                        onClicked: {
+                            root.showDeleteConfirm = false
+                            appSettings.deleteAllData()
+                        }
+
+                        background: Rectangle {
+                            color: parent.hovered ? "#7a2020" : "#5a1515"
+                            radius: 4
+                        }
+                        contentItem: Label {
+                            text: parent.text
+                            color: "#ffffff"
+                            font.pixelSize: 13
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 20
+                            rightPadding: 20
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -157,6 +254,59 @@ Item {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Delete database + photo folder card
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: deleteCardContent.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: deleteCardContent
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Daten zurücksetzen"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Löscht die Datenbank (%1) und den Import-Ordner (%2) vollständig. Die App muss danach neu gestartet werden."
+                            .arg(appSettings.databasePath)
+                            .arg(appSettings.photoFolder)
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Button {
+                        text: "Datenbank und Import Ordner löschen"
+                        onClicked: root.showDeleteConfirm = true
+
+                        background: Rectangle {
+                            color: parent.hovered ? "#5a2020" : "#3a1515"
+                            radius: 4
+                            border.color: "#7a3030"
+                            border.width: 1
+                        }
+                        contentItem: Label {
+                            text: parent.text
+                            color: "#ff8888"
+                            font.pixelSize: 13
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 16
+                            rightPadding: 16
                         }
                     }
                 }
