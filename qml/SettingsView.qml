@@ -165,6 +165,109 @@ Item {
                 }
             }
 
+            // UI-Skalierung section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: scaleSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: scaleSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Anzeige & Skalierung"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Vergrößert alle UI-Elemente gleichmäßig – sinnvoll für Displays mit hoher Pixeldichte (HiDPI). Erfordert einen Neustart."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    // Scale preset buttons
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Repeater {
+                            model: [
+                                { label: "100%", value: 1.0 },
+                                { label: "125%", value: 1.25 },
+                                { label: "150%", value: 1.5 },
+                                { label: "175%", value: 1.75 },
+                                { label: "200%", value: 2.0 }
+                            ]
+
+                            Rectangle {
+                                required property var modelData
+                                property bool isActive: Math.abs(appSettings.uiScale - modelData.value) < 0.01
+                                width: scaleLabel.implicitWidth + 24
+                                height: 34
+                                radius: 6
+                                color: isActive ? appSettings.accentColor : "#333333"
+                                border.color: isActive ? "transparent" : "#555555"
+                                border.width: 1
+
+                                Label {
+                                    id: scaleLabel
+                                    anchors.centerIn: parent
+                                    text: parent.modelData.label
+                                    color: "#ffffff"
+                                    font.pixelSize: 14
+                                    font.bold: parent.isActive
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: appSettings.uiScale = parent.modelData.value
+                                }
+                            }
+                        }
+                    }
+
+                    // Restart hint
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: restartRow.implicitHeight + 16
+                        color: "#2d2200"
+                        radius: 6
+                        border.color: "#6b4c00"
+                        border.width: 1
+                        visible: Math.abs(appSettings.uiScale - appSettings.effectiveUiScale) >= 0.01
+
+                        RowLayout {
+                            id: restartRow
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 8
+
+                            Label {
+                                text: "\u26A0"
+                                color: "#f59e0b"
+                                font.pixelSize: 16
+                            }
+                            Label {
+                                text: "Neustart erforderlich – die neue Skalierung wird beim nächsten Start wirksam."
+                                color: "#f59e0b"
+                                font.pixelSize: 13
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                            }
+                        }
+                    }
+                }
+            }
+
             // Fotoordner section
             Rectangle {
                 Layout.fillWidth: true

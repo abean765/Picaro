@@ -610,6 +610,35 @@ ApplicationWindow {
                             onClicked: slideshowDialog.open()
                         }
                     }
+
+                    // Fullscreen toggle button
+                    Rectangle {
+                        implicitWidth: fsLabel.implicitWidth + 20
+                        implicitHeight: 26
+                        radius: 4
+                        color: fsArea.containsMouse ? "#4a4a4a" : "#3a3a3a"
+
+                        Label {
+                            id: fsLabel
+                            anchors.centerIn: parent
+                            text: root.visibility === Window.FullScreen ? "\u2716 Vollbild" : "\u26F6 Vollbild"
+                            color: fsArea.containsMouse ? "#ffffff" : "#aaaaaa"
+                            font.pixelSize: 12
+                        }
+
+                        MouseArea {
+                            id: fsArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (root.visibility === Window.FullScreen)
+                                    root.showNormal()
+                                else
+                                    root.showFullScreen()
+                            }
+                        }
+                    }
                 }
             }
 
