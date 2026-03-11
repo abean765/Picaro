@@ -9,6 +9,7 @@ Item {
     property var dupGroups: []
     property bool dupSearchDone: false
     property bool showDeleteConfirm: false
+    property bool showDeleteDone: false
 
     Connections {
         target: photoImporter
@@ -93,6 +94,7 @@ Item {
                         onClicked: {
                             root.showDeleteConfirm = false
                             appSettings.deleteAllData()
+                            root.showDeleteDone = true
                         }
 
                         background: Rectangle {
@@ -107,6 +109,77 @@ Item {
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 20
                             rightPadding: 20
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // "Neustart erforderlich" dialog after deletion
+    Rectangle {
+        anchors.fill: parent
+        color: "#cc000000"
+        visible: root.showDeleteDone
+        z: 11
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 380
+            implicitHeight: doneContent.implicitHeight + 40
+            color: "#2a2a2a"
+            radius: 10
+            border.color: "#444444"
+            border.width: 1
+
+            ColumnLayout {
+                id: doneContent
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    margins: 24
+                }
+                spacing: 16
+
+                Label {
+                    text: "Daten gelöscht"
+                    color: "#ffffff"
+                    font.pixelSize: 17
+                    font.bold: true
+                    Layout.topMargin: 8
+                }
+
+                Label {
+                    text: "Datenbank und Import-Ordner wurden gelöscht. Picaro wird jetzt beendet."
+                    color: "#aaaaaa"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 4
+
+                    Item { Layout.fillWidth: true }
+
+                    Button {
+                        text: "OK"
+                        onClicked: Qt.quit()
+
+                        background: Rectangle {
+                            color: parent.hovered ? "#4a4a4a" : "#3a3a3a"
+                            radius: 4
+                        }
+                        contentItem: Label {
+                            text: parent.text
+                            color: "#ffffff"
+                            font.pixelSize: 13
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 24
+                            rightPadding: 24
                         }
                     }
                 }
