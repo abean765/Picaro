@@ -13,6 +13,7 @@ Rectangle {
     property int currentIndex: 0
     property int intervalSeconds: 5
     property bool running: false
+    property int activeLayer: 0  // 0 = A is front, 1 = B is front
 
     readonly property int currentPhotoId: photoIds.length > 0 ? photoIds[currentIndex] : -1
     readonly property string filePath: currentPhotoId > 0 ? photoModel.filePathForId(currentPhotoId) : ""
@@ -29,6 +30,11 @@ Rectangle {
         photoIds = ids
         intervalSeconds = seconds
         currentIndex = 0
+        activeLayer = 0
+        ssImageA.source = ""
+        ssImageB.source = ""
+        ssImageA.opacity = 0.0
+        ssImageB.opacity = 0.0
         visible = true
         running = true
         forceActiveFocus()
@@ -40,6 +46,10 @@ Rectangle {
         slideshowTimer.stop()
         ssPlayer.stop()
         ssPlayer.source = ""
+        ssImageA.source = ""
+        ssImageB.source = ""
+        ssImageA.opacity = 0.0
+        ssImageB.opacity = 0.0
         visible = false
         closed()
     }
@@ -80,11 +90,16 @@ Rectangle {
             ssPlayer.source = filePrefix + liveVideoPath
             // Timer starts when live video ends
         } else {
-            // Static photo — start timer
-            if (running) {
-                slideshowTimer.interval = intervalSeconds * 1000
-                slideshowTimer.start()
+            // Static photo — load into inactive layer for crossfade
+            var url = filePrefix + filePath
+            if (activeLayer === 0) {
+                // A is front, load new image into B
+                ssImageB.source = url
+            } else {
+                // B is front, load new image into A
+                ssImageA.source = url
             }
+            // Crossfade is triggered in onStatusChanged of the respective image
         }
     }
 
@@ -114,17 +129,52 @@ Rectangle {
         }
     }
 
-    // Full-size image
+    // Image layer A
     Image {
-        id: ssImage
+        id: ssImageA
         anchors.fill: parent
         visible: hasContent && !isVideo
-        source: hasContent && !isVideo ? "file:///" + filePath : ""
         fillMode: Image.PreserveAspectFit
         asynchronous: true
+        opacity: 0.0
+        Behavior on opacity { NumberAnimation { duration: 600 } }
 
-        opacity: status === Image.Ready ? 1.0 : 0.0
-        Behavior on opacity { NumberAnimation { duration: 300 } }
+        onStatusChanged: {
+            if (status === Image.Ready && slideshowView.activeLayer === 1) {
+                // A was loaded as the new layer (B was front before)
+                ssImageA.opacity = 1.0
+                ssImageB.opacity = 0.0
+                slideshowView.activeLayer = 0
+                if (slideshowView.running) {
+                    slideshowTimer.interval = slideshowView.intervalSeconds * 1000
+                    slideshowTimer.start()
+                }
+            }
+        }
+    }
+
+    // Image layer B
+    Image {
+        id: ssImageB
+        anchors.fill: parent
+        visible: hasContent && !isVideo
+        fillMode: Image.PreserveAspectFit
+        asynchronous: true
+        opacity: 0.0
+        Behavior on opacity { NumberAnimation { duration: 600 } }
+
+        onStatusChanged: {
+            if (status === Image.Ready && slideshowView.activeLayer === 0) {
+                // B was loaded as the new layer (A was front before)
+                ssImageB.opacity = 1.0
+                ssImageA.opacity = 0.0
+                slideshowView.activeLayer = 1
+                if (slideshowView.running) {
+                    slideshowTimer.interval = slideshowView.intervalSeconds * 1000
+                    slideshowTimer.start()
+                }
+            }
+        }
     }
 
     // Video player
@@ -160,7 +210,7 @@ Rectangle {
     // Loading spinner
     BusyIndicator {
         anchors.centerIn: parent
-        running: hasContent && !isVideo && ssImage.status === Image.Loading
+        running: hasContent && !isVideo && (ssImageA.status === Image.Loading || ssImageB.status === Image.Loading)
         visible: running
     }
 
