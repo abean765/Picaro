@@ -565,12 +565,13 @@ ApplicationWindow {
                         id: zoomSlider
                         from: 3
                         to: 12
-                        value: 5
+                        value: 10
                         stepSize: 1
                         implicitWidth: 120
 
                         onValueChanged: {
-                            photoModel.photosPerRow = Math.round(value)
+                            // Invert so left = small thumbnails, right = large
+                            photoModel.photosPerRow = (from + to) - Math.round(value)
                         }
                     }
 
