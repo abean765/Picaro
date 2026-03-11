@@ -222,6 +222,7 @@ ApplicationWindow {
 
             // Toolbar (only for photos view)
             Rectangle {
+                id: toolbarRect
                 Layout.fillWidth: true
                 implicitHeight: currentView === "photos" ? 44 : 0
                 color: "#2d2d2d"
@@ -486,8 +487,12 @@ ApplicationWindow {
                             target: photoModel
                             function onFilterSuggestionsChanged() {
                                 suggestionList.currentIndex = -1
+                                // Only show while typing, not after a filter has been applied
                                 suggestionDropdown.visible =
-                                    searchInput.text.length > 0 && photoModel.filterSuggestions.length > 0
+                                    searchInput.activeFocus &&
+                                    photoModel.filterText === "" &&
+                                    searchInput.text.length > 0 &&
+                                    photoModel.filterSuggestions.length > 0
                             }
                         }
 
@@ -511,7 +516,7 @@ ApplicationWindow {
                             photoModel.filterText = value
                             suggestionDropdown.visible = false
                             searchInput.forceActiveFocus()
-                            searchInput.selectAll()
+                            searchInput.cursorPosition = searchInput.text.length
                         }
                     }
 
@@ -1113,8 +1118,12 @@ ApplicationWindow {
         id: suggestionDropdown
         visible: false
         z: 50
-        x: searchItem.mapToItem(root.contentItem, 0, 0).x
-        y: searchItem.mapToItem(root.contentItem, 0, 0).y + searchItem.height + 4
+        // QML only tracks direct property references in bindings, not mapToItem().
+        // searchItem.x  = position within toolbar RowLayout (leftMargin=16)
+        // +16            = RowLayout.x within toolbarRect (= anchors.leftMargin)
+        // +200           = sidebar width (fixed Layout.preferredWidth)
+        x: searchItem.x + 16 + 200
+        y: toolbarRect.y + toolbarRect.height + 4
         width: searchItem.width
         height: Math.min(suggestionList.contentHeight + 8, 200)
         color: "#2a2a2a"
