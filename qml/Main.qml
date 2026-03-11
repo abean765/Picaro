@@ -326,6 +326,7 @@ ApplicationWindow {
 
                     // Search / filter by tag or sender
                     Item {
+                        id: searchItem
                         implicitWidth: 220
                         implicitHeight: 28
 
@@ -366,11 +367,11 @@ ApplicationWindow {
                                     }
 
                                     Keys.onReturnPressed: {
-                                        if (suggestionPopup.visible && suggestionList.currentIndex >= 0) {
-                                            applySuggestion(photoModel.filterSuggestions[suggestionList.currentIndex])
+                                        if (suggestionDropdown.visible && suggestionList.currentIndex >= 0) {
+                                            searchItem.applySuggestion(photoModel.filterSuggestions[suggestionList.currentIndex])
                                         } else if (text.trim() !== "") {
                                             photoModel.filterText = text.trim()
-                                            suggestionPopup.visible = false
+                                            suggestionDropdown.visible = false
                                         }
                                     }
 
@@ -380,8 +381,9 @@ ApplicationWindow {
                                     }
 
                                     Keys.onEscapePressed: {
-                                        if (suggestionPopup.visible) {
-                                            suggestionPopup.close()
+                                        if (suggestionDropdown.visible) {
+                                            suggestionCloseTimer.stop()
+                                            suggestionDropdown.visible = false
                                         } else {
                                             text = ""
                                             photoModel.clearFilter()
@@ -389,16 +391,24 @@ ApplicationWindow {
                                         }
                                     }
 
-                                    Keys.onDownPressed: {
-                                        if (suggestionPopup.visible && suggestionList.currentIndex < suggestionList.count - 1) {
-                                            suggestionList.currentIndex++
+                                    Keys.onTabPressed: {
+                                        if (suggestionDropdown.visible) {
+                                            event.accepted = true
+                                            if (suggestionList.currentIndex < suggestionList.count - 1)
+                                                suggestionList.currentIndex++
+                                            else
+                                                suggestionList.currentIndex = 0
                                         }
                                     }
 
+                                    Keys.onDownPressed: {
+                                        if (suggestionDropdown.visible && suggestionList.currentIndex < suggestionList.count - 1)
+                                            suggestionList.currentIndex++
+                                    }
+
                                     Keys.onUpPressed: {
-                                        if (suggestionPopup.visible && suggestionList.currentIndex > 0) {
+                                        if (suggestionDropdown.visible && suggestionList.currentIndex > 0)
                                             suggestionList.currentIndex--
-                                        }
                                     }
                                 }
 
@@ -472,94 +482,23 @@ ApplicationWindow {
                             }
                         }
 
-                        // Autocomplete popup - rendered in overlay above all content
-                        Popup {
-                            id: suggestionPopup
-                            x: 0
-                            y: searchBox.height + 4
-                            width: searchBox.width
-                            height: Math.min(suggestionList.contentHeight + 8, 200)
-                            padding: 0
-                            modal: false
-                            focus: false
-                            closePolicy: Popup.NoAutoClose
-
-                            background: Rectangle {
-                                color: "#2a2a2a"
-                                radius: 8
-                                border.color: "#444444"
-                                border.width: 1
-                            }
-
-                            contentItem: ListView {
-                                id: suggestionList
-                                anchors.fill: parent
-                                anchors.margins: 4
-                                model: photoModel.filterSuggestions
-                                currentIndex: -1
-                                clip: true
-
-                                delegate: Rectangle {
-                                    required property string modelData
-                                    required property int index
-
-                                    width: ListView.view.width
-                                    height: 30
-                                    radius: 4
-                                    color: index === suggestionList.currentIndex ? "#444444"
-                                         : suggItemArea.containsMouse ? "#383838" : "transparent"
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 8
-                                        anchors.rightMargin: 8
-                                        spacing: 6
-
-                                        Label {
-                                            text: modelData.startsWith("Tag:") ? "\u25C6" : "\u2B07"
-                                            font.pixelSize: 12
-                                        }
-
-                                        Label {
-                                            text: modelData
-                                            color: "#cccccc"
-                                            font.pixelSize: 12
-                                            Layout.fillWidth: true
-                                            elide: Text.ElideRight
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: suggItemArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: applySuggestion(modelData)
-                                    }
-                                }
-                            }
-                        }
-
                         Connections {
                             target: photoModel
                             function onFilterSuggestionsChanged() {
-                                if (searchInput.text.length > 0 && photoModel.filterSuggestions.length > 0) {
-                                    suggestionPopup.open()
-                                } else {
-                                    suggestionPopup.close()
-                                }
+                                suggestionList.currentIndex = -1
+                                suggestionDropdown.visible =
+                                    searchInput.text.length > 0 && photoModel.filterSuggestions.length > 0
                             }
                         }
 
                         Timer {
                             id: suggestionCloseTimer
                             interval: 150
-                            onTriggered: suggestionPopup.close()
+                            onTriggered: suggestionDropdown.visible = false
                         }
 
                         function applySuggestion(suggestion) {
                             suggestionCloseTimer.stop()
-                            // Extract the actual value after "Tag: " or "Sender: "
                             var value = suggestion
                             if (suggestion.startsWith("Tag: ")) {
                                 value = suggestion.substring(5)
@@ -570,7 +509,7 @@ ApplicationWindow {
                             searchInput.text = value
                             searchInput.suppressUpdate = false
                             photoModel.filterText = value
-                            suggestionPopup.close()
+                            suggestionDropdown.visible = false
                         }
                     }
 
@@ -1164,6 +1103,70 @@ ApplicationWindow {
     Component.onCompleted: {
         if (appSettings.networkVisible) {
             networkManager.startDiscovery(appSettings.computerName)
+        }
+    }
+
+    // Autocomplete dropdown — root-level overlay so clicks are delivered reliably
+    Rectangle {
+        id: suggestionDropdown
+        visible: false
+        z: 50
+        x: searchItem.mapToItem(null, 0, 0).x
+        y: searchItem.mapToItem(null, 0, 0).y + searchItem.height + 4
+        width: searchItem.width
+        height: Math.min(suggestionList.contentHeight + 8, 200)
+        color: "#2a2a2a"
+        radius: 8
+        border.color: "#444444"
+        border.width: 1
+        clip: true
+
+        ListView {
+            id: suggestionList
+            anchors.fill: parent
+            anchors.margins: 4
+            model: photoModel.filterSuggestions
+            currentIndex: -1
+            clip: true
+
+            delegate: Rectangle {
+                required property string modelData
+                required property int index
+
+                width: ListView.view.width
+                height: 30
+                radius: 4
+                color: index === suggestionList.currentIndex ? "#444444"
+                     : suggItemArea.containsMouse ? "#383838" : "transparent"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    spacing: 6
+
+                    Label {
+                        text: modelData.startsWith("Tag:") ? "\u25C6" : "\u2B07"
+                        font.pixelSize: 12
+                    }
+
+                    Label {
+                        text: modelData
+                        color: "#cccccc"
+                        font.pixelSize: 12
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                    }
+                }
+
+                MouseArea {
+                    id: suggItemArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: searchItem.applySuggestion(modelData)
+                }
+            }
         }
     }
 
