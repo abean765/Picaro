@@ -510,6 +510,8 @@ ApplicationWindow {
                             searchInput.suppressUpdate = false
                             photoModel.filterText = value
                             suggestionDropdown.visible = false
+                            searchInput.forceActiveFocus()
+                            searchInput.selectAll()
                         }
                     }
 
@@ -1111,8 +1113,8 @@ ApplicationWindow {
         id: suggestionDropdown
         visible: false
         z: 50
-        x: searchItem.mapToItem(null, 0, 0).x
-        y: searchItem.mapToItem(null, 0, 0).y + searchItem.height + 4
+        x: searchItem.mapToItem(root.contentItem, 0, 0).x
+        y: searchItem.mapToItem(root.contentItem, 0, 0).y + searchItem.height + 4
         width: searchItem.width
         height: Math.min(suggestionList.contentHeight + 8, 200)
         color: "#2a2a2a"
