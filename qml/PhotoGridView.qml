@@ -213,7 +213,7 @@ ListView {
                     // is too small to select without accidentally hitting the button)
                     Rectangle {
                         id: deleteBtn
-                        visible: hoverHandler.hovered && !cellItem.videoPlaying && parent.width >= deleteBtn.width * 2
+                        visible: hoverHandler.hovered && !cellItem.videoPlaying && parent.width >= deleteBtn.width * 4
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 6
