@@ -13,7 +13,9 @@ Rectangle {
     property int currentIndex: 0
     property int intervalSeconds: 5
     property bool running: false
-    property int activeLayer: 0  // 0 = A is front, 1 = B is front
+    property int activeLayer: 0  // 0 = Layer A is front, 1 = Layer B is front
+    property bool layerAIsVideo: false
+    property bool layerBIsVideo: false
 
     readonly property int currentPhotoId: photoIds.length > 0 ? photoIds[currentIndex] : -1
     readonly property string filePath: currentPhotoId > 0 ? photoModel.filePathForId(currentPhotoId) : ""
@@ -31,10 +33,14 @@ Rectangle {
         intervalSeconds = seconds
         currentIndex = 0
         activeLayer = 0
+        layerAIsVideo = false
+        layerBIsVideo = false
+        ssPlayerA.stop(); ssPlayerA.source = ""
+        ssPlayerB.stop(); ssPlayerB.source = ""
         ssImageA.source = ""
         ssImageB.source = ""
-        ssImageA.opacity = 0.0
-        ssImageB.opacity = 0.0
+        layerA.opacity = 0.0
+        layerB.opacity = 0.0
         visible = true
         running = true
         forceActiveFocus()
@@ -44,12 +50,12 @@ Rectangle {
     function stop() {
         running = false
         slideshowTimer.stop()
-        ssPlayer.stop()
-        ssPlayer.source = ""
+        ssPlayerA.stop(); ssPlayerA.source = ""
+        ssPlayerB.stop(); ssPlayerB.source = ""
         ssImageA.source = ""
         ssImageB.source = ""
-        ssImageA.opacity = 0.0
-        ssImageB.opacity = 0.0
+        layerA.opacity = 0.0
+        layerB.opacity = 0.0
         visible = false
         closed()
     }
@@ -59,7 +65,6 @@ Rectangle {
         if (currentIndex < photoIds.length - 1) {
             currentIndex++
         } else {
-            // Loop back to start
             currentIndex = 0
         }
         loadCurrentMedia()
@@ -77,40 +82,63 @@ Rectangle {
 
     function loadCurrentMedia() {
         slideshowTimer.stop()
-        ssPlayer.stop()
-        ssPlayer.source = ""
 
         if (!hasContent) return
 
         var filePrefix = Qt.platform.os === "windows" ? "file:///" : "file://"
-        if (isVideo) {
-            ssPlayer.source = filePrefix + filePath
-            // Timer starts when video ends
-        } else if (isLivePhoto && liveVideoPath !== "") {
-            ssPlayer.source = filePrefix + liveVideoPath
-            // Timer starts when live video ends
-        } else {
-            // Static photo — load into inactive layer for crossfade
-            var url = filePrefix + filePath
-            if (activeLayer === 0) {
-                // A is front, load new image into B
-                ssImageB.source = url
+        var isVideoContent = isVideo || (isLivePhoto && liveVideoPath !== "")
+
+        if (activeLayer === 0) {
+            // A is front — load new content into B
+            ssPlayerB.stop(); ssPlayerB.source = ""
+            ssImageB.source = ""
+            layerBIsVideo = isVideoContent
+            if (isVideo) {
+                ssPlayerB.source = filePrefix + filePath
+            } else if (isLivePhoto && liveVideoPath !== "") {
+                ssPlayerB.source = filePrefix + liveVideoPath
             } else {
-                // B is front, load new image into A
-                ssImageA.source = url
+                ssImageB.source = filePrefix + filePath
             }
-            // Crossfade is triggered in onStatusChanged of the respective image
+        } else {
+            // B is front — load new content into A
+            ssPlayerA.stop(); ssPlayerA.source = ""
+            ssImageA.source = ""
+            layerAIsVideo = isVideoContent
+            if (isVideo) {
+                ssPlayerA.source = filePrefix + filePath
+            } else if (isLivePhoto && liveVideoPath !== "") {
+                ssPlayerA.source = filePrefix + liveVideoPath
+            } else {
+                ssImageA.source = filePrefix + filePath
+            }
         }
     }
 
-    // Auto-advance timer
+    function crossfadeToA() {
+        layerA.opacity = 1.0
+        layerB.opacity = 0.0
+        activeLayer = 0
+        ssPlayerB.stop()
+        ssPlayerB.source = ""
+        ssImageB.source = ""
+    }
+
+    function crossfadeToB() {
+        layerB.opacity = 1.0
+        layerA.opacity = 0.0
+        activeLayer = 1
+        ssPlayerA.stop()
+        ssPlayerA.source = ""
+        ssImageA.source = ""
+    }
+
+    // Auto-advance timer (for static photos)
     Timer {
         id: slideshowTimer
         repeat: false
         onTriggered: {
-            if (slideshowView.running) {
-                slideshowView.goNext()
-            }
+            if (slideshowView.running) slideshowView.goNext()
         }
     }
 
@@ -129,88 +157,130 @@ Rectangle {
         }
     }
 
-    // Image layer A
-    Image {
-        id: ssImageA
+    // ── Layer A ──────────────────────────────────────────────────────────────
+    Item {
+        id: layerA
         anchors.fill: parent
-        visible: hasContent && !isVideo
-        fillMode: Image.PreserveAspectFit
-        asynchronous: true
         opacity: 0.0
         Behavior on opacity { NumberAnimation { duration: 600 } }
 
-        onStatusChanged: {
-            if (status === Image.Ready && slideshowView.activeLayer === 1) {
-                // A was loaded as the new layer (B was front before)
-                ssImageA.opacity = 1.0
-                ssImageB.opacity = 0.0
-                slideshowView.activeLayer = 0
-                if (slideshowView.running) {
-                    slideshowTimer.interval = slideshowView.intervalSeconds * 1000
-                    slideshowTimer.start()
+        Image {
+            id: ssImageA
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            visible: !layerAIsVideo
+
+            onStatusChanged: {
+                if (status === Image.Ready && slideshowView.activeLayer === 1) {
+                    slideshowView.crossfadeToA()
+                    if (slideshowView.running) {
+                        slideshowTimer.interval = slideshowView.intervalSeconds * 1000
+                        slideshowTimer.start()
+                    }
                 }
             }
         }
+
+        VideoOutput {
+            id: ssVideoOutputA
+            anchors.fill: parent
+            fillMode: VideoOutput.PreserveAspectFit
+            visible: layerAIsVideo
+        }
     }
 
-    // Image layer B
-    Image {
-        id: ssImageB
+    // ── Layer B ──────────────────────────────────────────────────────────────
+    Item {
+        id: layerB
         anchors.fill: parent
-        visible: hasContent && !isVideo
-        fillMode: Image.PreserveAspectFit
-        asynchronous: true
         opacity: 0.0
         Behavior on opacity { NumberAnimation { duration: 600 } }
 
-        onStatusChanged: {
-            if (status === Image.Ready && slideshowView.activeLayer === 0) {
-                // B was loaded as the new layer (A was front before)
-                ssImageB.opacity = 1.0
-                ssImageA.opacity = 0.0
-                slideshowView.activeLayer = 1
-                if (slideshowView.running) {
-                    slideshowTimer.interval = slideshowView.intervalSeconds * 1000
-                    slideshowTimer.start()
+        Image {
+            id: ssImageB
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            visible: !layerBIsVideo
+
+            onStatusChanged: {
+                if (status === Image.Ready && slideshowView.activeLayer === 0) {
+                    slideshowView.crossfadeToB()
+                    if (slideshowView.running) {
+                        slideshowTimer.interval = slideshowView.intervalSeconds * 1000
+                        slideshowTimer.start()
+                    }
                 }
             }
         }
+
+        VideoOutput {
+            id: ssVideoOutputB
+            anchors.fill: parent
+            fillMode: VideoOutput.PreserveAspectFit
+            visible: layerBIsVideo
+        }
     }
 
-    // Video player
-    AudioOutput { id: ssAudio }
+    // ── Media Players ────────────────────────────────────────────────────────
+    AudioOutput { id: ssAudioA }
     MediaPlayer {
-        id: ssPlayer
-        videoOutput: ssVideoOutput
-        audioOutput: ssAudio
+        id: ssPlayerA
+        videoOutput: ssVideoOutputA
+        audioOutput: ssAudioA
         loops: 1
 
         onSourceChanged: {
-            if (source.toString() !== "") {
-                play()
-            }
+            if (source.toString() !== "") play()
         }
 
         onPlaybackStateChanged: {
-            // When video/live photo finishes playing, advance
-            if (playbackState === MediaPlayer.StoppedState && source.toString() !== "" && slideshowView.running) {
+            if (playbackState === MediaPlayer.PlayingState && slideshowView.activeLayer === 1) {
+                // A just started as new layer — crossfade in
+                slideshowView.crossfadeToA()
+            }
+            if (playbackState === MediaPlayer.StoppedState
+                    && source.toString() !== ""
+                    && slideshowView.activeLayer === 0
+                    && slideshowView.running) {
+                // A finished playing as active layer — advance
                 slideshowView.goNext()
             }
         }
     }
 
-    VideoOutput {
-        id: ssVideoOutput
-        anchors.fill: parent
-        fillMode: VideoOutput.PreserveAspectFit
-        visible: hasContent && (isVideo || isLivePhoto)
-                 && ssPlayer.playbackState !== MediaPlayer.StoppedState
+    AudioOutput { id: ssAudioB }
+    MediaPlayer {
+        id: ssPlayerB
+        videoOutput: ssVideoOutputB
+        audioOutput: ssAudioB
+        loops: 1
+
+        onSourceChanged: {
+            if (source.toString() !== "") play()
+        }
+
+        onPlaybackStateChanged: {
+            if (playbackState === MediaPlayer.PlayingState && slideshowView.activeLayer === 0) {
+                // B just started as new layer — crossfade in
+                slideshowView.crossfadeToB()
+            }
+            if (playbackState === MediaPlayer.StoppedState
+                    && source.toString() !== ""
+                    && slideshowView.activeLayer === 1
+                    && slideshowView.running) {
+                // B finished playing as active layer — advance
+                slideshowView.goNext()
+            }
+        }
     }
 
     // Loading spinner
     BusyIndicator {
         anchors.centerIn: parent
-        running: hasContent && !isVideo && (ssImageA.status === Image.Loading || ssImageB.status === Image.Loading)
+        running: hasContent && !isVideo
+                 && (ssImageA.status === Image.Loading || ssImageB.status === Image.Loading)
         visible: running
     }
 
@@ -221,12 +291,14 @@ Rectangle {
             if (slideshowView.running) {
                 slideshowView.running = false
                 slideshowTimer.stop()
-                if (ssPlayer.playbackState === MediaPlayer.PlayingState)
-                    ssPlayer.pause()
+                if (ssPlayerA.playbackState === MediaPlayer.PlayingState) ssPlayerA.pause()
+                if (ssPlayerB.playbackState === MediaPlayer.PlayingState) ssPlayerB.pause()
             } else {
                 slideshowView.running = true
-                if (ssPlayer.playbackState === MediaPlayer.PausedState) {
-                    ssPlayer.play()
+                if (ssPlayerA.playbackState === MediaPlayer.PausedState) {
+                    ssPlayerA.play()
+                } else if (ssPlayerB.playbackState === MediaPlayer.PausedState) {
+                    ssPlayerB.play()
                 } else if (!slideshowView.isVideo && !slideshowView.isLivePhoto) {
                     slideshowTimer.interval = slideshowView.intervalSeconds * 1000
                     slideshowTimer.start()
@@ -258,21 +330,13 @@ Rectangle {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: 20
-        width: 48
-        height: 48
-        radius: 24
+        width: 48; height: 48; radius: 24
         color: prevSSArea.containsMouse ? "#80ffffff" : "#40ffffff"
         visible: controlsVisible && photoIds.length > 1
         opacity: controlsVisible ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
-        Label {
-            anchors.centerIn: parent
-            text: "\u276E"
-            color: "#ffffff"
-            font.pixelSize: 24
-        }
-
+        Label { anchors.centerIn: parent; text: "\u276E"; color: "#ffffff"; font.pixelSize: 24 }
         MouseArea {
             id: prevSSArea
             anchors.fill: parent
@@ -287,21 +351,13 @@ Rectangle {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         anchors.rightMargin: 20
-        width: 48
-        height: 48
-        radius: 24
+        width: 48; height: 48; radius: 24
         color: nextSSArea.containsMouse ? "#80ffffff" : "#40ffffff"
         visible: controlsVisible && photoIds.length > 1
         opacity: controlsVisible ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
-        Label {
-            anchors.centerIn: parent
-            text: "\u276F"
-            color: "#ffffff"
-            font.pixelSize: 24
-        }
-
+        Label { anchors.centerIn: parent; text: "\u276F"; color: "#ffffff"; font.pixelSize: 24 }
         MouseArea {
             id: nextSSArea
             anchors.fill: parent
@@ -327,21 +383,19 @@ Rectangle {
             anchors.leftMargin: 20
             anchors.rightMargin: 20
 
-            // Pause/Play indicator
             Label {
                 text: slideshowView.running ? "\u23F8" : "\u25B6"
                 color: "#ffffff"
                 font.pixelSize: 16
                 MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -8
+                    anchors.fill: parent; anchors.margins: -8
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         if (slideshowView.running) {
                             slideshowView.running = false
                             slideshowTimer.stop()
-                            if (ssPlayer.playbackState === MediaPlayer.PlayingState)
-                                ssPlayer.pause()
+                            if (ssPlayerA.playbackState === MediaPlayer.PlayingState) ssPlayerA.pause()
+                            if (ssPlayerB.playbackState === MediaPlayer.PlayingState) ssPlayerB.pause()
                         } else {
                             slideshowView.running = true
                             slideshowView.loadCurrentMedia()
@@ -350,7 +404,6 @@ Rectangle {
                 }
             }
 
-            // Counter
             Label {
                 text: (slideshowView.currentIndex + 1) + " / " + slideshowView.photoIds.length
                 color: "#cccccc"
@@ -359,14 +412,12 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
-            // Close button
             Label {
                 text: "ESC Beenden"
                 color: "#999999"
                 font.pixelSize: 12
                 MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -8
+                    anchors.fill: parent; anchors.margins: -8
                     cursorShape: Qt.PointingHandCursor
                     onClicked: slideshowView.stop()
                 }
