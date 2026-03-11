@@ -765,6 +765,7 @@ Rectangle {
                                     tagModel.removeTagFromPhoto(detailView.photoId, tagId)
                                 } else {
                                     tagModel.addTagToPhoto(detailView.photoId, tagId)
+                                    tagRow.dropdownOpen = false
                                 }
                                 tagRow.assignedTags = tagModel.tagsForPhoto(detailView.photoId)
                             }

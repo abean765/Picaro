@@ -376,7 +376,7 @@ ApplicationWindow {
 
                                     onActiveFocusChanged: {
                                         if (!activeFocus)
-                                            suggestionPopup.close()
+                                            suggestionCloseTimer.restart()
                                     }
 
                                     Keys.onEscapePressed: {
@@ -551,7 +551,14 @@ ApplicationWindow {
                             }
                         }
 
+                        Timer {
+                            id: suggestionCloseTimer
+                            interval: 150
+                            onTriggered: suggestionPopup.close()
+                        }
+
                         function applySuggestion(suggestion) {
+                            suggestionCloseTimer.stop()
                             // Extract the actual value after "Tag: " or "Sender: "
                             var value = suggestion
                             if (suggestion.startsWith("Tag: ")) {
