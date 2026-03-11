@@ -204,15 +204,16 @@ ListView {
                             anchors.centerIn: parent
                             text: modelData.mediaType === 2 ? "LIVE" : "\u25B6"
                             color: "#ffffff"
-                            font.pixelSize: 16
+                            font.pixelSize: parent.parent.width < 80 ? 10 : 16
                             font.bold: true
                         }
                     }
 
-                    // Delete / Restore button (visible on hover)
+                    // Delete / Restore button (visible on hover, hidden when thumbnail
+                    // is too small to select without accidentally hitting the button)
                     Rectangle {
                         id: deleteBtn
-                        visible: hoverHandler.hovered && !cellItem.videoPlaying
+                        visible: hoverHandler.hovered && !cellItem.videoPlaying && parent.width >= deleteBtn.width * 2
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 6
