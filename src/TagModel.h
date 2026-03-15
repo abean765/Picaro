@@ -49,6 +49,9 @@ public:
     Q_INVOKABLE QString tagIcon(qint64 tagId) const;
     Q_INVOKABLE qint64 tagParentId(qint64 tagId) const;
 
+    // Returns all tags as a flat JS-friendly list [{id, name, color, icon, depth}, ...]
+    Q_INVOKABLE QVariantList allTagsFlat() const;
+
 signals:
     void tagsChanged();
 

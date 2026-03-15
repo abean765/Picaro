@@ -145,6 +145,22 @@ qint64 TagModel::tagParentId(qint64 tagId) const
     return -1;
 }
 
+QVariantList TagModel::allTagsFlat() const
+{
+    QVariantList result;
+    result.reserve(m_tags.size());
+    for (const auto &t : m_tags) {
+        QVariantMap m;
+        m[QStringLiteral("id")]    = t.id;
+        m[QStringLiteral("name")]  = t.name;
+        m[QStringLiteral("color")] = t.color;
+        m[QStringLiteral("icon")]  = t.icon;
+        m[QStringLiteral("depth")] = t.depth;
+        result.append(m);
+    }
+    return result;
+}
+
 QVariantList TagModel::photoIdsForTag(qint64 tagId) const
 {
     QVariantList result;

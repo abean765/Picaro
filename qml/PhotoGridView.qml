@@ -13,6 +13,10 @@ ListView {
 
     model: photoModel
 
+    // Drag state — read by Main.qml to drive the drag ghost and drop logic
+    property int draggingPhotoId: -1
+    property point dragScenePos: Qt.point(0, 0)
+
     flickDeceleration: 1500
     maximumFlickVelocity: 15000
 
@@ -291,6 +295,36 @@ ListView {
                         onClicked: {
                             root.selectPhoto(modelData.id)
                         }
+                    }
+
+                    // Drag handler — activates after the default drag threshold (~10px).
+                    // Uses target:null so the cell itself is never moved.
+                    DragHandler {
+                        id: cellDragHandler
+                        target: null
+
+                        onActiveChanged: {
+                            if (active) {
+                                gridView.draggingPhotoId = modelData.id
+                            } else {
+                                // Signal drag end before clearing so Main.qml can
+                                // still read draggingPhotoId in the same frame.
+                                if (gridView.draggingPhotoId === modelData.id)
+                                    gridView.draggingPhotoId = -1
+                            }
+                        }
+
+                        onCentroidChanged: {
+                            if (active)
+                                gridView.dragScenePos = centroid.scenePosition
+                        }
+                    }
+
+                    // Reset drag state when a reused delegate is pulled from the pool
+                    // so a stale draggingPhotoId never gets stuck.
+                    ListView.onPooled: {
+                        if (cellDragHandler.active && gridView.draggingPhotoId === modelData.id)
+                            gridView.draggingPhotoId = -1
                     }
                 }
             }

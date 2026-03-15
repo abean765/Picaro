@@ -535,6 +535,34 @@ ApplicationWindow {
                         }
                     }
 
+                    // Tag panel toggle button
+                    Rectangle {
+                        implicitWidth: tagPanelBtnLabel.implicitWidth + 20
+                        implicitHeight: 26
+                        radius: 4
+                        color: photosViewRoot.tagPanelVisible
+                               ? root.accentColor
+                               : (tagPanelBtnArea.containsMouse ? "#4a4a4a" : "#3a3a3a")
+
+                        Label {
+                            id: tagPanelBtnLabel
+                            anchors.centerIn: parent
+                            text: "\u25C6 Tag-Panel"
+                            color: photosViewRoot.tagPanelVisible
+                                   ? "#ffffff"
+                                   : (tagPanelBtnArea.containsMouse ? "#ffffff" : "#aaaaaa")
+                            font.pixelSize: 12
+                        }
+
+                        MouseArea {
+                            id: tagPanelBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: photosViewRoot.tagPanelVisible = !photosViewRoot.tagPanelVisible
+                        }
+                    }
+
                     // Fullscreen toggle button
                     Rectangle {
                         implicitWidth: fsLabel.implicitWidth + 20
@@ -586,6 +614,50 @@ ApplicationWindow {
                     readonly property real contentWidth: width - timelineView.width
                     readonly property bool detailVisible: root.selectedPhotoId > 0
 
+                    // Tag filter panel
+                    property bool tagPanelVisible: false
+                    readonly property real tagPanelWidth: tagPanelVisible ? 240 : 0
+                    // Width available for grid + detail (after tag panel)
+                    readonly property real gridDetailWidth: contentWidth - tagPanelWidth
+
+                    // Drag-and-drop state
+                    property int lastDragPhotoId: -1
+
+                    function isGhostOverPanel() {
+                        if (!tagFilterPanel.visible) return false
+                        var sp = photoGrid.dragScenePos
+                        var p = tagFilterPanel.mapFromItem(null, sp.x, sp.y)
+                        return p.x >= 0 && p.y >= 0 &&
+                               p.x < tagFilterPanel.width &&
+                               p.y < tagFilterPanel.height
+                    }
+
+                    // Drive drag ghost position and panel highlight
+                    Connections {
+                        target: photoGrid
+
+                        function onDragScenePosChanged() {
+                            if (photoGrid.draggingPhotoId > 0)
+                                tagFilterPanel.dragOver = photosViewRoot.isGhostOverPanel()
+                        }
+
+                        function onDraggingPhotoIdChanged() {
+                            var pid = photoGrid.draggingPhotoId
+                            if (pid > 0) {
+                                photosViewRoot.lastDragPhotoId = pid
+                            } else {
+                                // Drag released — assign tag if ghost was over panel
+                                if (tagFilterPanel.dragOver &&
+                                        tagFilterPanel.selectedTagId > 0 &&
+                                        photosViewRoot.lastDragPhotoId > 0) {
+                                    tagFilterPanel.acceptDrop(photosViewRoot.lastDragPhotoId)
+                                }
+                                tagFilterPanel.dragOver = false
+                                photosViewRoot.lastDragPhotoId = -1
+                            }
+                        }
+                    }
+
                     TimelineView {
                         id: timelineView
                         anchors.left: parent.left
@@ -631,8 +703,53 @@ ApplicationWindow {
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
                         width: photosViewRoot.detailVisible
-                              ? photosViewRoot.contentWidth * photosViewRoot.splitRatio
-                              : photosViewRoot.contentWidth
+                              ? photosViewRoot.gridDetailWidth * photosViewRoot.splitRatio
+                              : photosViewRoot.gridDetailWidth
+                    }
+
+                    // Tag filter panel — optional, fixed width, between grid and detail
+                    TagFilterPanel {
+                        id: tagFilterPanel
+                        visible: photosViewRoot.tagPanelVisible
+                        anchors.left: photoGrid.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: photosViewRoot.tagPanelWidth
+
+                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Drag ghost — follows the cursor while a thumbnail is being dragged
+                    Rectangle {
+                        id: dragGhost
+                        parent: photosViewRoot
+                        z: 999
+                        width: 72; height: 72
+                        radius: 6
+                        clip: true
+                        border.color: root.accentColor
+                        border.width: 2
+                        color: "#1affffff"
+                        visible: photoGrid.draggingPhotoId > 0
+
+                        readonly property point _local: {
+                            var sp = photoGrid.dragScenePos
+                            return photosViewRoot.mapFromItem(null, sp.x, sp.y)
+                        }
+                        x: _local.x - width  / 2
+                        y: _local.y - height / 2
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            source: photoGrid.draggingPhotoId > 0
+                                    ? "image://thumbnail/" + photoGrid.draggingPhotoId : ""
+                            fillMode: Image.PreserveAspectCrop
+                            cache: true
+                        }
+
+                        opacity: 0.88
+                        Behavior on opacity { NumberAnimation { duration: 80 } }
                     }
 
                     // Draggable splitter handle
@@ -641,7 +758,10 @@ ApplicationWindow {
                         visible: photosViewRoot.detailVisible
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        x: photoGrid.x + photoGrid.width - 3
+                        // Position after the tag panel (if visible) or after the grid
+                        x: (photosViewRoot.tagPanelVisible
+                            ? tagFilterPanel.x + tagFilterPanel.width
+                            : photoGrid.x + photoGrid.width) - 3
                         width: 6
                         color: splitterMouse.containsMouse || splitterMouse.pressed ? root.accentColor : "#333333"
                         z: 10
@@ -665,7 +785,7 @@ ApplicationWindow {
                                 if (!pressed) return
                                 var currentX = mouse.x + splitterHandle.x
                                 var delta = currentX - dragStartX
-                                var newRatio = dragStartRatio + delta / photosViewRoot.contentWidth
+                                var newRatio = dragStartRatio + delta / photosViewRoot.gridDetailWidth
                                 photosViewRoot.splitRatio = Math.max(0.2, Math.min(0.8, newRatio))
                             }
                         }
