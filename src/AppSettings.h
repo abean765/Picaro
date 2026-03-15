@@ -29,6 +29,7 @@ class AppSettings : public QObject
     Q_PROPERTY(QString photoFolder READ photoFolder WRITE setPhotoFolder NOTIFY photoFolderChanged)
     Q_PROPERTY(int livePhotoMode READ livePhotoMode WRITE setLivePhotoMode NOTIFY livePhotoModeChanged)
     Q_PROPERTY(bool thumbnailFitMode READ thumbnailFitMode WRITE setThumbnailFitMode NOTIFY thumbnailFitModeChanged)
+    Q_PROPERTY(qint64 lastSelectedPhotoId READ lastSelectedPhotoId WRITE setLastSelectedPhotoId NOTIFY lastSelectedPhotoIdChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -257,6 +258,19 @@ public:
         emit thumbnailFitModeChanged();
     }
 
+    qint64 lastSelectedPhotoId() const
+    {
+        return m_settings.value(QStringLiteral("state/lastSelectedPhotoId"), -1).toLongLong();
+    }
+
+    void setLastSelectedPhotoId(qint64 id)
+    {
+        if (id == lastSelectedPhotoId()) return;
+        m_settings.setValue(QStringLiteral("state/lastSelectedPhotoId"), id);
+        m_settings.sync();
+        emit lastSelectedPhotoIdChanged();
+    }
+
     Q_INVOKABLE bool deleteAllData()
     {
         bool ok = true;
@@ -349,6 +363,7 @@ signals:
     void photoFolderChanged();
     void livePhotoModeChanged();
     void thumbnailFitModeChanged();
+    void lastSelectedPhotoIdChanged();
 
 private:
     QSettings m_settings;

@@ -47,7 +47,21 @@ ApplicationWindow {
         selectedPhotoIds = photoId > 0 ? [photoId] : []
         selectionAnchorId = photoId
         if (photoId > 0) {
+            appSettings.lastSelectedPhotoId = photoId
             detailPanel.forceActiveFocus()
+        }
+    }
+
+    // Restore last selected photo once the model has finished its initial load.
+    property bool _restoredSelection: false
+    Connections {
+        target: photoModel
+        function onModelReloaded() {
+            if (root._restoredSelection) return
+            root._restoredSelection = true
+            var id = appSettings.lastSelectedPhotoId
+            if (id > 0 && photoModel.filePathForId(id) !== "")
+                root.selectPhoto(id)
         }
     }
 
