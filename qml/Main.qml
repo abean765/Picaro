@@ -664,8 +664,11 @@ ApplicationWindow {
                     // Width available for grid + detail (after tag panel)
                     readonly property real gridDetailWidth: contentWidth - tagPanelWidth
 
-                    // Drag-and-drop state
+                    // Forward drag state (grid → panel = add tag)
                     property int lastDragPhotoId: -1
+                    // Reverse drag state (panel → grid = remove tag)
+                    property int  lastPanelDragPhotoId: -1
+                    property bool panelDragOverGrid: false
 
                     function isGhostOverPanel() {
                         if (!tagFilterPanel.visible) return false
@@ -676,7 +679,15 @@ ApplicationWindow {
                                p.y < tagFilterPanel.height
                     }
 
-                    // Drive drag ghost position and panel highlight
+                    function isPanelGhostOverGrid() {
+                        var sp = tagFilterPanel.panelDragScenePos
+                        var p  = photoGrid.mapFromItem(null, sp.x, sp.y)
+                        return p.x >= 0 && p.y >= 0 &&
+                               p.x < photoGrid.width &&
+                               p.y < photoGrid.height
+                    }
+
+                    // Forward drag: grid → panel
                     Connections {
                         target: photoGrid
 
@@ -704,6 +715,35 @@ ApplicationWindow {
                                 }
                                 tagFilterPanel.dragOver = false
                                 photosViewRoot.lastDragPhotoId = -1
+                            }
+                        }
+                    }
+
+                    // Reverse drag: panel → grid (remove tag)
+                    Connections {
+                        target: tagFilterPanel
+
+                        function onPanelDragScenePosChanged() {
+                            if (tagFilterPanel.panelDraggingPhotoId > 0)
+                                photosViewRoot.panelDragOverGrid = photosViewRoot.isPanelGhostOverGrid()
+                        }
+
+                        function onPanelDraggingPhotoIdChanged() {
+                            var pid = tagFilterPanel.panelDraggingPhotoId
+                            if (pid > 0) {
+                                photosViewRoot.lastPanelDragPhotoId = pid
+                            } else {
+                                if (photosViewRoot.panelDragOverGrid &&
+                                        tagFilterPanel.selectedTagId > 0 &&
+                                        photosViewRoot.lastPanelDragPhotoId > 0) {
+                                    var dragId  = photosViewRoot.lastPanelDragPhotoId
+                                    var sel     = tagFilterPanel.selectedPanelIds
+                                    var toRemove = (sel.length > 1 && sel.indexOf(dragId) >= 0)
+                                                   ? sel : [dragId]
+                                    tagFilterPanel.removeDraggedPhotos(toRemove)
+                                }
+                                photosViewRoot.panelDragOverGrid    = false
+                                photosViewRoot.lastPanelDragPhotoId = -1
                             }
                         }
                     }
@@ -825,6 +865,113 @@ ApplicationWindow {
 
                         opacity: 0.88
                         Behavior on opacity { NumberAnimation { duration: 80 } }
+                    }
+
+                    // Reverse drag ghost (panel → grid): red border signals tag removal
+                    Rectangle {
+                        id: panelDragGhost
+                        parent: photosViewRoot
+                        z: 999
+                        width: 72; height: 72
+                        radius: 6
+                        clip: true
+                        border.color: "#cc4444"
+                        border.width: 2
+                        color: "#1affaaaa"
+                        visible: tagFilterPanel.panelDraggingPhotoId > 0
+
+                        readonly property point _local: {
+                            var sp = tagFilterPanel.panelDragScenePos
+                            return photosViewRoot.mapFromItem(null, sp.x, sp.y)
+                        }
+                        x: _local.x - width  / 2
+                        y: _local.y - height / 2
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            source: tagFilterPanel.panelDraggingPhotoId > 0
+                                    ? "image://thumbnail/" + tagFilterPanel.panelDraggingPhotoId : ""
+                            fillMode: Image.PreserveAspectCrop
+                            cache: true
+                            opacity: 0.65
+                        }
+
+                        // Minus badge in center
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 26; height: 26; radius: 13
+                            color: "#cc4444"
+                            Label {
+                                anchors.centerIn: parent
+                                text: "\u2212"
+                                color: "#ffffff"
+                                font.pixelSize: 20
+                                font.bold: true
+                            }
+                        }
+
+                        // Count badge for multi-selection
+                        Rectangle {
+                            visible: {
+                                var sel = tagFilterPanel.selectedPanelIds
+                                return sel.length > 1 &&
+                                       sel.indexOf(tagFilterPanel.panelDraggingPhotoId) >= 0
+                            }
+                            anchors.top:   parent.top
+                            anchors.right: parent.right
+                            anchors.margins: -4
+                            width:  panelCountLabel.implicitWidth + 8
+                            height: 20
+                            radius: 10
+                            color:  "#cc4444"
+
+                            Label {
+                                id: panelCountLabel
+                                anchors.centerIn: parent
+                                text: tagFilterPanel.selectedPanelIds.length
+                                color: "#ffffff"
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
+                        }
+
+                        opacity: 0.9
+                    }
+
+                    // Grid drop zone overlay — shown while a panel photo is dragged over the grid
+                    Rectangle {
+                        anchors.fill: photoGrid
+                        z: 50
+                        visible: photosViewRoot.panelDragOverGrid
+                        color: "transparent"
+                        border.color: "#cc4444"
+                        border.width: 3
+                        radius: 4
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            color: "#cc000000"
+                            radius: 8
+                            width:  gridDropLabel.implicitWidth  + 24
+                            height: gridDropLabel.implicitHeight + 16
+
+                            Label {
+                                id: gridDropLabel
+                                anchors.centerIn: parent
+                                text: {
+                                    var n = tagFilterPanel.selectedPanelIds.length
+                                    var pid = photosViewRoot.lastPanelDragPhotoId
+                                    var inSel = n > 1 && tagFilterPanel.selectedPanelIds.indexOf(pid) >= 0
+                                    var count = inSel ? n : 1
+                                    return "\u2212 Tag von " + count +
+                                           (count === 1 ? " Foto" : " Fotos") + " entfernen"
+                                }
+                                color: "#ff8888"
+                                font.pixelSize: 14
+                                font.bold: true
+                            }
+                        }
                     }
 
                     // Draggable splitter handle

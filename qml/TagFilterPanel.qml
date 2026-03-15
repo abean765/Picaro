@@ -19,15 +19,61 @@ Rectangle {
     // Photo IDs that carry the selected tag
     property var tagPhotoIds: []
 
+    // ── Panel-internal multi-selection (independent of the main grid selection) ──
+    property var selectedPanelIds:    []
+    property int panelSelectionAnchor: -1
+
+    // Drag state for reverse drag (panel → grid = remove tag); read by Main.qml
+    property int   panelDraggingPhotoId: -1
+    property point panelDragScenePos:    Qt.point(0, 0)
+
+    function handlePanelCellClick(photoId, modifiers) {
+        var ctrl  = (modifiers & Qt.ControlModifier) !== 0
+        var shift = (modifiers & Qt.ShiftModifier)   !== 0
+
+        if (shift && panelSelectionAnchor > 0) {
+            var ids = tagPhotoIds
+            var a = ids.indexOf(panelSelectionAnchor)
+            var b = ids.indexOf(photoId)
+            if (a < 0 || b < 0) { selectedPanelIds = [photoId]; return }
+            if (a > b) { var tmp = a; a = b; b = tmp }
+            var range = []
+            for (var i = a; i <= b; i++) range.push(ids[i])
+            selectedPanelIds = range
+        } else if (ctrl) {
+            var arr = selectedPanelIds.slice()
+            var idx = arr.indexOf(photoId)
+            if (idx >= 0) arr.splice(idx, 1)
+            else          arr.push(photoId)
+            selectedPanelIds     = arr
+            panelSelectionAnchor = photoId
+        } else {
+            selectedPanelIds     = [photoId]
+            panelSelectionAnchor = photoId
+            root.selectPhoto(photoId)
+        }
+    }
+
+    // Called by Main.qml when selected panel photos are dragged back onto the grid
+    function removeDraggedPhotos(photoIds) {
+        if (selectedTagId <= 0) return
+        for (var i = 0; i < photoIds.length; i++) {
+            if (photoIds[i] > 0)
+                tagModel.removeTagFromPhoto(photoIds[i], selectedTagId)
+        }
+        selectedPanelIds = selectedPanelIds.filter(function(id) {
+            return photoIds.indexOf(id) < 0
+        })
+        // refreshPhotos() is triggered automatically via tagsChanged
+    }
+
     // Called by Main.qml when one or more photos are dropped onto this panel.
-    // photoIds is an array of photo IDs (may contain just one element).
     function acceptDrop(photoIds) {
         if (selectedTagId <= 0) return
         for (var i = 0; i < photoIds.length; i++) {
             if (photoIds[i] > 0)
                 tagModel.addTagToPhoto(photoIds[i], selectedTagId)
         }
-        // refreshPhotos() is triggered automatically via the tagsChanged Connections
     }
 
     function refreshPhotos() {
@@ -35,18 +81,22 @@ Rectangle {
     }
 
     function selectTag(tagId, tagName) {
-        selectedTagId  = tagId
-        selectedTagName = tagName
-        tagInput.text  = tagName
-        dropdownVisible = false
+        selectedTagId        = tagId
+        selectedTagName      = tagName
+        tagInput.text        = tagName
+        dropdownVisible      = false
+        selectedPanelIds     = []
+        panelSelectionAnchor = -1
         refreshPhotos()
     }
 
     function clearTag() {
-        selectedTagId   = -1
-        selectedTagName = ""
-        tagInput.text   = ""
-        tagPhotoIds     = []
+        selectedTagId        = -1
+        selectedTagName      = ""
+        tagInput.text        = ""
+        tagPhotoIds          = []
+        selectedPanelIds     = []
+        panelSelectionAnchor = -1
     }
 
     // Re-fetch photo list whenever tagModel changes (e.g. after a drop assignment)
@@ -415,6 +465,9 @@ Rectangle {
                     width:  tagPhotoGrid.cellWidth
                     height: tagPhotoGrid.cellHeight
 
+                    readonly property bool isSelected:
+                        tagFilterPanel.selectedPanelIds.indexOf(modelData) >= 0
+
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: 1
@@ -431,10 +484,49 @@ Rectangle {
                             Behavior on opacity { NumberAnimation { duration: 100 } }
                         }
 
+                        // Selection highlight
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            border.color: root.accentColor
+                            border.width: isSelected ? 3 : 0
+                            z: 2
+                        }
+
+                        // Dim unselected cells when a selection exists
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "#60000000"
+                            visible: tagFilterPanel.selectedPanelIds.length > 0 && !isSelected
+                            z: 1
+                        }
+
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.selectPhoto(modelData)
+                            z: 3
+                            onClicked: function(mouse) {
+                                tagFilterPanel.handlePanelCellClick(modelData, mouse.modifiers)
+                            }
+                        }
+
+                        // Drag handler for reverse drag (panel → grid removes tag)
+                        DragHandler {
+                            id: panelCellDragHandler
+                            target: null
+
+                            onActiveChanged: {
+                                if (active) {
+                                    tagFilterPanel.panelDraggingPhotoId = modelData
+                                } else {
+                                    if (tagFilterPanel.panelDraggingPhotoId === modelData)
+                                        tagFilterPanel.panelDraggingPhotoId = -1
+                                }
+                            }
+                            onCentroidChanged: {
+                                if (active)
+                                    tagFilterPanel.panelDragScenePos = centroid.scenePosition
+                            }
                         }
                     }
                 }
