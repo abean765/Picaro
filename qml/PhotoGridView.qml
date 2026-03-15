@@ -25,6 +25,14 @@ ListView {
     property var   taggedPhotoIds:     []
     property color tagIndicatorColor:  "#ffffff"
 
+    // String-keyed lookup built from taggedPhotoIds to avoid qint64 === comparison issues.
+    readonly property var _taggedIdSet: {
+        var s = {}
+        var arr = taggedPhotoIds
+        for (var i = 0; i < arr.length; i++) s["" + arr[i]] = true
+        return s
+    }
+
     // Scrolls the row containing photoId into view if it is not already visible.
     function scrollIntoView(photoId) {
         var rowIdx = photoModel.rowIndexForPhotoId(photoId)
@@ -62,7 +70,7 @@ ListView {
         id: overlayOutput
         parent: gridView
         z: 10
-        fillMode: VideoOutput.PreserveAspectCrop
+        fillMode: gridView.fitMode ? VideoOutput.PreserveAspectFit : VideoOutput.PreserveAspectCrop
         visible: gridView._hoveredCell !== null &&
                  sharedPlayer.playbackState === MediaPlayer.PlayingState &&
                  (sharedPlayer.mediaStatus === MediaPlayer.BufferedMedia ||
@@ -193,7 +201,7 @@ ListView {
 
                     // Tag indicator — top-left dot when this photo has the active tag
                     Rectangle {
-                        visible: gridView.taggedPhotoIds.indexOf(modelData.id) >= 0
+                        visible: gridView._taggedIdSet["" + modelData.id] === true
                         anchors.top:    parent.top
                         anchors.left:   parent.left
                         anchors.margins: 6
