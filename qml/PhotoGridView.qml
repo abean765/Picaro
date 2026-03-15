@@ -158,13 +158,13 @@ ListView {
                         (sharedPlayer.mediaStatus === MediaPlayer.BufferedMedia ||
                          sharedPlayer.mediaStatus === MediaPlayer.EndOfMedia)
 
-                    // Selection highlight
+                    // Selection highlight (single or multi-select)
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: 1
                         color: "transparent"
                         border.color: root.accentColor
-                        border.width: root.selectedPhotoId === modelData.id ? 3 : 0
+                        border.width: root.selectedPhotoIds.indexOf(modelData.id) >= 0 ? 3 : 0
                         z: 2
                     }
 
@@ -292,8 +292,8 @@ ListView {
                         anchors.fill: parent
                         hoverEnabled: false
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.selectPhoto(modelData.id)
+                        onClicked: function(mouse) {
+                            root.handleCellClick(modelData.id, mouse.modifiers)
                         }
                     }
 

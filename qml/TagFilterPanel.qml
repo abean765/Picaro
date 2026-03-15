@@ -19,11 +19,15 @@ Rectangle {
     // Photo IDs that carry the selected tag
     property var tagPhotoIds: []
 
-    // Called by Main.qml when a photo is dropped onto this panel
-    function acceptDrop(photoId) {
-        if (selectedTagId <= 0 || photoId <= 0) return
-        tagModel.addTagToPhoto(photoId, selectedTagId)
-        // photoIdsForTag is called inside refreshPhotos via tagsChanged signal
+    // Called by Main.qml when one or more photos are dropped onto this panel.
+    // photoIds is an array of photo IDs (may contain just one element).
+    function acceptDrop(photoIds) {
+        if (selectedTagId <= 0) return
+        for (var i = 0; i < photoIds.length; i++) {
+            if (photoIds[i] > 0)
+                tagModel.addTagToPhoto(photoIds[i], selectedTagId)
+        }
+        // refreshPhotos() is triggered automatically via the tagsChanged Connections
     }
 
     function refreshPhotos() {
@@ -376,9 +380,13 @@ Rectangle {
                     }
                     Label {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: tagFilterPanel.selectedTagId > 0
-                              ? "Tag \"" + tagFilterPanel.selectedTagName + "\"\nzuweisen"
-                              : "Zuerst einen Tag\noben wählen"
+                        text: {
+                            if (tagFilterPanel.selectedTagId <= 0)
+                                return "Zuerst einen Tag\noben wählen"
+                            var n = root.selectedPhotoIds.length
+                            var photoStr = n > 1 ? n + " Fotos" : "Foto"
+                            return photoStr + " mit Tag\n\"" + tagFilterPanel.selectedTagName + "\"\nverknüpfen"
+                        }
                         color: tagFilterPanel.selectedTagId > 0 ? "#ffffff" : "#aaaaaa"
                         font.pixelSize: 13
                         font.bold: tagFilterPanel.selectedTagId > 0

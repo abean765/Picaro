@@ -32,19 +32,62 @@ ApplicationWindow {
     // Photo selection state
     property int selectedPhotoId: -1
 
+    // Multi-selection: array of selected photo IDs (always contains selectedPhotoId for single clicks)
+    property var selectedPhotoIds: []
+    // Anchor for SHIFT+click range selection (last CTRL-click or normal click)
+    property int selectionAnchorId: -1
+
     function selectPhoto(photoId) {
         if (selectedPhotoId === photoId && photoId > 0) {
             detailPanel.replay()
             return
         }
         selectedPhotoId = photoId
+        selectedPhotoIds = photoId > 0 ? [photoId] : []
+        selectionAnchorId = photoId
         if (photoId > 0) {
             detailPanel.forceActiveFocus()
         }
     }
 
+    // Called from PhotoGridView cells — handles CTRL and SHIFT modifiers.
+    function handleCellClick(photoId, modifiers) {
+        var ctrl  = (modifiers & Qt.ControlModifier) !== 0
+        var shift = (modifiers & Qt.ShiftModifier)   !== 0
+
+        if (shift && selectionAnchorId > 0) {
+            // Range selection: select all photos between anchor and this one
+            var ids = photoModel.visiblePhotoIds()
+            var a = ids.indexOf(selectionAnchorId)
+            var b = ids.indexOf(photoId)
+            if (a < 0 || b < 0) { selectPhoto(photoId); return }
+            if (a > b) { var tmp = a; a = b; b = tmp }
+            var range = []
+            for (var i = a; i <= b; i++) range.push(ids[i])
+            selectedPhotoIds = range
+            // Update detail view to the clicked photo without changing the anchor
+            selectedPhotoId = photoId
+            detailPanel.forceActiveFocus()
+        } else if (ctrl) {
+            // Toggle this photo in/out of selection
+            var arr  = selectedPhotoIds.slice()
+            var idx  = arr.indexOf(photoId)
+            if (idx >= 0) arr.splice(idx, 1)
+            else          arr.push(photoId)
+            selectedPhotoIds  = arr
+            selectionAnchorId = photoId
+            selectedPhotoId   = photoId
+            detailPanel.forceActiveFocus()
+        } else {
+            // Normal click: single select + open detail (existing behaviour)
+            selectPhoto(photoId)
+        }
+    }
+
     function closeDetail() {
         selectedPhotoId = -1
+        selectedPhotoIds = []
+        selectionAnchorId = -1
         photoGrid.forceActiveFocus()
     }
 
@@ -650,7 +693,13 @@ ApplicationWindow {
                                 if (tagFilterPanel.dragOver &&
                                         tagFilterPanel.selectedTagId > 0 &&
                                         photosViewRoot.lastDragPhotoId > 0) {
-                                    tagFilterPanel.acceptDrop(photosViewRoot.lastDragPhotoId)
+                                    // If the dragged photo is part of a multi-selection,
+                                    // tag all selected photos; otherwise just the one.
+                                    var dragId = photosViewRoot.lastDragPhotoId
+                                    var sel    = root.selectedPhotoIds
+                                    var toTag  = (sel.length > 1 && sel.indexOf(dragId) >= 0)
+                                                 ? sel : [dragId]
+                                    tagFilterPanel.acceptDrop(toTag)
                                 }
                                 tagFilterPanel.dragOver = false
                                 photosViewRoot.lastDragPhotoId = -1
@@ -746,6 +795,31 @@ ApplicationWindow {
                                     ? "image://thumbnail/" + photoGrid.draggingPhotoId : ""
                             fillMode: Image.PreserveAspectCrop
                             cache: true
+                        }
+
+                        // Count badge for multi-selection drag
+                        Rectangle {
+                            visible: {
+                                var sel = root.selectedPhotoIds
+                                return sel.length > 1 &&
+                                       sel.indexOf(photoGrid.draggingPhotoId) >= 0
+                            }
+                            anchors.top:   parent.top
+                            anchors.right: parent.right
+                            anchors.margins: -4
+                            width:  countBadgeLabel.implicitWidth + 8
+                            height: 20
+                            radius: 10
+                            color:  root.accentColor
+
+                            Label {
+                                id: countBadgeLabel
+                                anchors.centerIn: parent
+                                text: root.selectedPhotoIds.length
+                                color: "#ffffff"
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
                         }
 
                         opacity: 0.88
