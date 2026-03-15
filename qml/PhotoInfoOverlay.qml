@@ -423,6 +423,45 @@ Rectangle {
                         value: overlay.meta["phash"] ?? ""
                     }
 
+                    Item { width: 1; height: 12 }
+
+                    // ── All EXIF tags ──────────────────────────────────────────
+                    SectionHeader {
+                        title: "ALLE EXIF-DATEN"
+                        visible: (overlay.meta["exifAll"] ?? []).length > 0
+                    }
+
+                    Repeater {
+                        model: overlay.meta["exifAll"] ?? []
+
+                        RowLayout {
+                            required property var modelData
+                            width: contentCol.width - contentCol.padding * 2
+                            height: 22
+                            spacing: 0
+
+                            Label {
+                                text: modelData.label !== "" ? modelData.label : modelData.key
+                                color: "#888888"
+                                font.pixelSize: 11
+                                Layout.preferredWidth: 150
+                                elide: Text.ElideRight
+                                ToolTip.visible: exifLabelHover.hovered
+                                ToolTip.delay: 400
+                                ToolTip.text: modelData.key
+                                HoverHandler { id: exifLabelHover }
+                            }
+                            Label {
+                                text: modelData.value
+                                color: "#dddddd"
+                                font.pixelSize: 11
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                wrapMode: Text.NoWrap
+                            }
+                        }
+                    }
+
                     Item { width: 1; height: 8 }
                 }
             }

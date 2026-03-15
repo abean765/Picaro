@@ -621,6 +621,7 @@ QVariantMap PhotoModel::fullMetadataForId(qint64 id) const
                     return QString::fromStdString(ki->print(&exifData)).trimmed();
                 };
 
+                // Named fields for structured display sections
                 result[QStringLiteral("cameraMake")]    = get("Exif.Image.Make");
                 result[QStringLiteral("cameraModel")]   = get("Exif.Image.Model");
                 result[QStringLiteral("lensModel")]     = get("Exif.Photo.LensModel");
@@ -636,6 +637,19 @@ QVariantMap PhotoModel::fullMetadataForId(qint64 id) const
                 result[QStringLiteral("software")]      = get("Exif.Image.Software");
                 result[QStringLiteral("colorSpace")]    = get("Exif.Photo.ColorSpace");
                 result[QStringLiteral("orientation")]   = get("Exif.Image.Orientation");
+
+                // Full EXIF dump — every tag that has a non-empty value
+                QVariantList exifAll;
+                for (auto it2 = exifData.begin(); it2 != exifData.end(); ++it2) {
+                    QString val = QString::fromStdString(it2->print(&exifData)).trimmed();
+                    if (val.isEmpty()) continue;
+                    QVariantMap entry;
+                    entry[QStringLiteral("key")]   = QString::fromStdString(it2->key());
+                    entry[QStringLiteral("label")] = QString::fromStdString(it2->tagLabel());
+                    entry[QStringLiteral("value")] = val;
+                    exifAll.append(entry);
+                }
+                result[QStringLiteral("exifAll")] = exifAll;
             }
         } catch (...) {
             // Silently ignore EXIF read errors in the info view
