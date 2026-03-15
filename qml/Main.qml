@@ -52,6 +52,11 @@ ApplicationWindow {
         }
     }
 
+    function scrollPhotoIntoView(photoId) {
+        if (photoId > 0)
+            photoGrid.scrollIntoView(photoId)
+    }
+
     // Restore last selected photo once the model has finished its initial load.
     property bool _restoredSelection: false
     Connections {

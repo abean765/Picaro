@@ -51,6 +51,7 @@ Rectangle {
             selectedPanelIds     = [photoId]
             panelSelectionAnchor = photoId
             root.selectPhoto(photoId)
+            root.scrollPhotoIntoView(photoId)
         }
     }
 

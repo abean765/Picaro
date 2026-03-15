@@ -20,6 +20,13 @@ ListView {
     // true = PreserveAspectFit (whole image, black bars); false = PreserveAspectCrop (fill)
     property bool fitMode: false
 
+    // Scrolls the row containing photoId into view if it is not already visible.
+    function scrollIntoView(photoId) {
+        var rowIdx = photoModel.rowIndexForPhotoId(photoId)
+        if (rowIdx >= 0)
+            gridView.positionViewAtIndex(rowIdx, ListView.Visible)
+    }
+
     flickDeceleration: 1500
     maximumFlickVelocity: 15000
 

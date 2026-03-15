@@ -444,6 +444,18 @@ QVariantList PhotoModel::visiblePhotoIds() const
     return ids;
 }
 
+int PhotoModel::rowIndexForPhotoId(qint64 id) const
+{
+    for (int i = 0; i < m_rows.size(); ++i) {
+        const auto &row = m_rows[i];
+        if (row.type != GridRow::PhotoRow) continue;
+        for (const auto &cell : row.cells) {
+            if (cell.id == id) return i;
+        }
+    }
+    return -1;
+}
+
 QVariantMap PhotoModel::coordinatesForId(qint64 id) const
 {
     auto it = m_idToPhotoIndex.find(id);
