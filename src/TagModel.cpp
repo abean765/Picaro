@@ -23,6 +23,8 @@ QVariant TagModel::data(const QModelIndex &index, int role) const
     case ColorRole:      return tag.color;
     case IconRole:       return tag.icon;
     case PhotoCountRole: return tag.photoCount;
+    case ParentIdRole:   return tag.parentId;
+    case DepthRole:      return tag.depth;
     }
     return {};
 }
@@ -30,11 +32,13 @@ QVariant TagModel::data(const QModelIndex &index, int role) const
 QHash<int, QByteArray> TagModel::roleNames() const
 {
     return {
-        { IdRole, "tagId" },
-        { NameRole, "name" },
-        { ColorRole, "tagColor" },
-        { IconRole, "tagIcon" },
-        { PhotoCountRole, "photoCount" }
+        { IdRole,         "tagId" },
+        { NameRole,       "name" },
+        { ColorRole,      "tagColor" },
+        { IconRole,       "tagIcon" },
+        { PhotoCountRole, "photoCount" },
+        { ParentIdRole,   "parentId" },
+        { DepthRole,      "depth" }
     };
 }
 
@@ -63,18 +67,18 @@ void TagModel::rebuildIndex()
     }
 }
 
-qint64 TagModel::createTag(const QString &name, const QString &color, const QString &icon)
+qint64 TagModel::createTag(const QString &name, const QString &color, const QString &icon, qint64 parentId)
 {
     if (!m_db) return -1;
-    qint64 id = m_db->createTag(name, color, icon);
+    qint64 id = m_db->createTag(name, color, icon, parentId);
     if (id > 0) reload();
     return id;
 }
 
-bool TagModel::updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon)
+bool TagModel::updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon, qint64 parentId)
 {
     if (!m_db) return false;
-    bool ok = m_db->updateTag(tagId, name, color, icon);
+    bool ok = m_db->updateTag(tagId, name, color, icon, parentId);
     if (ok) reload();
     return ok;
 }
@@ -132,6 +136,13 @@ QString TagModel::tagIcon(qint64 tagId) const
     auto it = m_tagIndex.constFind(tagId);
     if (it != m_tagIndex.constEnd()) return m_tags[it.value()].icon;
     return {};
+}
+
+qint64 TagModel::tagParentId(qint64 tagId) const
+{
+    auto it = m_tagIndex.constFind(tagId);
+    if (it != m_tagIndex.constEnd()) return m_tags[it.value()].parentId;
+    return -1;
 }
 
 QVariantList TagModel::photoIdsForTag(qint64 tagId) const

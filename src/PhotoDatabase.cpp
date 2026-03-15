@@ -165,6 +165,17 @@ void PhotoDatabase::migrateSchema()
     q.exec(QStringLiteral(
         "CREATE INDEX IF NOT EXISTS idx_photos_deleted_date ON photos(deleted, date_taken DESC)"
     ));
+
+    // Tags: add parent_id for tree structure
+    q.exec(QStringLiteral("PRAGMA table_info(tags)"));
+    QSet<QString> tagCols;
+    while (q.next()) {
+        tagCols.insert(q.value(1).toString());
+    }
+    if (!tagCols.contains(QStringLiteral("parent_id"))) {
+        q.exec(QStringLiteral("ALTER TABLE tags ADD COLUMN parent_id INTEGER DEFAULT NULL REFERENCES tags(id) ON DELETE SET NULL"));
+        qDebug() << "Migrated: added parent_id column to tags";
+    }
 }
 
 void PhotoDatabase::close()
@@ -535,24 +546,26 @@ bool PhotoDatabase::setRating(qint64 photoId, int rating)
     return q.exec();
 }
 
-qint64 PhotoDatabase::createTag(const QString &name, const QString &color, const QString &icon)
+qint64 PhotoDatabase::createTag(const QString &name, const QString &color, const QString &icon, qint64 parentId)
 {
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("INSERT INTO tags (name, color, icon) VALUES (?, ?, ?)"));
+    q.prepare(QStringLiteral("INSERT INTO tags (name, color, icon, parent_id) VALUES (?, ?, ?, ?)"));
     q.addBindValue(name);
     q.addBindValue(color);
     q.addBindValue(icon);
+    q.addBindValue(parentId >= 0 ? QVariant(parentId) : QVariant(QMetaType(QMetaType::LongLong)));
     if (!q.exec()) return -1;
     return q.lastInsertId().toLongLong();
 }
 
-bool PhotoDatabase::updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon)
+bool PhotoDatabase::updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon, qint64 parentId)
 {
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("UPDATE tags SET name = ?, color = ?, icon = ? WHERE id = ?"));
+    q.prepare(QStringLiteral("UPDATE tags SET name = ?, color = ?, icon = ?, parent_id = ? WHERE id = ?"));
     q.addBindValue(name);
     q.addBindValue(color);
     q.addBindValue(icon);
+    q.addBindValue(parentId >= 0 ? QVariant(parentId) : QVariant(QMetaType(QMetaType::LongLong)));
     q.addBindValue(tagId);
     return q.exec();
 }
@@ -560,6 +573,20 @@ bool PhotoDatabase::updateTag(qint64 tagId, const QString &name, const QString &
 bool PhotoDatabase::deleteTag(qint64 tagId)
 {
     QSqlQuery q(m_db);
+
+    // Find this tag's own parent so children can be re-parented to it
+    q.prepare(QStringLiteral("SELECT parent_id FROM tags WHERE id = ?"));
+    q.addBindValue(tagId);
+    QVariant grandparent;
+    if (q.exec() && q.next())
+        grandparent = q.value(0);  // may be NULL
+
+    // Re-parent children to grandparent (keeps sub-tags alive)
+    q.prepare(QStringLiteral("UPDATE tags SET parent_id = ? WHERE parent_id = ?"));
+    q.addBindValue(grandparent);
+    q.addBindValue(tagId);
+    q.exec();
+
     q.prepare(QStringLiteral("DELETE FROM photo_tags WHERE tag_id = ?"));
     q.addBindValue(tagId);
     q.exec();
@@ -571,14 +598,19 @@ bool PhotoDatabase::deleteTag(qint64 tagId)
 
 QVector<TagRecord> PhotoDatabase::loadAllTags() const
 {
-    QVector<TagRecord> tags;
+    // Load all tags with parent info and photo counts
     QSqlQuery q(m_db);
     q.exec(QStringLiteral(
-        "SELECT t.id, t.name, t.color, t.icon, COUNT(pt.photo_id) "
+        "SELECT t.id, t.name, t.color, t.icon, COUNT(pt.photo_id), t.parent_id "
         "FROM tags t LEFT JOIN photo_tags pt ON pt.tag_id = t.id "
-        "GROUP BY t.id, t.name, t.color, t.icon "
+        "GROUP BY t.id, t.name, t.color, t.icon, t.parent_id "
         "ORDER BY t.name"
     ));
+
+    QHash<qint64, TagRecord> byId;
+    QHash<qint64, QVector<qint64>> children;  // parentId -> child IDs
+    QVector<qint64> roots;
+
     while (q.next()) {
         TagRecord t;
         t.id = q.value(0).toLongLong();
@@ -586,9 +618,43 @@ QVector<TagRecord> PhotoDatabase::loadAllTags() const
         t.color = q.value(2).toString();
         t.icon = q.value(3).toString();
         t.photoCount = q.value(4).toInt();
-        tags.append(std::move(t));
+        t.parentId = q.value(5).isNull() ? -1 : q.value(5).toLongLong();
+        byId.insert(t.id, t);
+
+        if (t.parentId < 0)
+            roots.append(t.id);
+        else
+            children[t.parentId].append(t.id);
     }
-    return tags;
+
+    // Depth-first traversal to produce tree-ordered flat list
+    QVector<TagRecord> result;
+    result.reserve(byId.size());
+
+    std::function<void(qint64, int)> visit = [&](qint64 id, int depth) {
+        auto it = byId.find(id);
+        if (it == byId.end()) return;
+        TagRecord &rec = it.value();
+        rec.depth = depth;
+        result.append(rec);
+        const auto &kids = children.value(id);
+        for (qint64 childId : kids)
+            visit(childId, depth + 1);
+    };
+
+    for (qint64 rootId : roots)
+        visit(rootId, 0);
+
+    // Append any orphaned tags (parent_id points to a non-existent tag)
+    for (const TagRecord &t : byId) {
+        bool found = false;
+        for (const TagRecord &r : result) {
+            if (r.id == t.id) { found = true; break; }
+        }
+        if (!found) result.append(t);
+    }
+
+    return result;
 }
 
 QVector<qint64> PhotoDatabase::tagsForPhoto(qint64 photoId) const

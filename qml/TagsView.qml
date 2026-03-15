@@ -10,6 +10,10 @@ Item {
     property string editName: ""
     property string editColor: "#888888"
     property string editIcon: ""
+    property var editParentId: -1      // -1 = root tag
+
+    // Collapsed tree nodes (set of tag IDs whose children are hidden)
+    property var collapsedIds: ({})
 
     readonly property var presetColors: [
         "#e53e3e", "#dd6b20", "#d69e2e", "#38a169",
@@ -25,18 +29,62 @@ Item {
         "\u25CF", "\u2708", "\u270E", "\u26BD"
     ]
 
-    function startCreate() {
+    // Returns whether a row at list index i should be visible
+    // (i.e. none of its ancestors are collapsed)
+    function isVisible(index) {
+        var pid = tagModel.data(tagModel.index(index, 0), 259)  // ParentIdRole = Qt.UserRole+6 = 261... use role name lookup below
+        // We rely on the delegate to check ancestors via parentId chain
+        return true
+    }
+
+    function hasChildren(tagId) {
+        for (var i = 0; i < tagModel.count; i++) {
+            if (tagModel.data(tagModel.index(i, 0), 260) === tagId)  // ParentIdRole
+                return true
+        }
+        return false
+    }
+
+    function isAncestorCollapsed(parentId) {
+        var pid = parentId
+        while (pid >= 0) {
+            if (collapsedIds[pid]) return true
+            // walk up
+            var found = false
+            for (var i = 0; i < tagModel.count; i++) {
+                var rowId = tagModel.data(tagModel.index(i, 0), 257)  // IdRole
+                if (rowId === pid) {
+                    pid = tagModel.data(tagModel.index(i, 0), 260)    // ParentIdRole
+                    found = true
+                    break
+                }
+            }
+            if (!found) break
+        }
+        return false
+    }
+
+    function toggleCollapse(tagId) {
+        var copy = Object.assign({}, collapsedIds)
+        if (copy[tagId]) delete copy[tagId]
+        else copy[tagId] = true
+        collapsedIds = copy
+    }
+
+    function startCreate(parentId) {
         editingTagId = 0
         editName = ""
         editColor = "#3182ce"
         editIcon = "\u25C6"
+        editParentId = (parentId !== undefined) ? parentId : -1
     }
 
-    function startEdit(id, name, color, icon) {
+    function startEdit(id, name, color, icon, parentId) {
         editingTagId = id
         editName = name
         editColor = color
         editIcon = icon
+        editParentId = parentId
     }
 
     function cancelEdit() {
@@ -46,11 +94,17 @@ Item {
     function saveTag() {
         if (editName.trim() === "") return
         if (editingTagId === 0) {
-            tagModel.createTag(editName.trim(), editColor, editIcon)
+            tagModel.createTag(editName.trim(), editColor, editIcon, editParentId)
         } else {
-            tagModel.updateTag(editingTagId, editName.trim(), editColor, editIcon)
+            tagModel.updateTag(editingTagId, editName.trim(), editColor, editIcon, editParentId)
         }
         editingTagId = -1
+    }
+
+    // Parent tag name for display in form header
+    function parentTagName(pid) {
+        if (pid < 0) return ""
+        return tagModel.tagName(pid)
     }
 
     ColumnLayout {
@@ -90,7 +144,7 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: tagsView.startCreate()
+                    onClicked: tagsView.startCreate(-1)
                 }
             }
         }
@@ -110,7 +164,14 @@ Item {
                 spacing: 12
 
                 Label {
-                    text: editingTagId === 0 ? "Neuen Tag erstellen" : "Tag bearbeiten"
+                    text: {
+                        if (editingTagId === 0) {
+                            return editParentId >= 0
+                                ? "Kind-Tag erstellen unter \"" + tagsView.parentTagName(editParentId) + "\""
+                                : "Neuen Tag erstellen"
+                        }
+                        return "Tag bearbeiten"
+                    }
                     color: "#ffffff"
                     font.pixelSize: 16
                     font.bold: true
@@ -317,152 +378,235 @@ Item {
             }
         }
 
-        // Tag list
+        // Tag list (tree view via flat model with depth/parent info)
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
             model: tagModel
             clip: true
-            spacing: 4
+            spacing: 2
 
-            delegate: Rectangle {
+            delegate: Item {
                 required property int index
                 required property var tagId
                 required property string name
                 required property string tagColor
                 required property string tagIcon
                 required property int photoCount
+                required property var parentId
+                required property int depth
 
-                width: ListView.view.width
-                height: 56
-                radius: 8
-                color: tagItemArea.containsMouse ? "#333333" : "#2a2a2a"
-
-                MouseArea {
-                    id: tagItemArea
-                    anchors.fill: parent
-                    hoverEnabled: true
+                // Hide rows whose ancestor is collapsed
+                property bool ancestorCollapsed: {
+                    var pid = parentId
+                    while (pid >= 0) {
+                        if (tagsView.collapsedIds[pid]) return true
+                        pid = tagModel.tagParentId(pid)
+                    }
+                    return false
                 }
 
-                RowLayout {
+                property bool hasChildTags: {
+                    // Recompute when collapsedIds or model changes
+                    tagsView.collapsedIds
+                    for (var i = 0; i < tagModel.count; i++) {
+                        if (tagModel.data(tagModel.index(i, 0), 260) === tagId)
+                            return true
+                    }
+                    return false
+                }
+
+                property bool isCollapsed: tagsView.collapsedIds[tagId] === true
+
+                width: ListView.view.width
+                height: ancestorCollapsed ? 0 : 56
+                clip: true
+
+                Behavior on height { NumberAnimation { duration: 120 } }
+
+                Rectangle {
                     anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
-                    spacing: 12
+                    radius: 8
+                    color: tagItemArea.containsMouse ? "#333333" : "#2a2a2a"
 
-                    // Color dot + icon
-                    Rectangle {
-                        width: 36
-                        height: 36
-                        radius: 18
-                        color: tagColor
-
-                        Label {
-                            anchors.centerIn: parent
-                            text: tagIcon
-                            font.pixelSize: 16
-                        }
+                    MouseArea {
+                        id: tagItemArea
+                        anchors.fill: parent
+                        hoverEnabled: true
                     }
 
-                    // Name
-                    Label {
-                        text: name
-                        color: "#ffffff"
-                        font.pixelSize: 15
-                        font.bold: true
-                        Layout.fillWidth: true
-                    }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16 + depth * 20   // indentation per level
+                        anchors.rightMargin: 16
+                        spacing: 8
 
-                    // Photo count
-                    Label {
-                        text: photoCount + " Medien"
-                        color: "#888888"
-                        font.pixelSize: 12
-                    }
-
-                    // Send button
-                    Rectangle {
-                        implicitWidth: sendBtnRow.implicitWidth + 20
-                        implicitHeight: 32
-                        radius: 6
-                        color: sendTagArea.containsMouse
-                            ? Qt.darker(root.accentColor, 1.2)
-                            : root.accentColor
-                        visible: photoCount > 0
-
-                        RowLayout {
-                            id: sendBtnRow
-                            anchors.centerIn: parent
-                            spacing: 5
+                        // Collapse/expand triangle (only shown when tag has children)
+                        Item {
+                            width: 18
+                            height: 18
+                            visible: hasChildTags
 
                             Label {
-                                text: "\u2B06"
-                                color: "#ffffff"
+                                anchors.centerIn: parent
+                                text: isCollapsed ? "\u25B6" : "\u25BC"
+                                color: "#aaaaaa"
+                                font.pixelSize: 11
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: tagsView.toggleCollapse(tagId)
+                            }
+                        }
+
+                        // Spacer when no children (keeps alignment)
+                        Item {
+                            width: 18
+                            height: 18
+                            visible: !hasChildTags
+                        }
+
+                        // Color dot + icon
+                        Rectangle {
+                            width: 32
+                            height: 32
+                            radius: 16
+                            color: tagColor
+
+                            Label {
+                                anchors.centerIn: parent
+                                text: tagIcon
                                 font.pixelSize: 14
                             }
-                            Label {
-                                text: "Senden"
-                                color: "#ffffff"
-                                font.pixelSize: 13
-                                font.bold: true
-                            }
                         }
 
-                        MouseArea {
-                            id: sendTagArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                var ids = tagModel.photoIdsForTag(tagId)
-                                if (ids.length > 0) {
-                                    sendSheet.openMultiple(ids)
+                        // Name
+                        Label {
+                            text: name
+                            color: "#ffffff"
+                            font.pixelSize: 14
+                            font.bold: depth === 0
+                            Layout.fillWidth: true
+                        }
+
+                        // Photo count
+                        Label {
+                            text: photoCount + " Medien"
+                            color: "#888888"
+                            font.pixelSize: 12
+                        }
+
+                        // Send button
+                        Rectangle {
+                            implicitWidth: sendBtnRow.implicitWidth + 16
+                            implicitHeight: 28
+                            radius: 6
+                            color: sendTagArea.containsMouse
+                                ? Qt.darker(root.accentColor, 1.2)
+                                : root.accentColor
+                            visible: photoCount > 0
+
+                            RowLayout {
+                                id: sendBtnRow
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                Label {
+                                    text: "\u2B06"
+                                    color: "#ffffff"
+                                    font.pixelSize: 13
+                                }
+                                Label {
+                                    text: "Senden"
+                                    color: "#ffffff"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                }
+                            }
+
+                            MouseArea {
+                                id: sendTagArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    var ids = tagModel.photoIdsForTag(tagId)
+                                    if (ids.length > 0) {
+                                        sendSheet.openMultiple(ids)
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // Edit button
-                    Rectangle {
-                        implicitWidth: 34
-                        implicitHeight: 34
-                        radius: 4
-                        color: editArea.containsMouse ? "#555555" : "transparent"
+                        // Add child tag button
+                        Rectangle {
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            radius: 4
+                            color: addChildArea.containsMouse ? "#555555" : "transparent"
+                            ToolTip.text: "Kind-Tag erstellen"
+                            ToolTip.visible: addChildArea.containsMouse
+                            ToolTip.delay: 600
 
-                        Label {
-                            anchors.centerIn: parent
-                            text: "\u270E"
-                            color: "#cccccc"
-                            font.pixelSize: 18
+                            Label {
+                                anchors.centerIn: parent
+                                text: "\u2795"   // heavy plus
+                                color: "#aaaaaa"
+                                font.pixelSize: 13
+                            }
+                            MouseArea {
+                                id: addChildArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: tagsView.startCreate(tagId)
+                            }
                         }
-                        MouseArea {
-                            id: editArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: tagsView.startEdit(tagId, name, tagColor, tagIcon)
-                        }
-                    }
 
-                    // Delete button
-                    Rectangle {
-                        implicitWidth: 34
-                        implicitHeight: 34
-                        radius: 4
-                        color: delArea.containsMouse ? "#aa3333" : "transparent"
+                        // Edit button
+                        Rectangle {
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            radius: 4
+                            color: editArea.containsMouse ? "#555555" : "transparent"
 
-                        Label {
-                            anchors.centerIn: parent
-                            text: "\u2715"
-                            color: "#cccccc"
-                            font.pixelSize: 18
+                            Label {
+                                anchors.centerIn: parent
+                                text: "\u270E"
+                                color: "#cccccc"
+                                font.pixelSize: 16
+                            }
+                            MouseArea {
+                                id: editArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: tagsView.startEdit(tagId, name, tagColor, tagIcon, parentId)
+                            }
                         }
-                        MouseArea {
-                            id: delArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: tagModel.deleteTag(tagId)
+
+                        // Delete button
+                        Rectangle {
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            radius: 4
+                            color: delArea.containsMouse ? "#aa3333" : "transparent"
+
+                            Label {
+                                anchors.centerIn: parent
+                                text: "\u2715"
+                                color: "#cccccc"
+                                font.pixelSize: 16
+                            }
+                            MouseArea {
+                                id: delArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: tagModel.deleteTag(tagId)
+                            }
                         }
                     }
                 }

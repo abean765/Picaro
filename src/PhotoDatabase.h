@@ -62,6 +62,8 @@ struct TagRecord {
     QString color;    // hex color e.g. "#ff5555"
     QString icon;     // emoji or short text
     int photoCount = 0;
+    qint64 parentId = -1;  // -1 = root tag (no parent)
+    int depth = 0;         // tree depth, computed on load
 };
 
 class PhotoDatabase : public QObject
@@ -116,8 +118,8 @@ public:
     bool setRating(qint64 photoId, int rating);
 
     // Tags
-    qint64 createTag(const QString &name, const QString &color, const QString &icon);
-    bool updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon);
+    qint64 createTag(const QString &name, const QString &color, const QString &icon, qint64 parentId = -1);
+    bool updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon, qint64 parentId = -1);
     bool deleteTag(qint64 tagId);
     QVector<TagRecord> loadAllTags() const;
     QVector<qint64> tagsForPhoto(qint64 photoId) const;

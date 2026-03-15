@@ -16,7 +16,9 @@ public:
         NameRole,
         ColorRole,
         IconRole,
-        PhotoCountRole
+        PhotoCountRole,
+        ParentIdRole,
+        DepthRole
     };
 
     explicit TagModel(QObject *parent = nullptr);
@@ -29,8 +31,8 @@ public:
     int count() const { return m_tags.size(); }
 
     Q_INVOKABLE void reload();
-    Q_INVOKABLE qint64 createTag(const QString &name, const QString &color, const QString &icon);
-    Q_INVOKABLE bool updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon);
+    Q_INVOKABLE qint64 createTag(const QString &name, const QString &color, const QString &icon, qint64 parentId = -1);
+    Q_INVOKABLE bool updateTag(qint64 tagId, const QString &name, const QString &color, const QString &icon, qint64 parentId = -1);
     Q_INVOKABLE bool deleteTag(qint64 tagId);
 
     // Photo-tag association
@@ -45,6 +47,7 @@ public:
     Q_INVOKABLE QString tagName(qint64 tagId) const;
     Q_INVOKABLE QString tagColor(qint64 tagId) const;
     Q_INVOKABLE QString tagIcon(qint64 tagId) const;
+    Q_INVOKABLE qint64 tagParentId(qint64 tagId) const;
 
 signals:
     void tagsChanged();

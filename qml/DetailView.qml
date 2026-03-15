@@ -708,6 +708,8 @@ Rectangle {
                         required property string name
                         required property string tagColor
                         required property string tagIcon
+                        required property int depth
+                        required property var parentId
 
                         readonly property bool isAssigned: {
                             for (var i = 0; i < tagRow.assignedTags.length; ++i) {
@@ -723,14 +725,14 @@ Rectangle {
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 8
+                            anchors.leftMargin: 8 + depth * 14
                             anchors.rightMargin: 8
                             spacing: 6
 
                             Rectangle {
-                                width: 14
-                                height: 14
-                                radius: 7
+                                width: 12
+                                height: 12
+                                radius: 6
                                 color: tagColor
                             }
 
@@ -744,6 +746,7 @@ Rectangle {
                                 text: name
                                 color: "#ffffff"
                                 font.pixelSize: 12
+                                font.bold: depth === 0
                                 Layout.fillWidth: true
                             }
 
