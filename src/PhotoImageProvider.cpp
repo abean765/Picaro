@@ -61,7 +61,14 @@ void PhotoImageResponse::run()
 
             if (suffix == QLatin1String("heic") || suffix == QLatin1String("heif")
                     || suffix == QLatin1String("hif")) {
-                img = HeicImageReader::readHeicThumbnailOrScaled(filePath, kMaxPhotoSize);
+                // Decode the full-resolution image (not the embedded thumbnail which would
+                // produce blurry results when scaled up to display size).
+                img = HeicImageReader::readHeicImage(filePath);
+                if (!img.isNull()
+                        && (img.width() > kMaxPhotoSize || img.height() > kMaxPhotoSize)) {
+                    img = img.scaled(kMaxPhotoSize, kMaxPhotoSize,
+                                     Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                }
             } else {
                 QImageReader reader(filePath);
                 reader.setAutoTransform(true);
