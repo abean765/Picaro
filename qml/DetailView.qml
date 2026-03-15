@@ -342,6 +342,36 @@ Rectangle {
         }
     }
 
+    // Info button
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.rightMargin: 132
+        anchors.topMargin: 12
+        width: 32
+        height: 32
+        radius: 16
+        color: infoBtnAreaDetail.containsMouse ? "#60ffffff" : "#30ffffff"
+        visible: hasContent
+
+        Label {
+            anchors.centerIn: parent
+            text: "i"
+            font.pixelSize: 14
+            font.bold: true
+            font.italic: true
+            color: "#ffffff"
+        }
+
+        MouseArea {
+            id: infoBtnAreaDetail
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.infoPhotoId = detailView.photoId
+        }
+    }
+
     // GPS map button (only visible for geotagged photos)
     Rectangle {
         anchors.top: parent.top
