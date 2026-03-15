@@ -264,380 +264,6 @@ ApplicationWindow {
                 }
             }
 
-            // Toolbar (only for photos view)
-            Rectangle {
-                id: toolbarRect
-                Layout.fillWidth: true
-                implicitHeight: currentView === "photos" ? 44 : 0
-                color: "#2d2d2d"
-                visible: currentView === "photos"
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
-                    spacing: 12
-
-                    Label {
-                        text: photoModel.totalPhotos + " Medien"
-                        color: "#aaaaaa"
-                        font.pixelSize: 14
-                    }
-
-                    // Media type filter buttons
-                    Row {
-                        spacing: 1
-
-                        Repeater {
-                            id: filterRepeater
-                            model: [
-                                { label: "Alle", filter: -1 },
-                                { label: "Fotos", filter: 0 },
-                                { label: "Videos", filter: 1 }
-                            ]
-
-                            Rectangle {
-                                required property var modelData
-                                required property int index
-                                readonly property bool isFirst: index === 0
-                                readonly property bool isActive: !photoModel.showDeleted && photoModel.mediaTypeFilter === modelData.filter
-                                width: filterLabel.implicitWidth + 20
-                                height: 26
-                                radius: isFirst ? 4 : 0
-                                color: isActive ? "#555555" : "#3a3a3a"
-
-                                // Round only left corners for first
-                                Rectangle {
-                                    visible: isFirst
-                                    anchors.right: parent.right
-                                    width: parent.width / 2
-                                    height: parent.height
-                                    color: parent.color
-                                }
-
-                                Label {
-                                    id: filterLabel
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    color: isActive ? "#ffffff" : "#aaaaaa"
-                                    font.pixelSize: 12
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        photoModel.showDeleted = false
-                                        photoModel.mediaTypeFilter = modelData.filter
-                                    }
-                                }
-                            }
-                        }
-
-                        // Deleted filter (separate toggle)
-                        Rectangle {
-                            width: deletedLabel.implicitWidth + 20
-                            height: 26
-                            radius: 4
-                            color: photoModel.showDeleted ? "#664444" : "#3a3a3a"
-
-                            // Round only right corners
-                            Rectangle {
-                                anchors.left: parent.left
-                                width: parent.width / 2
-                                height: parent.height
-                                color: parent.color
-                            }
-
-                            Label {
-                                id: deletedLabel
-                                anchors.centerIn: parent
-                                text: "\u2715 Gelöscht"
-                                color: photoModel.showDeleted ? "#ff8888" : "#aaaaaa"
-                                font.pixelSize: 12
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    photoModel.showDeleted = !photoModel.showDeleted
-                                }
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    // Search / filter by tag or sender
-                    Item {
-                        id: searchItem
-                        implicitWidth: 220
-                        implicitHeight: 28
-
-                        Rectangle {
-                            id: searchBox
-                            anchors.fill: parent
-                            color: searchInput.activeFocus ? "#3a3a3a" : "#333333"
-                            radius: 14
-                            border.color: searchInput.activeFocus ? root.accentColor : "#444444"
-                            border.width: 1
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 6
-                                spacing: 4
-
-                                Label {
-                                    text: "\u25CB"
-                                    font.pixelSize: 12
-                                    opacity: 0.6
-                                }
-
-                                TextInput {
-                                    id: searchInput
-                                    Layout.fillWidth: true
-                                    verticalAlignment: Text.AlignVCenter
-                                    color: "#ffffff"
-                                    font.pixelSize: 12
-                                    clip: true
-                                    selectByMouse: true
-
-                                    property bool suppressUpdate: false
-
-                                    onTextChanged: {
-                                        if (!suppressUpdate)
-                                            photoModel.updateSuggestions(text)
-                                    }
-
-                                    Keys.onReturnPressed: {
-                                        if (suggestionDropdown.visible && suggestionList.currentIndex >= 0) {
-                                            searchItem.applySuggestion(photoModel.filterSuggestions[suggestionList.currentIndex])
-                                        } else if (text.trim() !== "") {
-                                            photoModel.filterText = text.trim()
-                                            suggestionDropdown.visible = false
-                                        }
-                                    }
-
-                                    onActiveFocusChanged: {
-                                        if (!activeFocus)
-                                            suggestionCloseTimer.restart()
-                                    }
-
-                                    Keys.onEscapePressed: {
-                                        if (suggestionDropdown.visible) {
-                                            suggestionCloseTimer.stop()
-                                            suggestionDropdown.visible = false
-                                        } else {
-                                            text = ""
-                                            photoModel.clearFilter()
-                                            focus = false
-                                        }
-                                    }
-
-                                    Keys.onTabPressed: {
-                                        if (suggestionDropdown.visible) {
-                                            event.accepted = true
-                                            if (suggestionList.currentIndex < suggestionList.count - 1)
-                                                suggestionList.currentIndex++
-                                            else
-                                                suggestionList.currentIndex = 0
-                                        }
-                                    }
-
-                                    Keys.onDownPressed: {
-                                        if (suggestionDropdown.visible && suggestionList.currentIndex < suggestionList.count - 1)
-                                            suggestionList.currentIndex++
-                                    }
-
-                                    Keys.onUpPressed: {
-                                        if (suggestionDropdown.visible && suggestionList.currentIndex > 0)
-                                            suggestionList.currentIndex--
-                                    }
-                                }
-
-                                // Clear button
-                                Rectangle {
-                                    width: 18
-                                    height: 18
-                                    radius: 9
-                                    color: clearFilterArea.containsMouse ? "#555555" : "transparent"
-                                    visible: searchInput.text.length > 0 || photoModel.filterText !== ""
-
-                                    Label {
-                                        anchors.centerIn: parent
-                                        text: "\u2715"
-                                        color: "#888888"
-                                        font.pixelSize: 10
-                                    }
-
-                                    MouseArea {
-                                        id: clearFilterArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            searchInput.text = ""
-                                            photoModel.clearFilter()
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Placeholder text
-                            Label {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 28
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Tag oder Sender..."
-                                color: "#666666"
-                                font.pixelSize: 12
-                                visible: searchInput.text.length === 0 && !searchInput.activeFocus
-                            }
-                        }
-
-
-                        Connections {
-                            target: photoModel
-                            function onFilterSuggestionsChanged() {
-                                suggestionList.currentIndex = -1
-                                // Only show while typing, not after a filter has been applied
-                                suggestionDropdown.visible =
-                                    searchInput.activeFocus &&
-                                    photoModel.filterText === "" &&
-                                    searchInput.text.length > 0 &&
-                                    photoModel.filterSuggestions.length > 0
-                            }
-                        }
-
-                        Timer {
-                            id: suggestionCloseTimer
-                            interval: 150
-                            onTriggered: suggestionDropdown.visible = false
-                        }
-
-                        function applySuggestion(suggestion) {
-                            suggestionCloseTimer.stop()
-                            var value = suggestion
-                            if (suggestion.startsWith("Tag: ")) {
-                                value = suggestion.substring(5)
-                            } else if (suggestion.startsWith("Sender: ")) {
-                                value = suggestion.substring(8)
-                            }
-                            searchInput.suppressUpdate = true
-                            searchInput.text = value
-                            searchInput.suppressUpdate = false
-                            photoModel.filterText = value
-                            suggestionDropdown.visible = false
-                            searchInput.forceActiveFocus()
-                            searchInput.cursorPosition = searchInput.text.length
-                        }
-                    }
-
-                    Label {
-                        text: "Größe"
-                        color: "#aaaaaa"
-                        font.pixelSize: 12
-                    }
-
-                    Slider {
-                        id: zoomSlider
-                        from: 3
-                        to: 12
-                        value: 10
-                        stepSize: 1
-                        implicitWidth: 120
-
-                        onValueChanged: {
-                            // Invert so left = small thumbnails, right = large
-                            photoModel.photosPerRow = (from + to) - Math.round(value)
-                        }
-                    }
-
-                    // Slideshow button
-                    Rectangle {
-                        implicitWidth: ssStartLabel.implicitWidth + 20
-                        implicitHeight: 26
-                        radius: 4
-                        color: ssStartArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "#3a3a3a"
-
-                        Label {
-                            id: ssStartLabel
-                            anchors.centerIn: parent
-                            text: "\u25B6 Slideshow"
-                            color: ssStartArea.containsMouse ? "#ffffff" : "#aaaaaa"
-                            font.pixelSize: 12
-                        }
-
-                        MouseArea {
-                            id: ssStartArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: slideshowDialog.open()
-                        }
-                    }
-
-                    // Tag panel toggle button
-                    Rectangle {
-                        implicitWidth: tagPanelBtnLabel.implicitWidth + 20
-                        implicitHeight: 26
-                        radius: 4
-                        color: photosViewRoot.tagPanelVisible
-                               ? root.accentColor
-                               : (tagPanelBtnArea.containsMouse ? "#4a4a4a" : "#3a3a3a")
-
-                        Label {
-                            id: tagPanelBtnLabel
-                            anchors.centerIn: parent
-                            text: "\u25C6 Tag-Panel"
-                            color: photosViewRoot.tagPanelVisible
-                                   ? "#ffffff"
-                                   : (tagPanelBtnArea.containsMouse ? "#ffffff" : "#aaaaaa")
-                            font.pixelSize: 12
-                        }
-
-                        MouseArea {
-                            id: tagPanelBtnArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: photosViewRoot.tagPanelVisible = !photosViewRoot.tagPanelVisible
-                        }
-                    }
-
-                    // Fullscreen toggle button
-                    Rectangle {
-                        implicitWidth: fsLabel.implicitWidth + 20
-                        implicitHeight: 26
-                        radius: 4
-                        color: fsArea.containsMouse ? "#4a4a4a" : "#3a3a3a"
-
-                        Label {
-                            id: fsLabel
-                            anchors.centerIn: parent
-                            text: root.visibility === Window.FullScreen ? "\u2716 Vollbild" : "\u26F6 Vollbild"
-                            color: fsArea.containsMouse ? "#ffffff" : "#aaaaaa"
-                            font.pixelSize: 12
-                        }
-
-                        MouseArea {
-                            id: fsArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (root.visibility === Window.FullScreen)
-                                    root.showNormal()
-                                else
-                                    root.showFullScreen()
-                            }
-                        }
-                    }
-                }
-            }
-
             // Stacked views
             StackLayout {
                 Layout.fillWidth: true
@@ -748,6 +374,362 @@ ApplicationWindow {
                         }
                     }
 
+                    // Toolbar — spans only the thumbnail grid column
+                    Rectangle {
+                        id: gridToolbar
+                        anchors.left: timelineView.visible ? timelineView.right : parent.left
+                        anchors.top: parent.top
+                        width: photoGrid.width
+                        height: 44
+                        color: "#2d2d2d"
+                        z: 5
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 10
+
+                            Label {
+                                text: photoModel.totalPhotos + " Medien"
+                                color: "#aaaaaa"
+                                font.pixelSize: 13
+                            }
+
+                            // Media type filter buttons
+                            Row {
+                                spacing: 1
+
+                                Repeater {
+                                    id: filterRepeater
+                                    model: [
+                                        { label: "Alle", filter: -1 },
+                                        { label: "Fotos", filter: 0 },
+                                        { label: "Videos", filter: 1 }
+                                    ]
+
+                                    Rectangle {
+                                        required property var modelData
+                                        required property int index
+                                        readonly property bool isFirst: index === 0
+                                        readonly property bool isActive: !photoModel.showDeleted && photoModel.mediaTypeFilter === modelData.filter
+                                        width: filterLabel.implicitWidth + 18
+                                        height: 26
+                                        radius: isFirst ? 4 : 0
+                                        color: isActive ? "#555555" : "#3a3a3a"
+
+                                        Rectangle {
+                                            visible: isFirst
+                                            anchors.right: parent.right
+                                            width: parent.width / 2
+                                            height: parent.height
+                                            color: parent.color
+                                        }
+
+                                        Label {
+                                            id: filterLabel
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            color: isActive ? "#ffffff" : "#aaaaaa"
+                                            font.pixelSize: 12
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                photoModel.showDeleted = false
+                                                photoModel.mediaTypeFilter = modelData.filter
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Deleted filter
+                                Rectangle {
+                                    width: deletedLabel.implicitWidth + 18
+                                    height: 26
+                                    radius: 4
+                                    color: photoModel.showDeleted ? "#664444" : "#3a3a3a"
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        width: parent.width / 2
+                                        height: parent.height
+                                        color: parent.color
+                                    }
+
+                                    Label {
+                                        id: deletedLabel
+                                        anchors.centerIn: parent
+                                        text: "\u2715 Gelöscht"
+                                        color: photoModel.showDeleted ? "#ff8888" : "#aaaaaa"
+                                        font.pixelSize: 12
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: photoModel.showDeleted = !photoModel.showDeleted
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            // Search / filter by tag or sender
+                            Item {
+                                id: searchItem
+                                implicitWidth: 200
+                                implicitHeight: 28
+
+                                Rectangle {
+                                    id: searchBox
+                                    anchors.fill: parent
+                                    color: searchInput.activeFocus ? "#3a3a3a" : "#333333"
+                                    radius: 14
+                                    border.color: searchInput.activeFocus ? root.accentColor : "#444444"
+                                    border.width: 1
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 6
+                                        spacing: 4
+
+                                        Label {
+                                            text: "\u25CB"
+                                            font.pixelSize: 12
+                                            opacity: 0.6
+                                        }
+
+                                        TextInput {
+                                            id: searchInput
+                                            Layout.fillWidth: true
+                                            verticalAlignment: Text.AlignVCenter
+                                            color: "#ffffff"
+                                            font.pixelSize: 12
+                                            clip: true
+                                            selectByMouse: true
+
+                                            property bool suppressUpdate: false
+
+                                            onTextChanged: {
+                                                if (!suppressUpdate)
+                                                    photoModel.updateSuggestions(text)
+                                            }
+
+                                            Keys.onReturnPressed: {
+                                                if (suggestionDropdown.visible && suggestionList.currentIndex >= 0) {
+                                                    searchItem.applySuggestion(photoModel.filterSuggestions[suggestionList.currentIndex])
+                                                } else if (text.trim() !== "") {
+                                                    photoModel.filterText = text.trim()
+                                                    suggestionDropdown.visible = false
+                                                }
+                                            }
+
+                                            onActiveFocusChanged: {
+                                                if (!activeFocus)
+                                                    suggestionCloseTimer.restart()
+                                            }
+
+                                            Keys.onEscapePressed: {
+                                                if (suggestionDropdown.visible) {
+                                                    suggestionCloseTimer.stop()
+                                                    suggestionDropdown.visible = false
+                                                } else {
+                                                    text = ""
+                                                    photoModel.clearFilter()
+                                                    focus = false
+                                                }
+                                            }
+
+                                            Keys.onTabPressed: {
+                                                if (suggestionDropdown.visible) {
+                                                    event.accepted = true
+                                                    if (suggestionList.currentIndex < suggestionList.count - 1)
+                                                        suggestionList.currentIndex++
+                                                    else
+                                                        suggestionList.currentIndex = 0
+                                                }
+                                            }
+
+                                            Keys.onDownPressed: {
+                                                if (suggestionDropdown.visible && suggestionList.currentIndex < suggestionList.count - 1)
+                                                    suggestionList.currentIndex++
+                                            }
+
+                                            Keys.onUpPressed: {
+                                                if (suggestionDropdown.visible && suggestionList.currentIndex > 0)
+                                                    suggestionList.currentIndex--
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: 18; height: 18; radius: 9
+                                            color: clearFilterArea.containsMouse ? "#555555" : "transparent"
+                                            visible: searchInput.text.length > 0 || photoModel.filterText !== ""
+                                            Label {
+                                                anchors.centerIn: parent
+                                                text: "\u2715"
+                                                color: "#888888"
+                                                font.pixelSize: 10
+                                            }
+                                            MouseArea {
+                                                id: clearFilterArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    searchInput.text = ""
+                                                    photoModel.clearFilter()
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Label {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 28
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "Tag oder Sender..."
+                                        color: "#666666"
+                                        font.pixelSize: 12
+                                        visible: searchInput.text.length === 0 && !searchInput.activeFocus
+                                    }
+                                }
+
+                                Connections {
+                                    target: photoModel
+                                    function onFilterSuggestionsChanged() {
+                                        suggestionList.currentIndex = -1
+                                        suggestionDropdown.visible =
+                                            searchInput.activeFocus &&
+                                            photoModel.filterText === "" &&
+                                            searchInput.text.length > 0 &&
+                                            photoModel.filterSuggestions.length > 0
+                                    }
+                                }
+
+                                Timer {
+                                    id: suggestionCloseTimer
+                                    interval: 150
+                                    onTriggered: suggestionDropdown.visible = false
+                                }
+
+                                function applySuggestion(suggestion) {
+                                    suggestionCloseTimer.stop()
+                                    var value = suggestion
+                                    if (suggestion.startsWith("Tag: "))
+                                        value = suggestion.substring(5)
+                                    else if (suggestion.startsWith("Sender: "))
+                                        value = suggestion.substring(8)
+                                    searchInput.suppressUpdate = true
+                                    searchInput.text = value
+                                    searchInput.suppressUpdate = false
+                                    photoModel.filterText = value
+                                    suggestionDropdown.visible = false
+                                    searchInput.forceActiveFocus()
+                                    searchInput.cursorPosition = searchInput.text.length
+                                }
+                            }
+
+                            Label {
+                                text: "Größe"
+                                color: "#aaaaaa"
+                                font.pixelSize: 12
+                            }
+
+                            Slider {
+                                id: zoomSlider
+                                from: 3
+                                to: 12
+                                value: 10
+                                stepSize: 1
+                                implicitWidth: 110
+
+                                onValueChanged: {
+                                    photoModel.photosPerRow = (from + to) - Math.round(value)
+                                }
+                            }
+
+                            // Slideshow button
+                            Rectangle {
+                                implicitWidth: ssStartLabel.implicitWidth + 18
+                                implicitHeight: 26
+                                radius: 4
+                                color: ssStartArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "#3a3a3a"
+                                Label {
+                                    id: ssStartLabel
+                                    anchors.centerIn: parent
+                                    text: "\u25B6 Slideshow"
+                                    color: ssStartArea.containsMouse ? "#ffffff" : "#aaaaaa"
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    id: ssStartArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: slideshowDialog.open()
+                                }
+                            }
+
+                            // Tag panel toggle button
+                            Rectangle {
+                                implicitWidth: tagPanelBtnLabel.implicitWidth + 18
+                                implicitHeight: 26
+                                radius: 4
+                                color: photosViewRoot.tagPanelVisible
+                                       ? root.accentColor
+                                       : (tagPanelBtnArea.containsMouse ? "#4a4a4a" : "#3a3a3a")
+                                Label {
+                                    id: tagPanelBtnLabel
+                                    anchors.centerIn: parent
+                                    text: "\u25C6 Tag-Panel"
+                                    color: photosViewRoot.tagPanelVisible
+                                           ? "#ffffff"
+                                           : (tagPanelBtnArea.containsMouse ? "#ffffff" : "#aaaaaa")
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    id: tagPanelBtnArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: photosViewRoot.tagPanelVisible = !photosViewRoot.tagPanelVisible
+                                }
+                            }
+
+                            // Fullscreen toggle button
+                            Rectangle {
+                                implicitWidth: fsLabel.implicitWidth + 18
+                                implicitHeight: 26
+                                radius: 4
+                                color: fsArea.containsMouse ? "#4a4a4a" : "#3a3a3a"
+                                Label {
+                                    id: fsLabel
+                                    anchors.centerIn: parent
+                                    text: root.visibility === Window.FullScreen ? "\u2716 Vollbild" : "\u26F6 Vollbild"
+                                    color: fsArea.containsMouse ? "#ffffff" : "#aaaaaa"
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    id: fsArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (root.visibility === Window.FullScreen)
+                                            root.showNormal()
+                                        else
+                                            root.showFullScreen()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     TimelineView {
                         id: timelineView
                         anchors.left: parent.left
@@ -790,7 +772,7 @@ ApplicationWindow {
                     PhotoGridView {
                         id: photoGrid
                         anchors.left: timelineView.visible ? timelineView.right : parent.left
-                        anchors.top: parent.top
+                        anchors.top: gridToolbar.bottom
                         anchors.bottom: parent.bottom
                         width: photosViewRoot.detailVisible
                               ? photosViewRoot.gridDetailWidth * photosViewRoot.splitRatio
@@ -1431,12 +1413,10 @@ ApplicationWindow {
         id: suggestionDropdown
         visible: false
         z: 50
-        // QML only tracks direct property references in bindings, not mapToItem().
-        // searchItem.x  = position within toolbar RowLayout (leftMargin=16)
-        // +16            = RowLayout.x within toolbarRect (= anchors.leftMargin)
-        // +200           = sidebar width (fixed Layout.preferredWidth)
-        x: searchItem.x + 16 + 200
-        y: toolbarRect.y + toolbarRect.height + 4
+        // sidebar(200) + timelineView.width + gridToolbar RowLayout leftMargin(12) + searchItem.x in RowLayout
+        x: 200 + (timelineView.visible ? timelineView.width : 0) + 12 + searchItem.x
+        // importBar(0 or 32) + gridToolbar height(44) + gap(4)
+        y: (photoImporter.running ? 32 : 0) + 44 + 4
         width: searchItem.width
         height: Math.min(suggestionList.contentHeight + 8, 200)
         color: "#2a2a2a"
