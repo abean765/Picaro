@@ -631,6 +631,15 @@ void PhotoModel::refreshExifForId(qint64 id)
                     rec.longitude = -rec.longitude;
             }
 
+            // Screenshot/selfie detection via EXIF signals:
+            // No camera Make in EXIF → likely a screenshot or app-generated image
+            bool hasCameraMake = exifData.findKey(Exiv2::ExifKey("Exif.Image.Make")) != exifData.end();
+            if (!hasCameraMake && rec.category == PhotoCategory::Normal) {
+                QString suffix2 = QFileInfo(rec.filePath).suffix().toLower();
+                if (suffix2 == QLatin1String("png"))
+                    rec.category = PhotoCategory::Screenshot;
+            }
+
             m_db->updateMetadata(id, rec);
         }
     } catch (...) {
@@ -639,6 +648,28 @@ void PhotoModel::refreshExifForId(qint64 id)
 #else
     Q_UNUSED(rec)
 #endif
+
+    // Re-classify category from filename/path regardless of EXIF availability
+    if (rec.category == PhotoCategory::Normal && rec.mediaType != MediaType::Video) {
+        QString nameLower = rec.fileName.toLower();
+        QString pathLower = rec.filePath.toLower();
+        if (nameLower.contains(QLatin1String("screenshot"))
+                || nameLower.contains(QLatin1String("bildschirmfoto"))
+                || nameLower.contains(QLatin1String("captura"))
+                || nameLower.startsWith(QLatin1String("screen_"))
+                || pathLower.contains(QLatin1String("/screenshots/"))
+                || pathLower.contains(QLatin1String("\\screenshots\\"))) {
+            rec.category = PhotoCategory::Screenshot;
+            m_db->updateMetadata(id, rec);
+        } else if (nameLower.contains(QLatin1String("selfie"))
+                || pathLower.contains(QLatin1String("/selfies/"))
+                || pathLower.contains(QLatin1String("\\selfies\\"))
+                || pathLower.contains(QLatin1String("/front camera/"))
+                || pathLower.contains(QLatin1String("\\front camera\\"))) {
+            rec.category = PhotoCategory::Selfie;
+            m_db->updateMetadata(id, rec);
+        }
+    }
 }
 
 QVariantMap PhotoModel::fullMetadataForId(qint64 id) const
