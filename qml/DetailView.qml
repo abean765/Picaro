@@ -20,9 +20,16 @@ Rectangle {
     // Replay the current video/live photo from the start.
     // Called by Main when the user clicks the same thumbnail a second time.
     function replay() {
-        if (isVideo || isLivePhoto) {
+        if (isVideo) {
             detailPlayer.position = 0
             detailPlayer.play()
+        } else if (isLivePhoto && appSettings.livePhotoMode !== 2) {
+            liveStopTimer.stop()
+            detailPlayer.loops = appSettings.livePhotoMode === 0 ? MediaPlayer.Infinite : 1
+            detailPlayer.position = 0
+            detailPlayer.play()
+            if (appSettings.livePhotoMode === 1)
+                liveStopTimer.restart()
         }
     }
 
@@ -43,6 +50,7 @@ Rectangle {
     // Query model directly to avoid stale derived properties (QML binding order is not guaranteed)
     onPhotoIdChanged: {
         mapVisible = false
+        liveStopTimer.stop()
         detailPlayer.stop()
         detailPlayer.source = ""
         if (photoId <= 0) return
@@ -51,9 +59,13 @@ Rectangle {
         var lvp = photoModel.liveVideoPathForId(photoId)
         var filePrefix = Qt.platform.os === "windows" ? "file:///" : "file://"
         if (mt === 1 && fp !== "") {
+            detailPlayer.loops = MediaPlayer.Infinite
             detailPlayer.source = filePrefix + fp
-        } else if (mt === 2 && lvp !== "") {
+        } else if (mt === 2 && lvp !== "" && appSettings.livePhotoMode !== 2) {
+            detailPlayer.loops = appSettings.livePhotoMode === 0 ? MediaPlayer.Infinite : 1
             detailPlayer.source = filePrefix + lvp
+            if (appSettings.livePhotoMode === 1)
+                liveStopTimer.restart()
         }
     }
 
@@ -118,6 +130,14 @@ Rectangle {
         anchors.centerIn: parent
         running: hasContent && !isVideo && fullImage.status === Image.Loading
         visible: running
+    }
+
+    // Stops a Live Photo after 1.5 s in "Video → Foto" mode (livePhotoMode === 1)
+    Timer {
+        id: liveStopTimer
+        interval: 1500
+        running: false
+        onTriggered: detailPlayer.stop()
     }
 
     // Video/LivePhoto player
@@ -227,8 +247,12 @@ Rectangle {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
+                liveStopTimer.stop()
+                detailPlayer.loops = appSettings.livePhotoMode === 0 ? MediaPlayer.Infinite : 1
                 detailPlayer.position = 0
                 detailPlayer.play()
+                if (appSettings.livePhotoMode === 1)
+                    liveStopTimer.restart()
             }
         }
     }
