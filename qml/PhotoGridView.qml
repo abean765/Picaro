@@ -20,6 +20,11 @@ ListView {
     // true = PreserveAspectFit (whole image, black bars); false = PreserveAspectCrop (fill)
     property bool fitMode: false
 
+    // Set by Main.qml when a tag is active in the tag panel.
+    // Photos whose IDs appear here get a coloured badge in the thumbnail.
+    property var   taggedPhotoIds:     []
+    property color tagIndicatorColor:  "#ffffff"
+
     // Scrolls the row containing photoId into view if it is not already visible.
     function scrollIntoView(photoId) {
         var rowIdx = photoModel.rowIndexForPhotoId(photoId)
@@ -184,6 +189,26 @@ ListView {
                         border.color: root.accentColor
                         border.width: root.selectedPhotoIds.indexOf(modelData.id) >= 0 ? 3 : 0
                         z: 2
+                    }
+
+                    // Tag indicator — top-left dot when this photo has the active tag
+                    Rectangle {
+                        visible: gridView.taggedPhotoIds.indexOf(modelData.id) >= 0
+                        anchors.top:    parent.top
+                        anchors.left:   parent.left
+                        anchors.margins: 6
+                        width: 22; height: 22
+                        radius: 11
+                        color: gridView.tagIndicatorColor
+                        z: 3
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "\u2713"
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: "#000000"
+                        }
                     }
 
                     // Background for fit mode (black letterbox) or loading placeholder

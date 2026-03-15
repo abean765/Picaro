@@ -786,6 +786,10 @@ ApplicationWindow {
                               ? photosViewRoot.gridDetailWidth * photosViewRoot.splitRatio
                               : photosViewRoot.gridDetailWidth
                         fitMode: appSettings.thumbnailFitMode
+                        taggedPhotoIds:    tagFilterPanel.tagPhotoIds
+                        tagIndicatorColor: tagFilterPanel.selectedTagId > 0
+                                           ? tagModel.tagColor(tagFilterPanel.selectedTagId)
+                                           : "#ffffff"
                     }
 
                     // Tag filter panel — optional, fixed width, between grid and detail
