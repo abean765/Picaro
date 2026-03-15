@@ -213,6 +213,40 @@ ListView {
                         }
                     }
 
+                    // Info button — bottom-left, visible on hover
+                    Rectangle {
+                        id: infoBtn
+                        visible: hoverHandler.hovered && !cellItem.videoPlaying && parent.width >= infoBtn.width * 4
+                        anchors.bottom: parent.bottom
+                        anchors.left:   parent.left
+                        anchors.margins: 6
+                        width: 28
+                        height: 28
+                        radius: 14
+                        color: infoBtnArea.containsMouse ? "#dddddd" : "#90000000"
+                        z: 3
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "i"
+                            font.pixelSize: 14
+                            font.bold: true
+                            font.italic: true
+                            color: infoBtnArea.containsMouse ? "#222222" : "#ffffff"
+                        }
+
+                        MouseArea {
+                            id: infoBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: function(mouse) {
+                                mouse.accepted = true
+                                root.infoPhotoId = modelData.id
+                            }
+                        }
+                    }
+
                     // Delete / Restore button (visible on hover, hidden when thumbnail
                     // is too small to select without accidentally hitting the button)
                     Rectangle {

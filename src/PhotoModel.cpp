@@ -1,10 +1,16 @@
 #include "PhotoModel.h"
+#include "HeicImageReader.h"
 #include <QLocale>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QDebug>
 #include <QSqlQuery>
 #include <QElapsedTimer>
+#include <QFileInfo>
+
+#ifdef HAVE_EXIV2
+#include <exiv2/exiv2.hpp>
+#endif
 
 PhotoModel::PhotoModel(QObject *parent)
     : QAbstractListModel(parent)
@@ -540,4 +546,102 @@ int PhotoModel::timelineIndexForPhotoId(qint64 id) const
 
     const QString &monthKey = m_allPhotos[it.value()].monthKey;
     return m_monthKeyToTimelineIndex.value(monthKey, -1);
+}
+
+QVariantMap PhotoModel::fullMetadataForId(qint64 id) const
+{
+    auto it = m_idToPhotoIndex.constFind(id);
+    if (it == m_idToPhotoIndex.constEnd()) return {};
+
+    const PhotoRecord &rec = m_allPhotos[it.value()];
+    QVariantMap result;
+
+    // ── File info ──────────────────────────────────────────────────────────────
+    result[QStringLiteral("fileName")]     = rec.fileName;
+    result[QStringLiteral("filePath")]     = rec.filePath;
+    result[QStringLiteral("fileSize")]     = rec.fileSize;
+    result[QStringLiteral("mimeType")]     = rec.mimeType;
+    result[QStringLiteral("mediaType")]    = static_cast<int>(rec.mediaType);
+    result[QStringLiteral("category")]     = static_cast<int>(rec.category);
+    result[QStringLiteral("owner")]        = rec.owner;
+
+    // ── Dates ──────────────────────────────────────────────────────────────────
+    result[QStringLiteral("dateTaken")]    = rec.dateTaken.isValid()
+        ? rec.dateTaken.toString(QStringLiteral("dd.MM.yyyy  HH:mm:ss")) : QString();
+    result[QStringLiteral("dateModified")] = rec.dateModified.isValid()
+        ? rec.dateModified.toString(QStringLiteral("dd.MM.yyyy  HH:mm:ss")) : QString();
+
+    // ── Dimensions ─────────────────────────────────────────────────────────────
+    result[QStringLiteral("width")]    = rec.width;
+    result[QStringLiteral("height")]   = rec.height;
+    result[QStringLiteral("duration")] = rec.duration;
+
+    // ── GPS ────────────────────────────────────────────────────────────────────
+    result[QStringLiteral("hasGeolocation")] = rec.hasGeolocation;
+    result[QStringLiteral("latitude")]       = rec.latitude;
+    result[QStringLiteral("longitude")]      = rec.longitude;
+
+    // ── Misc ───────────────────────────────────────────────────────────────────
+    result[QStringLiteral("hasExif")] = rec.hasExif;
+    result[QStringLiteral("phash")]   = rec.phash;
+    if (m_db) result[QStringLiteral("rating")] = m_db->getRating(id);
+
+    // ── Live EXIF (camera-specific fields read on demand) ─────────────────────
+#ifdef HAVE_EXIV2
+    if (rec.hasExif) {
+        try {
+            Exiv2::ExifData exifData;
+            bool loaded = false;
+
+            QString suffix = QFileInfo(rec.filePath).suffix().toLower();
+            if (suffix == QLatin1String("heic") || suffix == QLatin1String("heif")
+                    || suffix == QLatin1String("hif")) {
+                // exiv2 cannot open the HEIF container; extract raw EXIF bytes first
+                QByteArray raw = HeicImageReader::readHeicExifBytes(rec.filePath);
+                if (!raw.isEmpty()) {
+                    Exiv2::ExifParser::decode(
+                        exifData,
+                        reinterpret_cast<const Exiv2::byte *>(raw.constData()),
+                        static_cast<size_t>(raw.size()));
+                    loaded = !exifData.empty();
+                }
+            } else {
+                auto img = Exiv2::ImageFactory::open(rec.filePath.toStdString());
+                if (img.get()) {
+                    img->readMetadata();
+                    exifData = img->exifData();
+                    loaded = !exifData.empty();
+                }
+            }
+
+            if (loaded) {
+                auto get = [&](const char *key) -> QString {
+                    auto ki = exifData.findKey(Exiv2::ExifKey(key));
+                    if (ki == exifData.end()) return {};
+                    return QString::fromStdString(ki->print(&exifData)).trimmed();
+                };
+
+                result[QStringLiteral("cameraMake")]    = get("Exif.Image.Make");
+                result[QStringLiteral("cameraModel")]   = get("Exif.Image.Model");
+                result[QStringLiteral("lensModel")]     = get("Exif.Photo.LensModel");
+                result[QStringLiteral("fNumber")]       = get("Exif.Photo.FNumber");
+                result[QStringLiteral("exposureTime")]  = get("Exif.Photo.ExposureTime");
+                result[QStringLiteral("isoSpeed")]      = get("Exif.Photo.ISOSpeedRatings");
+                result[QStringLiteral("focalLength")]   = get("Exif.Photo.FocalLength");
+                result[QStringLiteral("focalLength35")] = get("Exif.Photo.FocalLengthIn35mmFilm");
+                result[QStringLiteral("flash")]         = get("Exif.Photo.Flash");
+                result[QStringLiteral("whiteBalance")]  = get("Exif.Photo.WhiteBalance");
+                result[QStringLiteral("exposureMode")]  = get("Exif.Photo.ExposureMode");
+                result[QStringLiteral("meteringMode")]  = get("Exif.Photo.MeteringMode");
+                result[QStringLiteral("software")]      = get("Exif.Image.Software");
+                result[QStringLiteral("colorSpace")]    = get("Exif.Photo.ColorSpace");
+                result[QStringLiteral("orientation")]   = get("Exif.Image.Orientation");
+            }
+        } catch (...) {
+            // Silently ignore EXIF read errors in the info view
+        }
+    }
+#endif
+
+    return result;
 }

@@ -31,6 +31,7 @@ ApplicationWindow {
 
     // Photo selection state
     property int selectedPhotoId: -1
+    property int infoPhotoId: -1      // photo whose metadata overlay is shown (-1 = closed)
 
     // Multi-selection: array of selected photo IDs (always contains selectedPhotoId for single clicks)
     property var selectedPhotoIds: []
@@ -1344,6 +1345,11 @@ ApplicationWindow {
                 }
             }
         }
+    }
+
+    // Photo metadata overlay
+    PhotoInfoOverlay {
+        visible: root.infoPhotoId > 0
     }
 
     // Sidebar button component

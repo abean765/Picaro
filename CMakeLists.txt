@@ -139,6 +139,7 @@ qt_add_qml_module(picaro
         qml/PhotoEditView.qml
         qml/EditSlider.qml
         qml/TagFilterPanel.qml
+        qml/PhotoInfoOverlay.qml
 )
 
 target_include_directories(picaro PRIVATE

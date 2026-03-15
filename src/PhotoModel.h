@@ -87,6 +87,9 @@ public:
     Q_INVOKABLE QVariantMap coordinatesForId(qint64 id) const;
     Q_INVOKABLE QVariantList allGeolocatedPhotos() const;
 
+    // Returns all available metadata for a single photo (DB fields + live EXIF).
+    Q_INVOKABLE QVariantMap fullMetadataForId(qint64 id) const;
+
 signals:
     void photosPerRowChanged();
     void mediaTypeFilterChanged();
