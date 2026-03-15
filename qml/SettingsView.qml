@@ -268,6 +268,75 @@ Item {
                 }
             }
 
+            // Live Photos section
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: livePhotoSection.implicitHeight + 32
+                color: "#2a2a2a"
+                radius: 8
+
+                ColumnLayout {
+                    id: livePhotoSection
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Label {
+                        text: "Live Photos"
+                        color: "#ffffff"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: "Legt fest, wie Live Photos in der Thumbnail-Ansicht beim Hovern angezeigt werden."
+                        color: "#999999"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Repeater {
+                            model: [
+                                { label: "Nur Video",              value: 0 },
+                                { label: "Video 1,5 s → Foto",    value: 1 },
+                                { label: "Nur Foto",               value: 2 }
+                            ]
+
+                            Rectangle {
+                                required property var modelData
+                                property bool isActive: appSettings.livePhotoMode === modelData.value
+                                width:  modeLabel.implicitWidth + 24
+                                height: 34
+                                radius: 6
+                                color:  isActive ? appSettings.accentColor : "#333333"
+                                border.color: isActive ? "transparent" : "#555555"
+                                border.width: 1
+
+                                Label {
+                                    id: modeLabel
+                                    anchors.centerIn: parent
+                                    text: parent.modelData.label
+                                    color: "#ffffff"
+                                    font.pixelSize: 13
+                                    font.bold: parent.isActive
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: appSettings.livePhotoMode = parent.modelData.value
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Fotoordner section
             Rectangle {
                 Layout.fillWidth: true

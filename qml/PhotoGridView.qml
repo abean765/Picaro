@@ -30,6 +30,14 @@ ListView {
         videoOutput: overlayOutput
     }
 
+    // Stops the Live Photo after 1.5 s in "Video → Foto" mode
+    Timer {
+        id: liveStopTimer
+        interval: 1500
+        running: false
+        onTriggered: sharedPlayer.stop()
+    }
+
     // Single VideoOutput overlay, parented directly to the ListView so it sits
     // in viewport coordinates and is clipped by the ListView bounds.
     // Its position tracks _hoveredCell; referencing gridView.contentY in the
@@ -292,7 +300,9 @@ ListView {
                     Timer {
                         id: hoverTimer
                         interval: 300
-                        running: hoverHandler.hovered && cellItem.hasVideo
+                        // Live Photos in "nur Foto"-Modus → kein Video abspielen
+                        running: hoverHandler.hovered && cellItem.hasVideo &&
+                                 (cellItem.isVideo || appSettings.livePhotoMode !== 2)
                         onTriggered: {
                             let path = cellItem.isLivePhoto
                                 ? (modelData.liveVideoPath || "")
@@ -301,7 +311,22 @@ ListView {
 
                             // Stop any previous preview before reconfiguring.
                             sharedPlayer.stop();
-                            sharedPlayer.loops = 1;
+                            liveStopTimer.stop();
+
+                            if (cellItem.isLivePhoto) {
+                                if (appSettings.livePhotoMode === 0) {
+                                    // Nur Video: endlos loopen
+                                    sharedPlayer.loops = MediaPlayer.Infinite;
+                                } else {
+                                    // Video 1,5 s → Foto: einmal abspielen, dann stoppen
+                                    sharedPlayer.loops = 1;
+                                    liveStopTimer.restart();
+                                }
+                            } else {
+                                // Normales Video: einmal abspielen
+                                sharedPlayer.loops = 1;
+                            }
+
                             gridView._hoveredCell = cellItem;
                             sharedPlayer.source = (Qt.platform.os === "windows" ? "file:///" : "file://") + path;
                             sharedPlayer.play();
@@ -314,6 +339,7 @@ ListView {
                             if (!hoverHandler.hovered) {
                                 hoverTimer.stop();
                                 if (gridView._hoveredCell === cellItem) {
+                                    liveStopTimer.stop();
                                     sharedPlayer.stop();
                                     sharedPlayer.source = "";
                                     gridView._hoveredCell = null;

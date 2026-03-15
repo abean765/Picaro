@@ -27,6 +27,7 @@ class AppSettings : public QObject
     Q_PROPERTY(QString importDirectory READ importDirectory WRITE setImportDirectory NOTIFY importDirectoryChanged)
     Q_PROPERTY(QString importOwner READ importOwner WRITE setImportOwner NOTIFY importOwnerChanged)
     Q_PROPERTY(QString photoFolder READ photoFolder WRITE setPhotoFolder NOTIFY photoFolderChanged)
+    Q_PROPERTY(int livePhotoMode READ livePhotoMode WRITE setLivePhotoMode NOTIFY livePhotoModeChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -228,6 +229,20 @@ public:
         emit photoFolderChanged();
     }
 
+    // 0 = nur Video (loop), 1 = Video 1.5s dann Foto, 2 = nur Foto
+    int livePhotoMode() const
+    {
+        return m_settings.value(QStringLiteral("playback/livePhotoMode"), 0).toInt();
+    }
+
+    void setLivePhotoMode(int mode)
+    {
+        if (mode == livePhotoMode()) return;
+        m_settings.setValue(QStringLiteral("playback/livePhotoMode"), mode);
+        m_settings.sync();
+        emit livePhotoModeChanged();
+    }
+
     Q_INVOKABLE bool deleteAllData()
     {
         bool ok = true;
@@ -318,6 +333,7 @@ signals:
     void importDirectoryChanged();
     void importOwnerChanged();
     void photoFolderChanged();
+    void livePhotoModeChanged();
 
 private:
     QSettings m_settings;
