@@ -90,6 +90,10 @@ public:
     // Returns all available metadata for a single photo (DB fields + live EXIF).
     Q_INVOKABLE QVariantMap fullMetadataForId(qint64 id) const;
 
+    // Re-reads EXIF from the file, updates m_allPhotos and the DB.
+    // Call this before fullMetadataForId when the data might be stale.
+    Q_INVOKABLE void refreshExifForId(qint64 id);
+
 signals:
     void photosPerRowChanged();
     void mediaTypeFilterChanged();

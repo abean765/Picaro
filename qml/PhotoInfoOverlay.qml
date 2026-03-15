@@ -15,8 +15,10 @@ Rectangle {
     property var meta: ({})
 
     onVisibleChanged: {
-        if (visible && root.infoPhotoId > 0)
+        if (visible && root.infoPhotoId > 0) {
+            photoModel.refreshExifForId(root.infoPhotoId)
             meta = photoModel.fullMetadataForId(root.infoPhotoId)
+        }
     }
 
     // Close on background click

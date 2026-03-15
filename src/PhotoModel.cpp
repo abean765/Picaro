@@ -548,6 +548,99 @@ int PhotoModel::timelineIndexForPhotoId(qint64 id) const
     return m_monthKeyToTimelineIndex.value(monthKey, -1);
 }
 
+void PhotoModel::refreshExifForId(qint64 id)
+{
+    auto it = m_idToPhotoIndex.find(id);
+    if (!m_db || it == m_idToPhotoIndex.end()) return;
+
+    PhotoRecord &rec = m_allPhotos[it.value()];
+
+#ifdef HAVE_EXIV2
+    try {
+        Exiv2::ExifData exifData;
+        bool loaded = false;
+
+        QString suffix = QFileInfo(rec.filePath).suffix().toLower();
+        if (suffix == QLatin1String("heic") || suffix == QLatin1String("heif")
+                || suffix == QLatin1String("hif")) {
+            QByteArray raw = HeicImageReader::readHeicExifBytes(rec.filePath);
+            if (!raw.isEmpty()) {
+                Exiv2::ExifParser::decode(
+                    exifData,
+                    reinterpret_cast<const Exiv2::byte *>(raw.constData()),
+                    static_cast<size_t>(raw.size()));
+                loaded = !exifData.empty();
+            }
+        } else {
+            auto img = Exiv2::ImageFactory::open(rec.filePath.toStdString());
+            if (img.get()) {
+                img->readMetadata();
+                exifData = img->exifData();
+                loaded = !exifData.empty();
+            }
+        }
+
+        if (loaded) {
+            rec.hasExif = true;
+
+            // Date taken
+            auto dtIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.DateTimeOriginal"));
+            if (dtIt == exifData.end())
+                dtIt = exifData.findKey(Exiv2::ExifKey("Exif.Image.DateTime"));
+            if (dtIt != exifData.end()) {
+                QDateTime dt = QDateTime::fromString(
+                    QString::fromStdString(dtIt->toString()),
+                    QStringLiteral("yyyy:MM:dd HH:mm:ss"));
+                if (dt.isValid()) {
+                    rec.dateTaken = dt;
+                    rec.monthKey  = dt.toString(QStringLiteral("yyyy-MM"));
+                }
+            }
+
+            // Dimensions (only fill if currently missing)
+            if (rec.width <= 0) {
+                auto wIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"));
+                if (wIt != exifData.end()) rec.width = static_cast<int>(wIt->toLong());
+            }
+            if (rec.height <= 0) {
+                auto hIt = exifData.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"));
+                if (hIt != exifData.end()) rec.height = static_cast<int>(hIt->toLong());
+            }
+
+            // GPS
+            auto latIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"));
+            auto latRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitudeRef"));
+            auto lonIt    = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"));
+            auto lonRefIt = exifData.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitudeRef"));
+            if (latIt != exifData.end() && lonIt != exifData.end()) {
+                auto dmsToDecimal = [](const Exiv2::Value &val) -> double {
+                    double result = 0.0;
+                    for (int i = 0; i < std::min(3, static_cast<int>(val.count())); ++i) {
+                        auto r = val.toRational(i);
+                        if (r.second != 0)
+                            result += static_cast<double>(r.first) / r.second / (i == 0 ? 1.0 : i == 1 ? 60.0 : 3600.0);
+                    }
+                    return result;
+                };
+                rec.hasGeolocation = true;
+                rec.latitude  = dmsToDecimal(latIt->value());
+                rec.longitude = dmsToDecimal(lonIt->value());
+                if (latRefIt != exifData.end() && latRefIt->toString() == "S")
+                    rec.latitude = -rec.latitude;
+                if (lonRefIt != exifData.end() && lonRefIt->toString() == "W")
+                    rec.longitude = -rec.longitude;
+            }
+
+            m_db->updateMetadata(id, rec);
+        }
+    } catch (...) {
+        // Silently ignore errors during refresh
+    }
+#else
+    Q_UNUSED(rec)
+#endif
+}
+
 QVariantMap PhotoModel::fullMetadataForId(qint64 id) const
 {
     auto it = m_idToPhotoIndex.constFind(id);
