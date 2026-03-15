@@ -165,6 +165,47 @@ ApplicationWindow {
 
                 Item { Layout.fillHeight: true }
 
+                // Divider
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    Layout.bottomMargin: 2
+                    height: 1
+                    color: "#333333"
+                }
+
+                // Slideshow
+                SidebarButton {
+                    text: "Slideshow"
+                    icon: "\u25B6"
+                    active: false
+                    visible: currentView === "photos"
+                    onClicked: slideshowDialog.open()
+                }
+
+                // Tag-Panel toggle
+                SidebarButton {
+                    text: "Tag-Panel"
+                    icon: "\u25C6"
+                    active: photosViewRoot.tagPanelVisible
+                    visible: currentView === "photos"
+                    onClicked: photosViewRoot.tagPanelVisible = !photosViewRoot.tagPanelVisible
+                }
+
+                // Vollbild toggle
+                SidebarButton {
+                    text: "Vollbild"
+                    icon: root.visibility === Window.FullScreen ? "\u2716" : "\u26F6"
+                    active: root.visibility === Window.FullScreen
+                    onClicked: {
+                        if (root.visibility === Window.FullScreen)
+                            root.showNormal()
+                        else
+                            root.showFullScreen()
+                    }
+                }
+
                 // Import button at bottom of sidebar
                 Rectangle {
                     Layout.fillWidth: true
@@ -653,80 +694,6 @@ ApplicationWindow {
                                 }
                             }
 
-                            // Slideshow button
-                            Rectangle {
-                                implicitWidth: ssStartLabel.implicitWidth + 18
-                                implicitHeight: 26
-                                radius: 4
-                                color: ssStartArea.containsMouse ? Qt.darker(root.accentColor, 1.3) : "#3a3a3a"
-                                Label {
-                                    id: ssStartLabel
-                                    anchors.centerIn: parent
-                                    text: "\u25B6 Slideshow"
-                                    color: ssStartArea.containsMouse ? "#ffffff" : "#aaaaaa"
-                                    font.pixelSize: 12
-                                }
-                                MouseArea {
-                                    id: ssStartArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: slideshowDialog.open()
-                                }
-                            }
-
-                            // Tag panel toggle button
-                            Rectangle {
-                                implicitWidth: tagPanelBtnLabel.implicitWidth + 18
-                                implicitHeight: 26
-                                radius: 4
-                                color: photosViewRoot.tagPanelVisible
-                                       ? root.accentColor
-                                       : (tagPanelBtnArea.containsMouse ? "#4a4a4a" : "#3a3a3a")
-                                Label {
-                                    id: tagPanelBtnLabel
-                                    anchors.centerIn: parent
-                                    text: "\u25C6 Tag-Panel"
-                                    color: photosViewRoot.tagPanelVisible
-                                           ? "#ffffff"
-                                           : (tagPanelBtnArea.containsMouse ? "#ffffff" : "#aaaaaa")
-                                    font.pixelSize: 12
-                                }
-                                MouseArea {
-                                    id: tagPanelBtnArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: photosViewRoot.tagPanelVisible = !photosViewRoot.tagPanelVisible
-                                }
-                            }
-
-                            // Fullscreen toggle button
-                            Rectangle {
-                                implicitWidth: fsLabel.implicitWidth + 18
-                                implicitHeight: 26
-                                radius: 4
-                                color: fsArea.containsMouse ? "#4a4a4a" : "#3a3a3a"
-                                Label {
-                                    id: fsLabel
-                                    anchors.centerIn: parent
-                                    text: root.visibility === Window.FullScreen ? "\u2716 Vollbild" : "\u26F6 Vollbild"
-                                    color: fsArea.containsMouse ? "#ffffff" : "#aaaaaa"
-                                    font.pixelSize: 12
-                                }
-                                MouseArea {
-                                    id: fsArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (root.visibility === Window.FullScreen)
-                                            root.showNormal()
-                                        else
-                                            root.showFullScreen()
-                                    }
-                                }
-                            }
                         }
                     }
 
