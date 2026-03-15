@@ -723,7 +723,7 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
             if (origSize.isValid()) {
                 record.width = origSize.width();
                 record.height = origSize.height();
-                int thumbSize = 320;
+                int thumbSize = 640;
                 QSize scaled = origSize.scaled(thumbSize, thumbSize, Qt::KeepAspectRatio);
                 reader.setScaledSize(scaled);
             }
@@ -731,7 +731,7 @@ void NetworkManager::receiveFiles(QTcpSocket *socket)
             if (!img.isNull()) {
                 QBuffer buf(&thumbnail);
                 buf.open(QIODevice::WriteOnly);
-                img.save(&buf, "JPEG", 75);
+                img.save(&buf, "JPEG", 90);
             }
         }
 

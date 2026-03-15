@@ -28,6 +28,7 @@ class AppSettings : public QObject
     Q_PROPERTY(QString importOwner READ importOwner WRITE setImportOwner NOTIFY importOwnerChanged)
     Q_PROPERTY(QString photoFolder READ photoFolder WRITE setPhotoFolder NOTIFY photoFolderChanged)
     Q_PROPERTY(int livePhotoMode READ livePhotoMode WRITE setLivePhotoMode NOTIFY livePhotoModeChanged)
+    Q_PROPERTY(bool thumbnailFitMode READ thumbnailFitMode WRITE setThumbnailFitMode NOTIFY thumbnailFitModeChanged)
 
 public:
     explicit AppSettings(QObject *parent = nullptr)
@@ -243,6 +244,19 @@ public:
         emit livePhotoModeChanged();
     }
 
+    bool thumbnailFitMode() const
+    {
+        return m_settings.value(QStringLiteral("appearance/thumbnailFitMode"), false).toBool();
+    }
+
+    void setThumbnailFitMode(bool fit)
+    {
+        if (fit == thumbnailFitMode()) return;
+        m_settings.setValue(QStringLiteral("appearance/thumbnailFitMode"), fit);
+        m_settings.sync();
+        emit thumbnailFitModeChanged();
+    }
+
     Q_INVOKABLE bool deleteAllData()
     {
         bool ok = true;
@@ -334,6 +348,7 @@ signals:
     void importOwnerChanged();
     void photoFolderChanged();
     void livePhotoModeChanged();
+    void thumbnailFitModeChanged();
 
 private:
     QSettings m_settings;

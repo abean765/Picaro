@@ -93,7 +93,7 @@ QImage readHeicThumbnail(const QString &filePath)
     if (result.isNull()) {
         result = decodeHandle(handle);
         if (!result.isNull()) {
-            result = result.scaled(320, 320, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            result = result.scaled(640, 640, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }
     }
 

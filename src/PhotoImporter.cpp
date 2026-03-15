@@ -471,7 +471,7 @@ void PhotoImporter::regenerateVideoThumbnails()
             if (m_cancelled) break;
 
             const auto &[id, filePath] = videos[i];
-            QImage frame = m_frameExtractor.grabFrame(filePath, 320);
+            QImage frame = m_frameExtractor.grabFrame(filePath, 640);
             if (!frame.isNull()) {
                 QByteArray blob = imageToJpegBlob(frame);
                 if (!blob.isEmpty()) {
@@ -713,7 +713,7 @@ PhotoRecord PhotoImporter::extractMetadata(const QString &filePath) const
 QByteArray PhotoImporter::generateThumbnail(const QString &filePath, MediaType type)
 {
     QImage thumb;
-    const int thumbSize = 320;
+    const int thumbSize = 640;
 
     if (type == MediaType::Video) {
         thumb = m_frameExtractor.grabFrame(filePath, thumbSize);
@@ -749,7 +749,7 @@ QByteArray PhotoImporter::imageToJpegBlob(const QImage &img) const
     QByteArray data;
     QBuffer buffer(&data);
     buffer.open(QIODevice::WriteOnly);
-    img.save(&buffer, "JPEG", 80);
+    img.save(&buffer, "JPEG", 90);
     return data;
 }
 

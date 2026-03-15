@@ -17,6 +17,9 @@ ListView {
     property int draggingPhotoId: -1
     property point dragScenePos: Qt.point(0, 0)
 
+    // true = PreserveAspectFit (whole image, black bars); false = PreserveAspectCrop (fill)
+    property bool fitMode: false
+
     flickDeceleration: 1500
     maximumFlickVelocity: 15000
 
@@ -176,28 +179,31 @@ ListView {
                         z: 2
                     }
 
+                    // Background for fit mode (black letterbox) or loading placeholder
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        color: gridView.fitMode ? "#000000" : "#2a2a2a"
+                        visible: thumbImage.status !== Image.Ready && !cellItem.videoPlaying ||
+                                 gridView.fitMode
+                        z: gridView.fitMode ? 0 : 1
+                    }
+
                     Image {
                         id: thumbImage
                         anchors.fill: parent
                         anchors.margins: 1
                         source: "image://thumbnail/" + modelData.id
                         asynchronous: true
-                        fillMode: Image.PreserveAspectCrop
+                        fillMode: gridView.fitMode ? Image.PreserveAspectFit : Image.PreserveAspectCrop
                         sourceSize.width: width
                         sourceSize.height: height
                         cache: true
                         visible: !cellItem.videoPlaying
+                        z: 1
 
                         opacity: status === Image.Ready ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 100 } }
-                    }
-
-                    // Loading placeholder (neutral dark gray, not black)
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        color: "#2a2a2a"
-                        visible: thumbImage.status !== Image.Ready && !cellItem.videoPlaying
                     }
 
                     // Video/Live Photo badge (hidden during playback)

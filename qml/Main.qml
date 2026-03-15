@@ -675,6 +675,28 @@ ApplicationWindow {
                                 }
                             }
 
+                            // Fill / Fit toggle
+                            Rectangle {
+                                width: fitToggleLabel.implicitWidth + 18
+                                height: 26
+                                radius: 4
+                                color: appSettings.thumbnailFitMode ? "#555555" : "#3a3a3a"
+
+                                Label {
+                                    id: fitToggleLabel
+                                    anchors.centerIn: parent
+                                    text: appSettings.thumbnailFitMode ? "\u25A1 Ganz" : "\u25A0 Füllen"
+                                    color: appSettings.thumbnailFitMode ? "#ffffff" : "#aaaaaa"
+                                    font.pixelSize: 12
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: appSettings.thumbnailFitMode = !appSettings.thumbnailFitMode
+                                }
+                            }
+
                             Label {
                                 text: "Größe"
                                 color: "#aaaaaa"
@@ -744,6 +766,7 @@ ApplicationWindow {
                         width: photosViewRoot.detailVisible
                               ? photosViewRoot.gridDetailWidth * photosViewRoot.splitRatio
                               : photosViewRoot.gridDetailWidth
+                        fitMode: appSettings.thumbnailFitMode
                     }
 
                     // Tag filter panel — optional, fixed width, between grid and detail
