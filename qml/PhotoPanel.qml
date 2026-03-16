@@ -87,12 +87,29 @@ Item {
         reloadPhotos()
     }
 
-    // Refresh photo list from model or tag
+    // Refresh photo list from model or tag.
+    // Preserves the current in-memory order: existing IDs keep their position,
+    // removed IDs are dropped, newly added IDs are appended at the end.
     function reloadPhotos() {
+        var newIds
         if (selectedTagId > 0)
-            photoIds = tagModel.photoIdsForTag(selectedTagId)
+            newIds = tagModel.photoIdsForTag(selectedTagId)
         else
-            photoIds = photoModel.visiblePhotoIds()
+            newIds = photoModel.visiblePhotoIds()
+
+        // Build a fast lookup set for the new IDs
+        var newSet = {}
+        for (var i = 0; i < newIds.length; i++) newSet[newIds[i]] = true
+
+        // Keep existing IDs that are still valid, in their current order
+        var kept = photoIds.filter(function(id) { return newSet[id] === true })
+
+        // Append IDs that are new (not yet in the current list)
+        var keptSet = {}
+        for (var j = 0; j < kept.length; j++) keptSet[kept[j]] = true
+        var added = newIds.filter(function(id) { return keptSet[id] !== true })
+
+        photoIds = kept.concat(added)
         _rebuildDisplayModel()
     }
 
@@ -780,6 +797,26 @@ Item {
                                             var sel    = panel.selectedPanelIds
                                             var toMove = (sel.length > 1 && sel.indexOf(modelData) >= 0)
                                                          ? sel : [modelData]
+
+                                            // Pre-insert into sibling at the marker position
+                                            // so that reloadPhotos() preserves the chosen order.
+                                            var insertAt = Math.max(0, Math.min(
+                                                sibling._dragInsertIndex, sibling.photoIds.length))
+                                            var dstIds = sibling.photoIds.filter(
+                                                function(id) { return toMove.indexOf(id) < 0 })
+                                            for (var k = toMove.length - 1; k >= 0; k--)
+                                                dstIds.splice(insertAt, 0, toMove[k])
+                                            sibling.photoIds = dstIds
+                                            sibling._rebuildDisplayModel()
+
+                                            // If the photos will leave the source panel
+                                            // (source has a tag that will be removed),
+                                            // pre-remove them so reloadPhotos() keeps order.
+                                            if (sibling.selectedTagId <= 0 && panel.selectedTagId > 0) {
+                                                panel.photoIds = panel.photoIds.filter(
+                                                    function(id) { return toMove.indexOf(id) < 0 })
+                                                panel._rebuildDisplayModel()
+                                            }
 
                                             if (sibling.selectedTagId > 0)
                                                 sibling.acceptDrop(toMove)
