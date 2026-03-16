@@ -44,7 +44,8 @@ Item {
     property point dragScenePos:    Qt.point(0, 0)
 
     // Repeater containing all panels — used to find drop targets and for drag highlighting
-    property var panelsRepeater: null
+    // Named 'allPanels' (not 'panelsRepeater') to avoid shadowing the Repeater id in Main.qml
+    property var allPanels: null
 
     // Show a 1 px left divider (set true for every panel after the first)
     property bool showLeftDivider: false
@@ -95,9 +96,9 @@ Item {
 
     // ── Internal: find which other panel (if any) is under scenePos ──────────
     function _findDropTarget(scenePos) {
-        if (!panelsRepeater) return null
-        for (var i = 0; i < panelsRepeater.count; i++) {
-            var p = panelsRepeater.itemAt(i)
+        if (!allPanels) return null
+        for (var i = 0; i < allPanels.count; i++) {
+            var p = allPanels.itemAt(i)
             if (!p || p === panel) continue
             var local = p.mapFromItem(null, scenePos.x, scenePos.y)
             if (local.x >= 0 && local.y >= 0 && local.x < p.width && local.y < p.height)
@@ -930,9 +931,9 @@ Item {
                                 var hoverTarget = panel._findDropTarget(centroid.scenePosition)
 
                                 // Update dragOver on all other panels
-                                if (panelsRepeater) {
-                                    for (var pi = 0; pi < panelsRepeater.count; pi++) {
-                                        var pp = panelsRepeater.itemAt(pi)
+                                if (allPanels) {
+                                    for (var pi = 0; pi < allPanels.count; pi++) {
+                                        var pp = allPanels.itemAt(pi)
                                         if (!pp || pp === panel) continue
                                         var over = (pp === hoverTarget)
                                         if (over !== pp.dragOver) {
