@@ -36,15 +36,21 @@ Item {
     // -2 = never loaded; used to detect context switches in reloadPhotos().
     property int _loadedTagId: -2
 
-    // dragOver: set by the sibling panel's DragHandler while hovering here
+    // dragOver: set by another panel's DragHandler while hovering here
     property bool dragOver: false
 
     // Outgoing drag state (read by Main.qml for the ghost)
     property int   draggingPhotoId: -1
     property point dragScenePos:    Qt.point(0, 0)
 
-    // Reference to the other panel (set from Main.qml)
-    property var siblingPanel: null
+    // Repeater containing all panels — used to find drop targets and for drag highlighting
+    property var panelsRepeater: null
+
+    // Show a 1 px left divider (set true for every panel after the first)
+    property bool showLeftDivider: false
+
+    // Fit/fill mode for thumbnails (false = fill/crop, true = fit/letterbox)
+    property bool fitMode: false
 
     // Expose the inner GridView so callers (e.g. DetailView) can scroll it
     readonly property GridView innerGrid: photoGrid
@@ -54,7 +60,51 @@ Item {
     property int panelSelectionAnchor: -1
 
     // How many photos per row (driven by the size slider in this panel's toolbar)
-    property int photosPerRow: 5
+    property int photosPerRow: 10
+
+    // Active month key currently shown at top of timeline (e.g. "2024-07")
+    readonly property string activeTimelineMonthKey:
+        (miniTimeline.activeMonth >= 0
+         && miniTimeline.activeMonth < miniTimeline.monthGroups.length)
+        ? miniTimeline.monthGroups[miniTimeline.activeMonth].key
+        : ""
+
+    // Emitted when the user clicks the close button
+    signal closeRequested()
+
+    // Scroll to the first photo belonging to the given month key
+    function scrollToMonthKey(mk) {
+        if (!mk || mk === "") return
+        for (var i = 0; i < miniTimeline.monthGroups.length; i++) {
+            var g = miniTimeline.monthGroups[i]
+            if (g.key === mk) {
+                var cols = Math.max(1, photosPerRow)
+                var row  = Math.floor(g.firstIdx / cols)
+                var cellH = photoGrid.width / cols
+                photoGrid.contentY = Math.max(0, row * cellH - 20)
+                return
+            }
+        }
+    }
+
+    // Set photosPerRow and sync the slider
+    function setPhotosPerRow(n) {
+        photosPerRow = n
+        panelSizeSlider.value = panelSizeSlider.from + panelSizeSlider.to - n
+    }
+
+    // ── Internal: find which other panel (if any) is under scenePos ──────────
+    function _findDropTarget(scenePos) {
+        if (!panelsRepeater) return null
+        for (var i = 0; i < panelsRepeater.count; i++) {
+            var p = panelsRepeater.itemAt(i)
+            if (!p || p === panel) continue
+            var local = p.mapFromItem(null, scenePos.x, scenePos.y)
+            if (local.x >= 0 && local.y >= 0 && local.x < p.width && local.y < p.height)
+                return p
+        }
+        return null
+    }
 
     // ── Public functions ────────────────────────────────────────────────────
 
@@ -248,6 +298,17 @@ Item {
     // Dark background
     Rectangle { anchors.fill: parent; color: "#1a1a1a" }
 
+    // Left divider shown between panels
+    Rectangle {
+        visible: panel.showLeftDivider
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 1
+        color: "#333333"
+        z: 5
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -391,19 +452,19 @@ Item {
                     width: fitLabel.implicitWidth + 16
                     height: 26
                     radius: 4
-                    color: fitToggle._fitMode ? "#555555" : "#3a3a3a"
+                    color: panel.fitMode ? "#555555" : "#3a3a3a"
 
                     Label {
                         id: fitLabel
                         anchors.centerIn: parent
-                        text: fitToggle._fitMode ? "\u25A1 Ganz" : "\u25A0 Füllen"
-                        color: fitToggle._fitMode ? "#ffffff" : "#aaaaaa"
+                        text: panel.fitMode ? "\u25A1 Ganz" : "\u25A0 Füllen"
+                        color: panel.fitMode ? "#ffffff" : "#aaaaaa"
                         font.pixelSize: 11
                     }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: fitToggle._fitMode = !fitToggle._fitMode
+                        onClicked: panel.fitMode = !panel.fitMode
                     }
                 }
 
@@ -429,7 +490,7 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: panel.visible = false
+                        onClicked: panel.closeRequested()
                     }
                 }
             }
@@ -736,7 +797,7 @@ Item {
                         Image {
                             anchors.fill: parent
                             source: "image://thumbnail/" + modelData
-                            fillMode: fitToggle._fitMode
+                            fillMode: panel.fitMode
                                       ? Image.PreserveAspectFit
                                       : Image.PreserveAspectCrop
                             asynchronous: true
@@ -749,7 +810,7 @@ Item {
                         Rectangle {
                             anchors.fill: parent
                             color: "#000000"
-                            visible: fitToggle._fitMode
+                            visible: panel.fitMode
                             z: -1
                         }
 
@@ -807,59 +868,52 @@ Item {
                                 } else {
                                     if (panel.draggingPhotoId !== modelData) return
 
-                                    var sibling = panel.siblingPanel
+                                    var fp     = centroid.scenePosition
+                                    var target = panel._findDropTarget(fp)
 
-                                    // Check if released over the sibling panel
-                                    if (sibling && sibling.visible) {
-                                        var fp  = centroid.scenePosition
-                                        var sp  = sibling.mapFromItem(null, fp.x, fp.y)
-                                        var hit = (sp.x >= 0 && sp.y >= 0
-                                                   && sp.x < sibling.width
-                                                   && sp.y < sibling.height)
-                                        if (hit) {
-                                            // ── Cross-panel drop ──────────────
-                                            var sel    = panel.selectedPanelIds
-                                            var toMove = (sel.length > 1 && sel.indexOf(modelData) >= 0)
-                                                         ? sel : [modelData]
+                                    if (target) {
+                                        // ── Cross-panel drop ──────────────────
+                                        var sel    = panel.selectedPanelIds
+                                        var toMove = (sel.length > 1 && sel.indexOf(modelData) >= 0)
+                                                     ? sel : [modelData]
 
-                                            // Pre-insert into sibling at the marker position
-                                            // so that reloadPhotos() preserves the chosen order.
-                                            var insertAt = Math.max(0, Math.min(
-                                                sibling._dragInsertIndex, sibling.photoIds.length))
-                                            var dstIds = sibling.photoIds.filter(
+                                        // Pre-insert into target at the marker position
+                                        // so that reloadPhotos() preserves the chosen order.
+                                        var insertAt = Math.max(0, Math.min(
+                                            target._dragInsertIndex, target.photoIds.length))
+                                        var dstIds = target.photoIds.filter(
+                                            function(id) { return toMove.indexOf(id) < 0 })
+                                        for (var k = toMove.length - 1; k >= 0; k--)
+                                            dstIds.splice(insertAt, 0, toMove[k])
+                                        target.photoIds = dstIds
+                                        target._rebuildDisplayModel()
+
+                                        // If the photos will leave the source panel
+                                        // (source has a tag that will be removed),
+                                        // pre-remove them so reloadPhotos() keeps order.
+                                        if (target.selectedTagId <= 0 && panel.selectedTagId > 0) {
+                                            panel.photoIds = panel.photoIds.filter(
                                                 function(id) { return toMove.indexOf(id) < 0 })
-                                            for (var k = toMove.length - 1; k >= 0; k--)
-                                                dstIds.splice(insertAt, 0, toMove[k])
-                                            sibling.photoIds = dstIds
-                                            sibling._rebuildDisplayModel()
-
-                                            // If the photos will leave the source panel
-                                            // (source has a tag that will be removed),
-                                            // pre-remove them so reloadPhotos() keeps order.
-                                            if (sibling.selectedTagId <= 0 && panel.selectedTagId > 0) {
-                                                panel.photoIds = panel.photoIds.filter(
-                                                    function(id) { return toMove.indexOf(id) < 0 })
-                                                panel._rebuildDisplayModel()
-                                            }
-
-                                            if (sibling.selectedTagId > 0)
-                                                sibling.acceptDrop(toMove)
-                                            else if (panel.selectedTagId > 0)
-                                                panel.removeDrop(toMove)
-
-                                            // Persist the new order on both panels
-                                            if (sibling.selectedTagId > 0)
-                                                tagModel.saveTagPhotoOrder(sibling.selectedTagId, sibling.photoIds)
-                                            if (panel.selectedTagId > 0)
-                                                tagModel.saveTagPhotoOrder(panel.selectedTagId, panel.photoIds)
-
-                                            panel._dragFromIndex    = -1
-                                            panel._dragInsertIndex  = -1
-                                            panel.draggingPhotoId   = -1
-                                            sibling.dragOver        = false
-                                            sibling._dragInsertIndex = -1
-                                            return
+                                            panel._rebuildDisplayModel()
                                         }
+
+                                        if (target.selectedTagId > 0)
+                                            target.acceptDrop(toMove)
+                                        else if (panel.selectedTagId > 0)
+                                            panel.removeDrop(toMove)
+
+                                        // Persist the new order on both panels
+                                        if (target.selectedTagId > 0)
+                                            tagModel.saveTagPhotoOrder(target.selectedTagId, target.photoIds)
+                                        if (panel.selectedTagId > 0)
+                                            tagModel.saveTagPhotoOrder(panel.selectedTagId, panel.photoIds)
+
+                                        panel._dragFromIndex    = -1
+                                        panel._dragInsertIndex  = -1
+                                        panel.draggingPhotoId   = -1
+                                        target.dragOver         = false
+                                        target._dragInsertIndex = -1
+                                        return
                                     }
 
                                     // ── Same-panel: apply reorder ─────────────
@@ -873,27 +927,26 @@ Item {
                                 if (!active) return
                                 panel.dragScenePos = centroid.scenePosition
 
-                                var sibling = panel.siblingPanel
-                                var overSibling = false
-                                if (sibling && sibling.visible) {
-                                    var cp = sibling.mapFromItem(null,
-                                                centroid.scenePosition.x,
-                                                centroid.scenePosition.y)
-                                    overSibling = (cp.x >= 0 && cp.y >= 0
-                                                   && cp.x < sibling.width
-                                                   && cp.y < sibling.height)
+                                var hoverTarget = panel._findDropTarget(centroid.scenePosition)
 
-                                    if (overSibling !== sibling.dragOver) {
-                                        sibling.dragOver = overSibling
-                                        if (overSibling)
-                                            panel._dragInsertIndex = -1
-                                        else
-                                            sibling._dragInsertIndex = -1
+                                // Update dragOver on all other panels
+                                if (panelsRepeater) {
+                                    for (var pi = 0; pi < panelsRepeater.count; pi++) {
+                                        var pp = panelsRepeater.itemAt(pi)
+                                        if (!pp || pp === panel) continue
+                                        var over = (pp === hoverTarget)
+                                        if (over !== pp.dragOver) {
+                                            pp.dragOver = over
+                                            if (over)
+                                                panel._dragInsertIndex = -1
+                                            else
+                                                pp._dragInsertIndex = -1
+                                        }
                                     }
                                 }
 
-                                if (overSibling)
-                                    sibling._updateInsertIndex(centroid.scenePosition)
+                                if (hoverTarget)
+                                    hoverTarget._updateInsertIndex(centroid.scenePosition)
                                 else
                                     panel._updateInsertIndex(centroid.scenePosition)
                             }
@@ -980,10 +1033,4 @@ Item {
         }
     }
 
-    // Reference to the fit-toggle to share with cell delegates
-    Item {
-        id: fitToggle
-        visible: false
-        property bool _fitMode: false
-    }
 }

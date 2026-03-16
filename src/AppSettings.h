@@ -7,6 +7,10 @@
 #include <QDir>
 #include <QColor>
 #include <QVariantMap>
+#include <QVariantList>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
 #include <QTemporaryDir>
 #include <QFile>
 #include <QtMath>
@@ -269,6 +273,28 @@ public:
         m_settings.setValue(QStringLiteral("state/lastSelectedPhotoId"), id);
         m_settings.sync();
         emit lastSelectedPhotoIdChanged();
+    }
+
+    // Panel layout state: list of {tagId, tagName, fitMode, photosPerRow, timelineMonth}
+    Q_INVOKABLE QVariantList loadPanelStates() const
+    {
+        QByteArray json = m_settings.value(QStringLiteral("state/panelStates")).toByteArray();
+        if (json.isEmpty()) return {};
+        QJsonArray arr = QJsonDocument::fromJson(json).array();
+        QVariantList result;
+        for (const QJsonValue &v : arr)
+            result.append(v.toObject().toVariantMap());
+        return result;
+    }
+
+    Q_INVOKABLE void savePanelStates(const QVariantList &states)
+    {
+        QJsonArray arr;
+        for (const QVariant &v : states)
+            arr.append(QJsonObject::fromVariantMap(v.toMap()));
+        m_settings.setValue(QStringLiteral("state/panelStates"),
+                            QJsonDocument(arr).toJson(QJsonDocument::Compact));
+        m_settings.sync();
     }
 
     Q_INVOKABLE bool deleteAllData()

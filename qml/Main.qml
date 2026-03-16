@@ -70,6 +70,52 @@ ApplicationWindow {
         }
     }
 
+    // ── Panel state persistence ──────────────────────────────────────────────
+
+    function _savePanelStates() {
+        var states = []
+        for (var i = 0; i < panelsModel.count; i++) {
+            var p = panelsRepeater.itemAt(i)
+            states.push({
+                tagId:        p ? p.selectedTagId  : panelsModel.get(i).tagId,
+                tagName:      p ? p.selectedTagName : panelsModel.get(i).tagName,
+                fitMode:      p ? p.fitMode         : panelsModel.get(i).fitMode,
+                photosPerRow: p ? p.photosPerRow    : panelsModel.get(i).photosPerRow,
+                timelineMonth: p ? p.activeTimelineMonthKey : ""
+            })
+        }
+        appSettings.savePanelStates(states)
+    }
+
+    function _loadPanelStates() {
+        var states = appSettings.loadPanelStates()
+        if (!states || states.length === 0) {
+            panelsModel.append({ tagId: -1, tagName: "", fitMode: false, photosPerRow: 10 })
+            return
+        }
+        for (var i = 0; i < states.length; i++) {
+            var s = states[i]
+            panelsModel.append({
+                tagId:        s.tagId        !== undefined ? s.tagId        : -1,
+                tagName:      s.tagName      !== undefined ? s.tagName      : "",
+                fitMode:      s.fitMode      !== undefined ? s.fitMode      : false,
+                photosPerRow: s.photosPerRow !== undefined ? s.photosPerRow : 10
+            })
+        }
+        // Restore timeline positions after panels are built
+        Qt.callLater(function() {
+            for (var j = 0; j < states.length; j++) {
+                var panel = panelsRepeater.itemAt(j)
+                if (panel && states[j].timelineMonth)
+                    panel.scrollToMonthKey(states[j].timelineMonth)
+            }
+        })
+    }
+
+    Component.onCompleted: _loadPanelStates()
+
+    onClosing: _savePanelStates()
+
     // Called from PhotoGridView cells — handles CTRL and SHIFT modifiers.
     function handleCellClick(photoId, modifiers) {
         var ctrl  = (modifiers & Qt.ControlModifier) !== 0
@@ -202,13 +248,13 @@ ApplicationWindow {
                     onClicked: slideshowDialog.open()
                 }
 
-                // Second panel toggle
+                // Add new panel
                 SidebarButton {
-                    text: "2. Panel"
+                    text: "Neues Panel"
                     icon: "\u25A3"
-                    active: photosViewRoot.panel2Visible
+                    active: panelsModel.count > 1
                     visible: currentView === "photos"
-                    onClicked: photosViewRoot.panel2Visible = !photosViewRoot.panel2Visible
+                    onClicked: panelsModel.append({ tagId: -1, tagName: "", fitMode: false, photosPerRow: 10 })
                 }
 
                 // Vollbild toggle
@@ -341,51 +387,63 @@ ApplicationWindow {
                     property real splitRatio: 0.55
                     readonly property bool detailVisible: root.selectedPhotoId > 0
 
-                    // Width allocated to the two panels together
+                    // Width allocated to all panels together
                     readonly property real panelsAreaWidth: detailVisible
                         ? width * splitRatio
                         : width
 
-                    // panel2 can be toggled
-                    property bool panel2Visible: false
+                    // ── Panel model — each entry: {tagId, tagName, fitMode, photosPerRow} ──
+                    ListModel { id: panelsModel }
 
-                    // ── Panel 1 — always visible ─────────────────────────────
-                    PhotoPanel {
-                        id: panel1
-                        siblingPanel: panel2
+                    // ── Panels row ────────────────────────────────────────────
+                    Item {
+                        id: panelsRow
                         anchors.left: parent.left
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        width: photosViewRoot.panel2Visible
-                               ? photosViewRoot.panelsAreaWidth / 2
-                               : photosViewRoot.panelsAreaWidth
+                        width: photosViewRoot.panelsAreaWidth
 
-                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    }
+                        Repeater {
+                            id: panelsRepeater
+                            model: panelsModel
 
-                    // Thin divider between panels
-                    Rectangle {
-                        visible: photosViewRoot.panel2Visible
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        x: panel1.width
-                        width: 1
-                        color: "#333333"
-                        z: 5
-                    }
+                            PhotoPanel {
+                                required property int index
 
-                    // ── Panel 2 — toggled by sidebar button ──────────────────
-                    PhotoPanel {
-                        id: panel2
-                        siblingPanel: panel1
-                        visible: photosViewRoot.panel2Visible
-                        anchors.left: panel1.right
-                        anchors.leftMargin: 1
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        width: photosViewRoot.panel2Visible
-                               ? photosViewRoot.panelsAreaWidth / 2
-                               : 0
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                x: index * (panelsRow.width / Math.max(1, panelsModel.count))
+                                width: panelsRow.width / Math.max(1, panelsModel.count)
+
+                                panelsRepeater:  panelsRepeater
+                                showLeftDivider: index > 0
+
+                                // Initialise from saved state (avoids naming collision
+                                // by reading directly from the model by index)
+                                Component.onCompleted: {
+                                    var m = panelsModel.get(index)
+                                    if (m.tagId > 0)
+                                        selectTag(m.tagId, m.tagName)
+                                    else
+                                        reloadPhotos()
+                                    fitMode = m.fitMode
+                                    setPhotosPerRow(m.photosPerRow)
+                                }
+
+                                // Write-back: keep model in sync for save-on-close
+                                onFitModeChanged:      panelsModel.setProperty(index, "fitMode",      fitMode)
+                                onPhotosPerRowChanged: panelsModel.setProperty(index, "photosPerRow", photosPerRow)
+                                onSelectedTagIdChanged: {
+                                    panelsModel.setProperty(index, "tagId",   selectedTagId > 0 ? selectedTagId : -1)
+                                    panelsModel.setProperty(index, "tagName", selectedTagName)
+                                }
+
+                                onCloseRequested: {
+                                    if (panelsModel.count > 1)
+                                        panelsModel.remove(index)
+                                }
+                            }
+                        }
                     }
 
                     // ── Drag ghost ────────────────────────────────────────────
@@ -398,21 +456,38 @@ ApplicationWindow {
                         border.width: 2
                         color: "#1affffff"
 
-                        readonly property int   _id:  panel1.draggingPhotoId > 0
-                                                       ? panel1.draggingPhotoId
-                                                       : panel2.draggingPhotoId
-                        readonly property point _sp:  panel1.draggingPhotoId > 0
-                                                       ? panel1.dragScenePos
-                                                       : panel2.dragScenePos
+                        // These bindings iterate all panels and register QML dependencies
+                        // on each panel's relevant properties so they update reactively.
+                        readonly property int _id: {
+                            for (var i = 0; i < panelsRepeater.count; i++) {
+                                var p = panelsRepeater.itemAt(i)
+                                if (p && p.draggingPhotoId > 0) return p.draggingPhotoId
+                            }
+                            return -1
+                        }
+                        readonly property point _sp: {
+                            for (var i = 0; i < panelsRepeater.count; i++) {
+                                var p = panelsRepeater.itemAt(i)
+                                if (p) {
+                                    var sp = p.dragScenePos  // register dep
+                                    if (p.draggingPhotoId > 0) return sp
+                                }
+                            }
+                            return Qt.point(0, 0)
+                        }
 
                         visible: _id > 0
 
                         border.color: {
-                            var src  = panel1.draggingPhotoId > 0 ? panel1 : panel2
-                            var dest = panel1.draggingPhotoId > 0 ? panel2 : panel1
-                            if (dest.dragOver && dest.selectedTagId <= 0
-                                    && src.selectedTagId > 0) return "#cc4444"
-                            return root.accentColor
+                            var srcTagId = -1
+                            var hasRemoveTarget = false
+                            for (var i = 0; i < panelsRepeater.count; i++) {
+                                var p = panelsRepeater.itemAt(i)
+                                if (!p) continue
+                                if (p.draggingPhotoId > 0) srcTagId = p.selectedTagId
+                                if (p.dragOver && p.selectedTagId <= 0) hasRemoveTarget = true
+                            }
+                            return (hasRemoveTarget && srcTagId > 0) ? "#cc4444" : root.accentColor
                         }
 
                         readonly property point _local:
@@ -542,7 +617,7 @@ ApplicationWindow {
         z: 180
         onClosed: {
             photoEditOverlay.visible = false
-            panel1.forceActiveFocus()
+            { var p = panelsRepeater.itemAt(0); if (p) p.forceActiveFocus() }
         }
         onSavedAndReload: function(photoId) {
             photoModel.reload()
@@ -555,7 +630,7 @@ ApplicationWindow {
         anchors.fill: parent
         onClosed: {
             // Return focus to grid
-            panel1.forceActiveFocus()
+            { var p = panelsRepeater.itemAt(0); if (p) p.forceActiveFocus() }
         }
     }
 
