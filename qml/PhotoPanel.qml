@@ -32,6 +32,10 @@ Item {
     // Initialised from photoModel; can be reordered in place.
     property var photoIds: []
 
+    // Tracks which tag context the current photoIds belongs to.
+    // -2 = never loaded; used to detect context switches in reloadPhotos().
+    property int _loadedTagId: -2
+
     // dragOver: set by the sibling panel's DragHandler while hovering here
     property bool dragOver: false
 
@@ -88,8 +92,10 @@ Item {
     }
 
     // Refresh photo list from model or tag.
-    // Preserves the current in-memory order: existing IDs keep their position,
-    // removed IDs are dropped, newly added IDs are appended at the end.
+    // If the context (tag) changed, the new list is adopted as-is.
+    // Within the same context, the current in-memory order is preserved:
+    // existing IDs keep their position, removed IDs are dropped,
+    // newly added IDs are appended at the end.
     function reloadPhotos() {
         var newIds
         if (selectedTagId > 0)
@@ -97,6 +103,15 @@ Item {
         else
             newIds = photoModel.visiblePhotoIds()
 
+        if (selectedTagId !== _loadedTagId) {
+            // Context switch: adopt the new list without any order carry-over
+            _loadedTagId = selectedTagId
+            photoIds = newIds
+            _rebuildDisplayModel()
+            return
+        }
+
+        // Same context: preserve in-memory order, just add/remove IDs
         // Build a fast lookup set for the new IDs
         var newSet = {}
         for (var i = 0; i < newIds.length; i++) newSet[newIds[i]] = true
