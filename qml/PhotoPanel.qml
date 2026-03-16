@@ -311,6 +311,10 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            if (clearTagHover.containsMouse) {
+                                panel.clearTag()
+                                return
+                            }
                             panel.rebuildTagList()
                             panel.dropdownVisible = !panel.dropdownVisible
                             if (panel.dropdownVisible) tagInput.forceActiveFocus()
@@ -782,10 +786,11 @@ Item {
                                             else if (panel.selectedTagId > 0)
                                                 panel.removeDrop(toMove)
 
-                                            panel._dragFromIndex   = -1
-                                            panel._dragInsertIndex = -1
-                                            panel.draggingPhotoId  = -1
-                                            sibling.dragOver       = false
+                                            panel._dragFromIndex    = -1
+                                            panel._dragInsertIndex  = -1
+                                            panel.draggingPhotoId   = -1
+                                            sibling.dragOver        = false
+                                            sibling._dragInsertIndex = -1
                                             return
                                         }
                                     }
@@ -815,10 +820,14 @@ Item {
                                         sibling.dragOver = overSibling
                                         if (overSibling)
                                             panel._dragInsertIndex = -1
+                                        else
+                                            sibling._dragInsertIndex = -1
                                     }
                                 }
 
-                                if (!overSibling)
+                                if (overSibling)
+                                    sibling._updateInsertIndex(centroid.scenePosition)
+                                else
                                     panel._updateInsertIndex(centroid.scenePosition)
                             }
                         }
@@ -836,7 +845,8 @@ Item {
                         width: 3
                         radius: 2
                         color: root.accentColor
-                        visible: panel._dragFromIndex >= 0
+                        visible: (panel._dragFromIndex >= 0 || panel.dragOver)
+                                 && panel._dragInsertIndex >= 0
                                  && panel._dragInsertIndex === index
                                  && !isDragging
                         x: 0
