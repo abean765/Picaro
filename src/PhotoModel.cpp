@@ -307,6 +307,14 @@ QString PhotoModel::filePathForId(qint64 id) const
     return {};
 }
 
+QString PhotoModel::monthKeyForId(qint64 id) const
+{
+    auto it = m_idToPhotoIndex.constFind(id);
+    if (it != m_idToPhotoIndex.constEnd())
+        return m_allPhotos[it.value()].monthKey;
+    return {};
+}
+
 int PhotoModel::mediaTypeForId(qint64 id) const
 {
     auto it = m_idToPhotoIndex.constFind(id);

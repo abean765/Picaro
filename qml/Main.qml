@@ -53,8 +53,8 @@ ApplicationWindow {
     }
 
     function scrollPhotoIntoView(photoId) {
-        if (photoId > 0)
-            photoGrid.scrollIntoView(photoId)
+        // PhotoPanel scrolls automatically via its own content;
+        // there is no global grid to scroll.
     }
 
     // Restore last selected photo once the model has finished its initial load.
@@ -108,7 +108,6 @@ ApplicationWindow {
         selectedPhotoId = -1
         selectedPhotoIds = []
         selectionAnchorId = -1
-        photoGrid.forceActiveFocus()
     }
 
     // F11 toggles fullscreen
@@ -203,13 +202,13 @@ ApplicationWindow {
                     onClicked: slideshowDialog.open()
                 }
 
-                // Thumbnail-Panels toggle
+                // Second panel toggle
                 SidebarButton {
-                    text: "Panels"
-                    icon: "\u25C6"
-                    active: photosViewRoot.panelsVisible
+                    text: "2. Panel"
+                    icon: "\u25A3"
+                    active: photosViewRoot.panel2Visible
                     visible: currentView === "photos"
-                    onClicked: photosViewRoot.panelsVisible = !photosViewRoot.panelsVisible
+                    onClicked: photosViewRoot.panel2Visible = !photosViewRoot.panel2Visible
                 }
 
                 // Vollbild toggle
@@ -338,607 +337,173 @@ ApplicationWindow {
                 Item {
                     id: photosViewRoot
 
-                    // Splitter position (ratio of grid width to total available width)
+                    // Split ratio between panels-area and detail panel
                     property real splitRatio: 0.55
-                    // Available width after timeline
-                    readonly property real contentWidth: width - timelineView.width
                     readonly property bool detailVisible: root.selectedPhotoId > 0
 
-                    // Thumbnail panels
-                    property bool panelsVisible: false
-                    readonly property real panelWidth: panelsVisible ? 220 : 0
-                    // Width available for grid + detail (after both panels)
-                    readonly property real gridDetailWidth: contentWidth - panelWidth * 2
+                    // Width allocated to the two panels together
+                    readonly property real panelsAreaWidth: detailVisible
+                        ? width * splitRatio
+                        : width
 
-                    // ── Drag coordination helpers ──────────────────────────────
+                    // panel2 can be toggled
+                    property bool panel2Visible: false
 
-                    // Returns true when scene position sp is inside the given panel item
-                    function isOverItem(sp, item) {
+                    // ── Panel 1 — always visible ─────────────────────────────
+                    PhotoPanel {
+                        id: panel1
+                        property int _lastDragId: -1
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: photosViewRoot.panel2Visible
+                               ? photosViewRoot.panelsAreaWidth / 2
+                               : photosViewRoot.panelsAreaWidth
+
+                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Thin divider between panels
+                    Rectangle {
+                        visible: photosViewRoot.panel2Visible
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        x: panel1.width
+                        width: 1
+                        color: "#333333"
+                        z: 5
+                    }
+
+                    // ── Panel 2 — toggled by sidebar button ──────────────────
+                    PhotoPanel {
+                        id: panel2
+                        property int _lastDragId: -1
+                        visible: photosViewRoot.panel2Visible
+                        anchors.left: panel1.right
+                        anchors.leftMargin: 1
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: photosViewRoot.panel2Visible
+                               ? photosViewRoot.panelsAreaWidth / 2
+                               : 0
+                    }
+
+                    // ── Drag coordination ─────────────────────────────────────
+
+                    function _isOver(scenePos, item) {
                         if (!item.visible) return false
-                        var p = item.mapFromItem(null, sp.x, sp.y)
+                        var p = item.mapFromItem(null, scenePos.x, scenePos.y)
                         return p.x >= 0 && p.y >= 0 && p.x < item.width && p.y < item.height
                     }
 
-                    // ── Main grid → panels drag ────────────────────────────────
-                    property int _lastGridDragId: -1
-
-                    Connections {
-                        target: photoGrid
-
-                        function onDragScenePosChanged() {
-                            if (photoGrid.draggingPhotoId <= 0) return
-                            var sp = photoGrid.dragScenePos
-                            panel1.dragOver = photosViewRoot.isOverItem(sp, panel1)
-                            panel2.dragOver = photosViewRoot.isOverItem(sp, panel2)
-                        }
-
-                        function onDraggingPhotoIdChanged() {
-                            var pid = photoGrid.draggingPhotoId
-                            if (pid > 0) {
-                                photosViewRoot._lastGridDragId = pid
-                                return
-                            }
-                            // Drag released — act on last known ID
-                            var dragId = photosViewRoot._lastGridDragId
-                            var sel    = root.selectedPhotoIds
-                            var toTag  = (sel.length > 1 && sel.indexOf(dragId) >= 0)
-                                         ? sel : [dragId]
-
-                            if (panel1.dragOver) {
-                                if (panel1.selectedTagId > 0)
-                                    panel1.acceptDrop(toTag)
-                            } else if (panel2.dragOver) {
-                                if (panel2.selectedTagId > 0)
-                                    panel2.acceptDrop(toTag)
-                            }
-                            panel1.dragOver = false
-                            panel2.dragOver = false
-                            photosViewRoot._lastGridDragId = -1
-                        }
-                    }
-
-                    // ── Panel → panel / panel → grid drag ─────────────────────
-                    // Shared handler factory: wired for each of panel1 and panel2.
-
-                    function handlePanelDrag(sourcePanel, otherPanel, scenePos) {
-                        sourcePanel.dragOver = false
-                        otherPanel.dragOver  = photosViewRoot.isOverItem(scenePos, otherPanel)
-                    }
-
-                    function handlePanelDrop(sourcePanel, otherPanel) {
-                        var pid = sourcePanel._lastDragId
-                        if (pid <= 0) { sourcePanel.dragOver = false; otherPanel.dragOver = false; return }
-
-                        var sel      = sourcePanel.selectedPanelIds
-                        var toMove   = (sel.length > 1 && sel.indexOf(pid) >= 0) ? sel : [pid]
-
-                        if (otherPanel.dragOver) {
-                            // Cross-panel drop
-                            if (otherPanel.selectedTagId > 0) {
-                                // Add tag from other panel
-                                otherPanel.acceptDrop(toMove)
-                            }
-                            if (sourcePanel.selectedTagId > 0) {
-                                // Remove tag from source panel
-                                sourcePanel.removeDraggedPhotos(toMove)
-                            }
-                        } else if (sourcePanel.reorderInsertIndex >= 0) {
-                            // Reorder within same panel
-                            sourcePanel.applyReorder(pid, sourcePanel.reorderInsertIndex)
-                        }
-
-                        sourcePanel.dragOver = false
-                        otherPanel.dragOver  = false
-                        sourcePanel._lastDragId = -1
-                    }
-
+                    // When dragging FROM panel1 or panel2: update dragOver on the OTHER panel,
+                    // and on drag-end decide cross-panel transfer vs. in-panel reorder.
                     Connections {
                         target: panel1
                         function onDragScenePosChanged() {
-                            if (panel1.draggingPhotoId > 0)
-                                photosViewRoot.handlePanelDrag(panel1, panel2, panel1.dragScenePos)
+                            if (panel1.draggingPhotoId <= 0) return
+                            panel2.dragOver = photosViewRoot._isOver(panel1.dragScenePos, panel2)
                         }
                         function onDraggingPhotoIdChanged() {
-                            if (panel1.draggingPhotoId > 0) {
-                                panel1._lastDragId = panel1.draggingPhotoId
-                            } else {
-                                photosViewRoot.handlePanelDrop(panel1, panel2)
+                            var pid = panel1.draggingPhotoId
+                            if (pid > 0) {
+                                panel1._lastDragId = pid
+                                return
                             }
+                            // Drag released
+                            if (panel2.dragOver) {
+                                panel1._dragFromIndex = -1   // cancel in-panel reorder
+                                var lastId = panel1._lastDragId
+                                var sel    = panel1.selectedPanelIds
+                                var toMove = (sel.length > 1 && sel.indexOf(lastId) >= 0) ? sel : [lastId]
+                                if (panel2.selectedTagId > 0) panel2.acceptDrop(toMove)
+                                else if (panel1.selectedTagId > 0) panel1.removeDrop(toMove)
+                            }
+                            panel2.dragOver    = false
+                            panel1._lastDragId = -1
                         }
                     }
 
                     Connections {
                         target: panel2
                         function onDragScenePosChanged() {
-                            if (panel2.draggingPhotoId > 0)
-                                photosViewRoot.handlePanelDrag(panel2, panel1, panel2.dragScenePos)
+                            if (panel2.draggingPhotoId <= 0) return
+                            panel1.dragOver = photosViewRoot._isOver(panel2.dragScenePos, panel1)
                         }
                         function onDraggingPhotoIdChanged() {
-                            if (panel2.draggingPhotoId > 0) {
-                                panel2._lastDragId = panel2.draggingPhotoId
-                            } else {
-                                photosViewRoot.handlePanelDrop(panel2, panel1)
+                            var pid = panel2.draggingPhotoId
+                            if (pid > 0) {
+                                panel2._lastDragId = pid
+                                return
                             }
+                            if (panel1.dragOver) {
+                                panel2._dragFromIndex = -1
+                                var lastId = panel2._lastDragId
+                                var sel    = panel2.selectedPanelIds
+                                var toMove = (sel.length > 1 && sel.indexOf(lastId) >= 0) ? sel : [lastId]
+                                if (panel1.selectedTagId > 0) panel1.acceptDrop(toMove)
+                                else if (panel2.selectedTagId > 0) panel2.removeDrop(toMove)
+                            }
+                            panel1.dragOver    = false
+                            panel2._lastDragId = -1
                         }
                     }
 
-                    // Toolbar — spans only the thumbnail grid column
-                    Rectangle {
-                        id: gridToolbar
-                        anchors.left: timelineView.visible ? timelineView.right : parent.left
-                        anchors.top: parent.top
-                        width: photoGrid.width
-                        height: 44
-                        color: "#2d2d2d"
-                        z: 5
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 10
-
-                            Label {
-                                text: photoModel.totalPhotos + " Medien"
-                                color: "#aaaaaa"
-                                font.pixelSize: 13
-                            }
-
-                            // Media type filter buttons
-                            Row {
-                                spacing: 1
-
-                                Repeater {
-                                    id: filterRepeater
-                                    model: [
-                                        { label: "Alle", filter: -1 },
-                                        { label: "Fotos", filter: 0 },
-                                        { label: "Videos", filter: 1 }
-                                    ]
-
-                                    Rectangle {
-                                        required property var modelData
-                                        required property int index
-                                        readonly property bool isFirst: index === 0
-                                        readonly property bool isActive: !photoModel.showDeleted && photoModel.mediaTypeFilter === modelData.filter
-                                        width: filterLabel.implicitWidth + 18
-                                        height: 26
-                                        radius: isFirst ? 4 : 0
-                                        color: isActive ? "#555555" : "#3a3a3a"
-
-                                        Rectangle {
-                                            visible: isFirst
-                                            anchors.right: parent.right
-                                            width: parent.width / 2
-                                            height: parent.height
-                                            color: parent.color
-                                        }
-
-                                        Label {
-                                            id: filterLabel
-                                            anchors.centerIn: parent
-                                            text: modelData.label
-                                            color: isActive ? "#ffffff" : "#aaaaaa"
-                                            font.pixelSize: 12
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                photoModel.showDeleted = false
-                                                photoModel.mediaTypeFilter = modelData.filter
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Deleted filter
-                                Rectangle {
-                                    width: deletedLabel.implicitWidth + 18
-                                    height: 26
-                                    radius: 4
-                                    color: photoModel.showDeleted ? "#664444" : "#3a3a3a"
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        width: parent.width / 2
-                                        height: parent.height
-                                        color: parent.color
-                                    }
-
-                                    Label {
-                                        id: deletedLabel
-                                        anchors.centerIn: parent
-                                        text: "\u2715 Gelöscht"
-                                        color: photoModel.showDeleted ? "#ff8888" : "#aaaaaa"
-                                        font.pixelSize: 12
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: photoModel.showDeleted = !photoModel.showDeleted
-                                    }
-                                }
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            // Search / filter by tag or sender
-                            Item {
-                                id: searchItem
-                                implicitWidth: 200
-                                implicitHeight: 28
-
-                                Rectangle {
-                                    id: searchBox
-                                    anchors.fill: parent
-                                    color: searchInput.activeFocus ? "#3a3a3a" : "#333333"
-                                    radius: 14
-                                    border.color: searchInput.activeFocus ? root.accentColor : "#444444"
-                                    border.width: 1
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 10
-                                        anchors.rightMargin: 6
-                                        spacing: 4
-
-                                        Label {
-                                            text: "\u25CB"
-                                            font.pixelSize: 12
-                                            opacity: 0.6
-                                        }
-
-                                        TextInput {
-                                            id: searchInput
-                                            Layout.fillWidth: true
-                                            verticalAlignment: Text.AlignVCenter
-                                            color: "#ffffff"
-                                            font.pixelSize: 12
-                                            clip: true
-                                            selectByMouse: true
-
-                                            property bool suppressUpdate: false
-
-                                            onTextChanged: {
-                                                if (!suppressUpdate)
-                                                    photoModel.updateSuggestions(text)
-                                            }
-
-                                            Keys.onReturnPressed: {
-                                                if (suggestionDropdown.visible && suggestionList.currentIndex >= 0) {
-                                                    searchItem.applySuggestion(photoModel.filterSuggestions[suggestionList.currentIndex])
-                                                } else if (text.trim() !== "") {
-                                                    photoModel.filterText = text.trim()
-                                                    suggestionDropdown.visible = false
-                                                }
-                                            }
-
-                                            onActiveFocusChanged: {
-                                                if (!activeFocus)
-                                                    suggestionCloseTimer.restart()
-                                            }
-
-                                            Keys.onEscapePressed: {
-                                                if (suggestionDropdown.visible) {
-                                                    suggestionCloseTimer.stop()
-                                                    suggestionDropdown.visible = false
-                                                } else {
-                                                    text = ""
-                                                    photoModel.clearFilter()
-                                                    focus = false
-                                                }
-                                            }
-
-                                            Keys.onTabPressed: {
-                                                if (suggestionDropdown.visible) {
-                                                    event.accepted = true
-                                                    if (suggestionList.currentIndex < suggestionList.count - 1)
-                                                        suggestionList.currentIndex++
-                                                    else
-                                                        suggestionList.currentIndex = 0
-                                                }
-                                            }
-
-                                            Keys.onDownPressed: {
-                                                if (suggestionDropdown.visible && suggestionList.currentIndex < suggestionList.count - 1)
-                                                    suggestionList.currentIndex++
-                                            }
-
-                                            Keys.onUpPressed: {
-                                                if (suggestionDropdown.visible && suggestionList.currentIndex > 0)
-                                                    suggestionList.currentIndex--
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            width: 18; height: 18; radius: 9
-                                            color: clearFilterArea.containsMouse ? "#555555" : "transparent"
-                                            visible: searchInput.text.length > 0 || photoModel.filterText !== ""
-                                            Label {
-                                                anchors.centerIn: parent
-                                                text: "\u2715"
-                                                color: "#888888"
-                                                font.pixelSize: 10
-                                            }
-                                            MouseArea {
-                                                id: clearFilterArea
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                    searchInput.text = ""
-                                                    photoModel.clearFilter()
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Label {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 28
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: "Tag oder Sender..."
-                                        color: "#666666"
-                                        font.pixelSize: 12
-                                        visible: searchInput.text.length === 0 && !searchInput.activeFocus
-                                    }
-                                }
-
-                                Connections {
-                                    target: photoModel
-                                    function onFilterSuggestionsChanged() {
-                                        suggestionList.currentIndex = -1
-                                        suggestionDropdown.visible =
-                                            searchInput.activeFocus &&
-                                            photoModel.filterText === "" &&
-                                            searchInput.text.length > 0 &&
-                                            photoModel.filterSuggestions.length > 0
-                                    }
-                                }
-
-                                Timer {
-                                    id: suggestionCloseTimer
-                                    interval: 150
-                                    onTriggered: suggestionDropdown.visible = false
-                                }
-
-                                function applySuggestion(suggestion) {
-                                    suggestionCloseTimer.stop()
-                                    var value = suggestion
-                                    if (suggestion.startsWith("Tag: "))
-                                        value = suggestion.substring(5)
-                                    else if (suggestion.startsWith("Sender: "))
-                                        value = suggestion.substring(8)
-                                    searchInput.suppressUpdate = true
-                                    searchInput.text = value
-                                    searchInput.suppressUpdate = false
-                                    photoModel.filterText = value
-                                    suggestionDropdown.visible = false
-                                    searchInput.forceActiveFocus()
-                                    searchInput.cursorPosition = searchInput.text.length
-                                }
-                            }
-
-                            // Fill / Fit toggle
-                            Rectangle {
-                                width: fitToggleLabel.implicitWidth + 18
-                                height: 26
-                                radius: 4
-                                color: appSettings.thumbnailFitMode ? "#555555" : "#3a3a3a"
-
-                                Label {
-                                    id: fitToggleLabel
-                                    anchors.centerIn: parent
-                                    text: appSettings.thumbnailFitMode ? "\u25A1 Ganz" : "\u25A0 Füllen"
-                                    color: appSettings.thumbnailFitMode ? "#ffffff" : "#aaaaaa"
-                                    font.pixelSize: 12
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: appSettings.thumbnailFitMode = !appSettings.thumbnailFitMode
-                                }
-                            }
-
-                            Label {
-                                text: "Größe"
-                                color: "#aaaaaa"
-                                font.pixelSize: 12
-                            }
-
-                            Slider {
-                                id: zoomSlider
-                                from: 3
-                                to: 12
-                                value: 10
-                                stepSize: 1
-                                implicitWidth: 110
-
-                                onValueChanged: {
-                                    photoModel.photosPerRow = (from + to) - Math.round(value)
-                                }
-                            }
-
-                        }
-                    }
-
-                    TimelineView {
-                        id: timelineView
-                        anchors.left: parent.left
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        visible: photoModel.totalPhotos > 0
-                        onMonthClicked: function(timelineIndex, rowIndex) {
-                            photoGrid.positionViewAtIndex(rowIndex, ListView.Beginning)
-                        }
-                    }
-
-                    // Debounced timeline activeIndex update (avoids per-pixel recomputation during scroll)
-                    Timer {
-                        id: timelineUpdateTimer
-                        interval: 80
-                        onTriggered: {
-                            if (!photoGrid.count) { timelineView.activeIndex = -1; return }
-                            var topIdx = photoGrid.indexAt(0, photoGrid.contentY + 10)
-                            if (topIdx < 0) { timelineView.activeIndex = -1; return }
-                            // Binary search through headerRowIndices
-                            var data = photoModel.timelineData
-                            var lo = 0, hi = data.length - 1, best = -1
-                            while (lo <= hi) {
-                                var mid = (lo + hi) >> 1
-                                if (data[mid].rowIndex <= topIdx) {
-                                    best = mid
-                                    lo = mid + 1
-                                } else {
-                                    hi = mid - 1
-                                }
-                            }
-                            timelineView.activeIndex = best
-                        }
-                    }
-                    Connections {
-                        target: photoGrid
-                        function onContentYChanged() { timelineUpdateTimer.restart() }
-                    }
-
-                    PhotoGridView {
-                        id: photoGrid
-                        anchors.left: timelineView.visible ? timelineView.right : parent.left
-                        anchors.top: gridToolbar.bottom
-                        anchors.bottom: parent.bottom
-                        width: photosViewRoot.detailVisible
-                              ? photosViewRoot.gridDetailWidth * photosViewRoot.splitRatio
-                              : photosViewRoot.gridDetailWidth
-                        fitMode: appSettings.thumbnailFitMode
-                        taggedPhotoIds:    panel1.tagPhotoIds
-                        tagIndicatorColor: panel1.selectedTagId > 0
-                                           ? tagModel.tagColor(panel1.selectedTagId)
-                                           : "#ffffff"
-                    }
-
-                    // ── Panel 1 (left of detail, right of grid) ─────────────
-                    ThumbnailPanel {
-                        id: panel1
-                        visible: photosViewRoot.panelsVisible
-                        anchors.left: photoGrid.right
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        width: photosViewRoot.panelWidth
-                        property int _lastDragId: -1
-
-                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    }
-
-                    // ── Panel 2 (right of panel 1) ───────────────────────────
-                    ThumbnailPanel {
-                        id: panel2
-                        visible: photosViewRoot.panelsVisible
-                        anchors.left: panel1.right
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        width: photosViewRoot.panelWidth
-                        property int _lastDragId: -1
-
-                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    }
-
-                    // ── Drag ghost — follows cursor during any thumbnail drag ─
-                    // Works for drags from the main grid as well as from panels.
+                    // ── Drag ghost ────────────────────────────────────────────
                     Rectangle {
                         id: dragGhost
                         parent: photosViewRoot
                         z: 999
                         width: 72; height: 72
-                        radius: 6
-                        clip: true
+                        radius: 6; clip: true
                         border.width: 2
                         color: "#1affffff"
 
-                        readonly property int  _activeDragId: photoGrid.draggingPhotoId > 0
-                                                              ? photoGrid.draggingPhotoId
-                                                              : panel1.draggingPhotoId > 0
-                                                                ? panel1.draggingPhotoId
-                                                                : panel2.draggingPhotoId
+                        readonly property int   _id:  panel1.draggingPhotoId > 0
+                                                       ? panel1.draggingPhotoId
+                                                       : panel2.draggingPhotoId
+                        readonly property point _sp:  panel1.draggingPhotoId > 0
+                                                       ? panel1.dragScenePos
+                                                       : panel2.dragScenePos
 
-                        readonly property point _scenePos: photoGrid.draggingPhotoId > 0
-                                                           ? photoGrid.dragScenePos
-                                                           : panel1.draggingPhotoId > 0
-                                                             ? panel1.dragScenePos
-                                                             : panel2.dragScenePos
+                        visible: _id > 0
 
-                        visible: _activeDragId > 0
-
-                        // Blue for grid→panel (add), purple for panel→panel, red for panel→no-tag
                         border.color: {
-                            if (photoGrid.draggingPhotoId > 0) return root.accentColor
-                            // panel drag: check if target panel has a tag
                             var src  = panel1.draggingPhotoId > 0 ? panel1 : panel2
                             var dest = panel1.draggingPhotoId > 0 ? panel2 : panel1
-                            if (dest.dragOver && dest.selectedTagId <= 0) return "#cc4444"
+                            if (dest.dragOver && dest.selectedTagId <= 0
+                                    && src.selectedTagId > 0) return "#cc4444"
                             return root.accentColor
                         }
 
-                        readonly property point _local: {
-                            var sp = _scenePos
-                            return photosViewRoot.mapFromItem(null, sp.x, sp.y)
-                        }
+                        readonly property point _local:
+                            photosViewRoot.mapFromItem(null, _sp.x, _sp.y)
+
                         x: _local.x - width  / 2
                         y: _local.y - height / 2
 
                         Image {
-                            anchors.fill: parent
-                            anchors.margins: 2
-                            source: dragGhost._activeDragId > 0
-                                    ? "image://thumbnail/" + dragGhost._activeDragId : ""
+                            anchors.fill: parent; anchors.margins: 2
+                            source: dragGhost._id > 0
+                                    ? "image://thumbnail/" + dragGhost._id : ""
                             fillMode: Image.PreserveAspectCrop
                             cache: true
-                        }
-
-                        // Count badge (grid multi-select)
-                        Rectangle {
-                            visible: {
-                                var sel = root.selectedPhotoIds
-                                return sel.length > 1 &&
-                                       sel.indexOf(photoGrid.draggingPhotoId) >= 0
-                            }
-                            anchors.top:   parent.top
-                            anchors.right: parent.right
-                            anchors.margins: -4
-                            width:  countBadgeLabel.implicitWidth + 8
-                            height: 20
-                            radius: 10
-                            color:  root.accentColor
-
-                            Label {
-                                id: countBadgeLabel
-                                anchors.centerIn: parent
-                                text: root.selectedPhotoIds.length
-                                color: "#ffffff"
-                                font.pixelSize: 11
-                                font.bold: true
-                            }
                         }
 
                         opacity: 0.88
                         Behavior on opacity { NumberAnimation { duration: 80 } }
                     }
 
-                    // Draggable splitter handle
+                    // ── Draggable splitter handle ─────────────────────────────
                     Rectangle {
                         id: splitterHandle
                         visible: photosViewRoot.detailVisible
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        // Position after panel2 (if visible) or after the grid
-                        x: (photosViewRoot.panelsVisible
-                            ? panel2.x + panel2.width
-                            : photoGrid.x + photoGrid.width) - 3
+                        x: photosViewRoot.panelsAreaWidth - 3
                         width: 6
-                        color: splitterMouse.containsMouse || splitterMouse.pressed ? root.accentColor : "#333333"
+                        color: splitterMouse.containsMouse || splitterMouse.pressed
+                               ? root.accentColor : "#333333"
                         z: 10
 
                         Behavior on color { ColorAnimation { duration: 150 } }
@@ -946,27 +511,26 @@ ApplicationWindow {
                         MouseArea {
                             id: splitterMouse
                             anchors.fill: parent
-                            anchors.margins: -3  // larger hit area
+                            anchors.margins: -3
                             hoverEnabled: true
                             cursorShape: Qt.SplitHCursor
-                            property real dragStartX: 0
-                            property real dragStartRatio: 0
+                            property real _startX: 0
+                            property real _startRatio: 0
 
                             onPressed: function(mouse) {
-                                dragStartX = mouse.x + splitterHandle.x
-                                dragStartRatio = photosViewRoot.splitRatio
+                                _startX     = mouse.x + splitterHandle.x
+                                _startRatio = photosViewRoot.splitRatio
                             }
                             onPositionChanged: function(mouse) {
                                 if (!pressed) return
-                                var currentX = mouse.x + splitterHandle.x
-                                var delta = currentX - dragStartX
-                                var newRatio = dragStartRatio + delta / photosViewRoot.gridDetailWidth
+                                var delta    = (mouse.x + splitterHandle.x) - _startX
+                                var newRatio = _startRatio + delta / photosViewRoot.width
                                 photosViewRoot.splitRatio = Math.max(0.2, Math.min(0.8, newRatio))
                             }
                         }
                     }
 
-                    // Detail panel (right side)
+                    // ── Detail panel ──────────────────────────────────────────
                     DetailView {
                         id: detailPanel
                         visible: photosViewRoot.detailVisible
@@ -975,7 +539,7 @@ ApplicationWindow {
                         anchors.left: splitterHandle.right
                         anchors.right: parent.right
                         photoId: root.selectedPhotoId
-                        gridView: photoGrid
+                        gridView: null    // panels use GridView, not ListView
                         onClosed: root.closeDetail()
                         onNavigateNext: {
                             var nextId = photoModel.nextPhotoId(root.selectedPhotoId)
@@ -985,9 +549,7 @@ ApplicationWindow {
                             var prevId = photoModel.previousPhotoId(root.selectedPhotoId)
                             if (prevId > 0) root.selectPhoto(prevId)
                         }
-                        onSendRequested: function(photoId) {
-                            sendSheet.open(photoId)
-                        }
+                        onSendRequested: function(photoId) { sendSheet.open(photoId) }
                         onEditRequested: function(photoId, filePath, mediaType) {
                             photoEditOverlay.open(photoId, filePath, mediaType)
                         }
@@ -1041,7 +603,7 @@ ApplicationWindow {
         z: 180
         onClosed: {
             photoEditOverlay.visible = false
-            photoGrid.forceActiveFocus()
+            panel1.forceActiveFocus()
         }
         onSavedAndReload: function(photoId) {
             photoModel.reload()
@@ -1054,7 +616,7 @@ ApplicationWindow {
         anchors.fill: parent
         onClosed: {
             // Return focus to grid
-            photoGrid.forceActiveFocus()
+            panel1.forceActiveFocus()
         }
     }
 
@@ -1379,71 +941,6 @@ ApplicationWindow {
         }
     }
 
-    // Autocomplete dropdown — root-level overlay so clicks are delivered reliably
-    Rectangle {
-        id: suggestionDropdown
-        visible: false
-        z: 50
-        // sidebar(200) + timelineView.width + gridToolbar RowLayout leftMargin(12) + searchItem.x in RowLayout
-        x: 200 + (timelineView.visible ? timelineView.width : 0) + 12 + searchItem.x
-        // importBar(0 or 32) + gridToolbar height(44) + gap(4)
-        y: (photoImporter.running ? 32 : 0) + 44 + 4
-        width: searchItem.width
-        height: Math.min(suggestionList.contentHeight + 8, 200)
-        color: "#2a2a2a"
-        radius: 8
-        border.color: "#444444"
-        border.width: 1
-        clip: true
-
-        ListView {
-            id: suggestionList
-            anchors.fill: parent
-            anchors.margins: 4
-            model: photoModel.filterSuggestions
-            currentIndex: -1
-            clip: true
-
-            delegate: Rectangle {
-                required property string modelData
-                required property int index
-
-                width: ListView.view.width
-                height: 30
-                radius: 4
-                color: index === suggestionList.currentIndex ? "#444444"
-                     : suggItemArea.containsMouse ? "#383838" : "transparent"
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 8
-                    anchors.rightMargin: 8
-                    spacing: 6
-
-                    Label {
-                        text: modelData.startsWith("Tag:") ? "\u25C6" : "\u2B07"
-                        font.pixelSize: 12
-                    }
-
-                    Label {
-                        text: modelData
-                        color: "#cccccc"
-                        font.pixelSize: 12
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                    }
-                }
-
-                MouseArea {
-                    id: suggItemArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: searchItem.applySuggestion(modelData)
-                }
-            }
-        }
-    }
 
     // Photo metadata overlay
     PhotoInfoOverlay {

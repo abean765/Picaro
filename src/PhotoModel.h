@@ -74,6 +74,7 @@ public:
     Q_INVOKABLE int timelineIndexForPhotoId(qint64 id) const;
 
     Q_INVOKABLE QString filePathForId(qint64 id) const;
+    Q_INVOKABLE QString monthKeyForId(qint64 id) const;
     Q_INVOKABLE int mediaTypeForId(qint64 id) const;
     Q_INVOKABLE QString liveVideoPathForId(qint64 id) const;
     Q_INVOKABLE QString resolutionForId(qint64 id) const;

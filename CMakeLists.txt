@@ -138,7 +138,7 @@ qt_add_qml_module(picaro
         qml/GeoMapView.qml
         qml/PhotoEditView.qml
         qml/EditSlider.qml
-        qml/ThumbnailPanel.qml
+        qml/PhotoPanel.qml
         qml/PhotoInfoOverlay.qml
 )
 
