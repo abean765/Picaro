@@ -645,6 +645,7 @@ Item {
                 anchors.right: parent.right
                 clip: true
                 model: panel._displayModel
+                interactive: false   // WheelHandler handles scrolling; keep mouse events for DragHandler
 
                 readonly property real _cellSize: Math.max(50, Math.floor((width - 2) / panel.photosPerRow))
                 cellWidth:  _cellSize
