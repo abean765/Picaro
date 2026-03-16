@@ -112,9 +112,12 @@ ApplicationWindow {
         })
     }
 
-    Component.onCompleted: _loadPanelStates()
-
-    onClosing: _savePanelStates()
+    Component.onCompleted: {
+        _loadPanelStates()
+        if (appSettings.networkVisible) {
+            networkManager.startDiscovery(appSettings.computerName)
+        }
+    }
 
     // Called from PhotoGridView cells — handles CTRL and SHIFT modifiers.
     function handleCellClick(photoId, modifiers) {
@@ -948,12 +951,7 @@ ApplicationWindow {
         }
     }
 
-    // Auto-start discovery if network visible
-    Component.onCompleted: {
-        if (appSettings.networkVisible) {
-            networkManager.startDiscovery(appSettings.computerName)
-        }
-    }
+
 
 
     // Photo metadata overlay
