@@ -126,8 +126,10 @@ Item {
 
     // ── Internal state ──────────────────────────────────────────────────────
 
-    // displayModel: photoIds with a -1 placeholder for the reorder gap.
-    // The GridView's model is this array.
+    // displayModel: mirror of photoIds used as GridView model.
+    // During drag we do NOT insert placeholders here — the DragHandler lives
+    // inside each delegate; making its parent invisible would kill the handler.
+    // Instead the delegate itself renders the insertion-point indicator.
     property var _displayModel: []
 
     // Reorder state
@@ -149,49 +151,33 @@ Item {
             : allTags.filter(function(t) { return t.name.toLowerCase().indexOf(f) >= 0 })
     }
 
-    // Build _displayModel from photoIds (with optional placeholder)
+    // _displayModel is always just photoIds — no placeholder insertion.
+    // The insertion indicator is rendered per-delegate via _dragInsertIndex.
     function _rebuildDisplayModel() {
-        if (_dragFromIndex < 0 || _dragInsertIndex < 0) {
-            _displayModel = photoIds.slice()
-            return
-        }
-        var src = photoIds.slice()
-        // Remove the dragged item from its original position
-        src.splice(_dragFromIndex, 1)
-        // Insert placeholder at insertion index (clamped)
-        var ins = Math.max(0, Math.min(_dragInsertIndex, src.length))
-        src.splice(ins, 0, -1)
-        _displayModel = src
+        _displayModel = photoIds.slice()
     }
 
-    // Update insertion index from the pointer position inside the grid
+    // Update insertion index from pointer scene position.
+    // No model rebuild — delegates react to _dragInsertIndex via bindings.
     function _updateInsertIndex(scenePos) {
         var localPos = photoGrid.mapFromItem(null, scenePos.x, scenePos.y)
         var cols = Math.max(1, photosPerRow)
         var cellW = photoGrid.width / cols
-        var cellH = cellW  // square cells
 
         var col = Math.floor(localPos.x / cellW)
-        var row = Math.floor((localPos.y + photoGrid.contentY) / cellH)
+        var row = Math.floor((localPos.y + photoGrid.contentY) / cellW)
         col = Math.max(0, Math.min(col, cols - 1))
         row = Math.max(0, row)
 
         var rawIdx = row * cols + col
-        // Snap to right side when pointer is in right half of cell
         var cellLocalX = localPos.x - col * cellW
         if (cellLocalX > cellW / 2) rawIdx++
 
-        // The insert index is into the array WITHOUT the dragged item
-        var maxInsert = photoIds.length - 1  // placeholder replaces one slot
-        var newInsert = Math.max(0, Math.min(rawIdx, maxInsert))
-
-        if (newInsert !== _dragInsertIndex) {
-            _dragInsertIndex = newInsert
-            _rebuildDisplayModel()
-        }
+        var newInsert = Math.max(0, Math.min(rawIdx, photoIds.length - 1))
+        _dragInsertIndex = newInsert
     }
 
-    // Finalise reorder: apply the pending move
+    // Finalise reorder: apply the pending move to photoIds
     function _applyReorder() {
         if (_dragFromIndex < 0 || _dragInsertIndex < 0) return
         var dragId = photoIds[_dragFromIndex]
@@ -202,14 +188,7 @@ Item {
         _dragFromIndex   = -1
         _dragInsertIndex = -1
         photoIds         = arr
-        _displayModel    = arr.slice()
-    }
-
-    // Debounce display-model rebuild during drag to avoid rebuilding on every pixel
-    Timer {
-        id: rebuildTimer
-        interval: 30
-        onTriggered: panel._rebuildDisplayModel()
+        _rebuildDisplayModel()
     }
 
     // Reload when the underlying model changes
@@ -692,46 +671,27 @@ Item {
 
                 delegate: Item {
                     id: cellDelegate
-                    required property var modelData   // -1 = reorder placeholder
+                    required property var modelData
                     required property int index
 
                     width:  photoGrid._cellSize
                     height: photoGrid._cellSize
 
-                    readonly property bool isPlaceholder: modelData === -1
                     readonly property bool isSelected:
-                        !isPlaceholder && panel.selectedPanelIds.indexOf(modelData) >= 0
+                        panel.selectedPanelIds.indexOf(modelData) >= 0
+                    readonly property bool isDragging:
+                        modelData === panel.draggingPhotoId
 
-                    // Placeholder: empty gap showing where the item will land
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 2
-                        visible: isPlaceholder
-                        color: "transparent"
-                        border.color: root.accentColor
-                        border.width: 2
-                        radius: 4
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 40; height: 40; radius: 20
-                            color: Qt.rgba(root.accentColor.r,
-                                           root.accentColor.g,
-                                           root.accentColor.b, 0.15)
-                        }
-                    }
-
-                    // Normal photo cell
+                    // Photo thumbnail
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: 1
-                        visible: !isPlaceholder
                         color: "#2a2a2a"
                         clip: true
 
                         Image {
                             anchors.fill: parent
-                            source: !isPlaceholder ? "image://thumbnail/" + modelData : ""
+                            source: "image://thumbnail/" + modelData
                             fillMode: fitToggle._fitMode
                                       ? Image.PreserveAspectFit
                                       : Image.PreserveAspectCrop
@@ -758,12 +718,20 @@ Item {
                             z: 2
                         }
 
-                        // Dim unselected when selection is active
+                        // Dim unselected when multi-selection is active
                         Rectangle {
                             anchors.fill: parent
                             color: "#60000000"
                             visible: panel.selectedPanelIds.length > 0 && !isSelected
                             z: 1
+                        }
+
+                        // Dim the item that is currently being dragged
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "#88000000"
+                            visible: isDragging
+                            z: 4
                         }
 
                         MouseArea {
@@ -775,17 +743,23 @@ Item {
                             }
                         }
 
-                        // Drag handler — drives reorder and cross-panel drag
+                        // ── Drag handler ─────────────────────────────────────
+                        // NOTE: kept inside the always-visible Rectangle so it
+                        // is never disabled by a visibility change on a parent.
                         DragHandler {
                             id: cellDragHandler
                             target: null
 
                             onActiveChanged: {
                                 if (active) {
+                                    // Set position FIRST so ghost appears at cursor
+                                    panel.dragScenePos    = centroid.scenePosition
                                     panel.draggingPhotoId = modelData
                                     panel._dragFromIndex  = panel.photoIds.indexOf(modelData)
                                     panel._dragInsertIndex = panel._dragFromIndex
-                                    panel._rebuildDisplayModel()
+                                    // No _rebuildDisplayModel() here — that would reassign
+                                    // _displayModel and cause GridView to recreate this
+                                    // delegate, killing the active DragHandler.
                                 } else {
                                     if (panel.draggingPhotoId !== modelData) return
 
@@ -799,7 +773,7 @@ Item {
                                                    && sp.x < sibling.width
                                                    && sp.y < sibling.height)
                                         if (hit) {
-                                            // ── Cross-panel drop ──────────────────
+                                            // ── Cross-panel drop ──────────────
                                             var sel    = panel.selectedPanelIds
                                             var toMove = (sel.length > 1 && sel.indexOf(modelData) >= 0)
                                                          ? sel : [modelData]
@@ -809,10 +783,8 @@ Item {
                                             else if (panel.selectedTagId > 0)
                                                 panel.removeDrop(toMove)
 
-                                            // Cancel reorder placeholder
                                             panel._dragFromIndex   = -1
                                             panel._dragInsertIndex = -1
-                                            panel._rebuildDisplayModel()
                                             panel.draggingPhotoId  = -1
                                             sibling.dragOver       = false
                                             return
@@ -842,11 +814,8 @@ Item {
 
                                     if (overSibling !== sibling.dragOver) {
                                         sibling.dragOver = overSibling
-                                        if (overSibling) {
-                                            // Entering sibling: remove reorder gap
+                                        if (overSibling)
                                             panel._dragInsertIndex = -1
-                                            panel._rebuildDisplayModel()
-                                        }
                                     }
                                 }
 
@@ -854,6 +823,25 @@ Item {
                                     panel._updateInsertIndex(centroid.scenePosition)
                             }
                         }
+                    }
+
+                    // ── Insertion-point indicator ─────────────────────────────
+                    // Shown on the cell where the dragged item would land.
+                    // Uses a left-edge bar (before this cell) or right-edge bar
+                    // (after last cell). No model rebuild needed.
+                    Rectangle {
+                        anchors.top:    parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.topMargin:    3
+                        anchors.bottomMargin: 3
+                        width: 3
+                        radius: 2
+                        color: root.accentColor
+                        visible: panel._dragFromIndex >= 0
+                                 && panel._dragInsertIndex === index
+                                 && !isDragging
+                        x: 0
+                        z: 20
                     }
                 }
             }
