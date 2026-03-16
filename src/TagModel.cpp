@@ -172,3 +172,13 @@ QVariantList TagModel::photoIdsForTag(qint64 tagId) const
     }
     return result;
 }
+
+bool TagModel::saveTagPhotoOrder(qint64 tagId, const QVariantList &photoIds)
+{
+    if (!m_db) return false;
+    QVector<qint64> ids;
+    ids.reserve(photoIds.size());
+    for (const QVariant &v : photoIds)
+        ids.append(v.toLongLong());
+    return m_db->saveTagPhotoOrder(tagId, ids);
+}

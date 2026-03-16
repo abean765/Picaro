@@ -206,6 +206,8 @@ Item {
         _dragInsertIndex = -1
         photoIds         = arr
         _rebuildDisplayModel()
+        if (selectedTagId > 0)
+            tagModel.saveTagPhotoOrder(selectedTagId, photoIds)
     }
 
     // Reload when the underlying model changes
@@ -327,10 +329,17 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (clearTagHover.containsMouse) {
-                                panel.clearTag()
-                                return
+                        onClicked: function(mouse) {
+                            // containsMouse on clearTagHover is unreliable because
+                            // this MouseArea sits on top and intercepts hover events.
+                            // Use explicit position mapping instead.
+                            if (panel.selectedTagId > 0) {
+                                var p = mapToItem(clearTagHover, mouse.x, mouse.y)
+                                if (p.x >= 0 && p.x < clearTagHover.width
+                                        && p.y >= 0 && p.y < clearTagHover.height) {
+                                    panel.clearTag()
+                                    return
+                                }
                             }
                             panel.rebuildTagList()
                             panel.dropdownVisible = !panel.dropdownVisible
@@ -822,6 +831,12 @@ Item {
                                                 sibling.acceptDrop(toMove)
                                             else if (panel.selectedTagId > 0)
                                                 panel.removeDrop(toMove)
+
+                                            // Persist the new order on both panels
+                                            if (sibling.selectedTagId > 0)
+                                                tagModel.saveTagPhotoOrder(sibling.selectedTagId, sibling.photoIds)
+                                            if (panel.selectedTagId > 0)
+                                                tagModel.saveTagPhotoOrder(panel.selectedTagId, panel.photoIds)
 
                                             panel._dragFromIndex    = -1
                                             panel._dragInsertIndex  = -1

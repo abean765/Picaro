@@ -43,6 +43,9 @@ public:
     // Get all photo IDs for a tag (for bulk operations like sending)
     Q_INVOKABLE QVariantList photoIdsForTag(qint64 tagId) const;
 
+    // Persist the custom sort order for a tag's photos
+    Q_INVOKABLE bool saveTagPhotoOrder(qint64 tagId, const QVariantList &photoIds);
+
     // Lookup helpers for QML
     Q_INVOKABLE QString tagName(qint64 tagId) const;
     Q_INVOKABLE QString tagColor(qint64 tagId) const;

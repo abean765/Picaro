@@ -166,6 +166,21 @@ void PhotoDatabase::migrateSchema()
         "CREATE INDEX IF NOT EXISTS idx_photos_deleted_date ON photos(deleted, date_taken DESC)"
     ));
 
+    // photo_tags: add sort_order for custom per-tag ordering
+    q.exec(QStringLiteral("PRAGMA table_info(photo_tags)"));
+    QSet<QString> photoTagCols;
+    while (q.next()) {
+        photoTagCols.insert(q.value(1).toString());
+    }
+    if (!photoTagCols.contains(QStringLiteral("sort_order"))) {
+        q.exec(QStringLiteral("ALTER TABLE photo_tags ADD COLUMN sort_order INTEGER DEFAULT 0"));
+        // Initialise sort_order to rowid order so existing rows get a stable baseline
+        q.exec(QStringLiteral(
+            "UPDATE photo_tags SET sort_order = rowid"
+        ));
+        qDebug() << "Migrated: added sort_order column to photo_tags";
+    }
+
     // Tags: add parent_id for tree structure
     q.exec(QStringLiteral("PRAGMA table_info(tags)"));
     QSet<QString> tagCols;
@@ -673,8 +688,12 @@ QVector<qint64> PhotoDatabase::tagsForPhoto(qint64 photoId) const
 bool PhotoDatabase::addTagToPhoto(qint64 photoId, qint64 tagId)
 {
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("INSERT OR IGNORE INTO photo_tags (photo_id, tag_id) VALUES (?, ?)"));
+    q.prepare(QStringLiteral(
+        "INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, sort_order) "
+        "VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM photo_tags WHERE tag_id = ?))"
+    ));
     q.addBindValue(photoId);
+    q.addBindValue(tagId);
     q.addBindValue(tagId);
     return q.exec();
 }
@@ -773,7 +792,7 @@ QVector<qint64> PhotoDatabase::photoIdsForTag(qint64 tagId) const
     QVector<qint64> ids;
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "SELECT photo_id FROM photo_tags WHERE tag_id = ?"
+        "SELECT photo_id FROM photo_tags WHERE tag_id = ? ORDER BY sort_order"
     ));
     q.addBindValue(tagId);
     if (q.exec()) {
@@ -782,4 +801,20 @@ QVector<qint64> PhotoDatabase::photoIdsForTag(qint64 tagId) const
         }
     }
     return ids;
+}
+
+bool PhotoDatabase::saveTagPhotoOrder(qint64 tagId, const QVector<qint64> &photoIds)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "UPDATE photo_tags SET sort_order = ? WHERE tag_id = ? AND photo_id = ?"
+    ));
+    bool ok = true;
+    for (int i = 0; i < photoIds.size(); ++i) {
+        q.addBindValue(i);
+        q.addBindValue(tagId);
+        q.addBindValue(photoIds[i]);
+        ok = q.exec() && ok;
+    }
+    return ok;
 }
