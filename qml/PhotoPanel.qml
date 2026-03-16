@@ -32,12 +32,15 @@ Item {
     // Initialised from photoModel; can be reordered in place.
     property var photoIds: []
 
-    // dragOver: set by Main.qml while an incoming drag is hovering here.
+    // dragOver: set by the sibling panel's DragHandler while hovering here
     property bool dragOver: false
 
-    // Outgoing drag state (read by Main.qml)
+    // Outgoing drag state (read by Main.qml for the ghost)
     property int   draggingPhotoId: -1
     property point dragScenePos:    Qt.point(0, 0)
+
+    // Reference to the other panel (set from Main.qml)
+    property var siblingPanel: null
 
     // Expose the inner GridView so callers (e.g. DetailView) can scroll it
     readonly property GridView innerGrid: photoGrid
@@ -771,7 +774,7 @@ Item {
                             }
                         }
 
-                        // Drag handler — drives both reorder and cross-panel drag
+                        // Drag handler — drives reorder and cross-panel drag
                         DragHandler {
                             id: cellDragHandler
                             target: null
@@ -779,26 +782,75 @@ Item {
                             onActiveChanged: {
                                 if (active) {
                                     panel.draggingPhotoId = modelData
-                                    // Record original index for reorder
-                                    panel._dragFromIndex = panel.photoIds.indexOf(modelData)
+                                    panel._dragFromIndex  = panel.photoIds.indexOf(modelData)
                                     panel._dragInsertIndex = panel._dragFromIndex
                                     panel._rebuildDisplayModel()
                                 } else {
-                                    if (panel.draggingPhotoId === modelData) {
-                                        panel.draggingPhotoId = -1
+                                    if (panel.draggingPhotoId !== modelData) return
+
+                                    var sibling = panel.siblingPanel
+
+                                    // Check if released over the sibling panel
+                                    if (sibling && sibling.visible) {
+                                        var fp  = centroid.scenePosition
+                                        var sp  = sibling.mapFromItem(null, fp.x, fp.y)
+                                        var hit = (sp.x >= 0 && sp.y >= 0
+                                                   && sp.x < sibling.width
+                                                   && sp.y < sibling.height)
+                                        if (hit) {
+                                            // ── Cross-panel drop ──────────────────
+                                            var sel    = panel.selectedPanelIds
+                                            var toMove = (sel.length > 1 && sel.indexOf(modelData) >= 0)
+                                                         ? sel : [modelData]
+
+                                            if (sibling.selectedTagId > 0)
+                                                sibling.acceptDrop(toMove)
+                                            else if (panel.selectedTagId > 0)
+                                                panel.removeDrop(toMove)
+
+                                            // Cancel reorder placeholder
+                                            panel._dragFromIndex   = -1
+                                            panel._dragInsertIndex = -1
+                                            panel._rebuildDisplayModel()
+                                            panel.draggingPhotoId  = -1
+                                            sibling.dragOver       = false
+                                            return
+                                        }
                                     }
-                                    // If no cross-panel drop happened, apply reorder
-                                    // (cross-panel drops reset _dragFromIndex via Main.qml)
-                                    if (panel._dragFromIndex >= 0) {
+
+                                    // ── Same-panel: apply reorder ─────────────
+                                    panel.draggingPhotoId = -1
+                                    if (panel._dragFromIndex >= 0)
                                         panel._applyReorder()
-                                    }
                                 }
                             }
+
                             onCentroidChanged: {
-                                if (active) {
-                                    panel.dragScenePos = centroid.scenePosition
-                                    panel._updateInsertIndex(centroid.scenePosition)
+                                if (!active) return
+                                panel.dragScenePos = centroid.scenePosition
+
+                                var sibling = panel.siblingPanel
+                                var overSibling = false
+                                if (sibling && sibling.visible) {
+                                    var cp = sibling.mapFromItem(null,
+                                                centroid.scenePosition.x,
+                                                centroid.scenePosition.y)
+                                    overSibling = (cp.x >= 0 && cp.y >= 0
+                                                   && cp.x < sibling.width
+                                                   && cp.y < sibling.height)
+
+                                    if (overSibling !== sibling.dragOver) {
+                                        sibling.dragOver = overSibling
+                                        if (overSibling) {
+                                            // Entering sibling: remove reorder gap
+                                            panel._dragInsertIndex = -1
+                                            panel._rebuildDisplayModel()
+                                        }
+                                    }
                                 }
+
+                                if (!overSibling)
+                                    panel._updateInsertIndex(centroid.scenePosition)
                             }
                         }
                     }

@@ -352,7 +352,7 @@ ApplicationWindow {
                     // ── Panel 1 — always visible ─────────────────────────────
                     PhotoPanel {
                         id: panel1
-                        property int _lastDragId: -1
+                        siblingPanel: panel2
                         anchors.left: parent.left
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
@@ -377,7 +377,7 @@ ApplicationWindow {
                     // ── Panel 2 — toggled by sidebar button ──────────────────
                     PhotoPanel {
                         id: panel2
-                        property int _lastDragId: -1
+                        siblingPanel: panel1
                         visible: photosViewRoot.panel2Visible
                         anchors.left: panel1.right
                         anchors.leftMargin: 1
@@ -386,67 +386,6 @@ ApplicationWindow {
                         width: photosViewRoot.panel2Visible
                                ? photosViewRoot.panelsAreaWidth / 2
                                : 0
-                    }
-
-                    // ── Drag coordination ─────────────────────────────────────
-
-                    function _isOver(scenePos, item) {
-                        if (!item.visible) return false
-                        var p = item.mapFromItem(null, scenePos.x, scenePos.y)
-                        return p.x >= 0 && p.y >= 0 && p.x < item.width && p.y < item.height
-                    }
-
-                    // When dragging FROM panel1 or panel2: update dragOver on the OTHER panel,
-                    // and on drag-end decide cross-panel transfer vs. in-panel reorder.
-                    Connections {
-                        target: panel1
-                        function onDragScenePosChanged() {
-                            if (panel1.draggingPhotoId <= 0) return
-                            panel2.dragOver = photosViewRoot._isOver(panel1.dragScenePos, panel2)
-                        }
-                        function onDraggingPhotoIdChanged() {
-                            var pid = panel1.draggingPhotoId
-                            if (pid > 0) {
-                                panel1._lastDragId = pid
-                                return
-                            }
-                            // Drag released
-                            if (panel2.dragOver) {
-                                panel1._dragFromIndex = -1   // cancel in-panel reorder
-                                var lastId = panel1._lastDragId
-                                var sel    = panel1.selectedPanelIds
-                                var toMove = (sel.length > 1 && sel.indexOf(lastId) >= 0) ? sel : [lastId]
-                                if (panel2.selectedTagId > 0) panel2.acceptDrop(toMove)
-                                else if (panel1.selectedTagId > 0) panel1.removeDrop(toMove)
-                            }
-                            panel2.dragOver    = false
-                            panel1._lastDragId = -1
-                        }
-                    }
-
-                    Connections {
-                        target: panel2
-                        function onDragScenePosChanged() {
-                            if (panel2.draggingPhotoId <= 0) return
-                            panel1.dragOver = photosViewRoot._isOver(panel2.dragScenePos, panel1)
-                        }
-                        function onDraggingPhotoIdChanged() {
-                            var pid = panel2.draggingPhotoId
-                            if (pid > 0) {
-                                panel2._lastDragId = pid
-                                return
-                            }
-                            if (panel1.dragOver) {
-                                panel2._dragFromIndex = -1
-                                var lastId = panel2._lastDragId
-                                var sel    = panel2.selectedPanelIds
-                                var toMove = (sel.length > 1 && sel.indexOf(lastId) >= 0) ? sel : [lastId]
-                                if (panel1.selectedTagId > 0) panel1.acceptDrop(toMove)
-                                else if (panel2.selectedTagId > 0) panel2.removeDrop(toMove)
-                            }
-                            panel1.dragOver    = false
-                            panel2._lastDragId = -1
-                        }
                     }
 
                     // ── Drag ghost ────────────────────────────────────────────
