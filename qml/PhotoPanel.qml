@@ -346,20 +346,19 @@ Item {
                     width: fitLabel.implicitWidth + 16
                     height: 26
                     radius: 4
-                    color: panel._fitMode ? "#555555" : "#3a3a3a"
-                    property bool _fitMode: false
+                    color: fitToggle._fitMode ? "#555555" : "#3a3a3a"
 
                     Label {
                         id: fitLabel
                         anchors.centerIn: parent
-                        text: parent._fitMode ? "\u25A1 Ganz" : "\u25A0 Füllen"
-                        color: parent._fitMode ? "#ffffff" : "#aaaaaa"
+                        text: fitToggle._fitMode ? "\u25A1 Ganz" : "\u25A0 Füllen"
+                        color: fitToggle._fitMode ? "#ffffff" : "#aaaaaa"
                         font.pixelSize: 11
                     }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: parent._fitMode = !parent._fitMode
+                        onClicked: fitToggle._fitMode = !fitToggle._fitMode
                     }
                 }
 
