@@ -824,20 +824,49 @@ Item {
                             z: 2
                         }
 
-                        // Dim unselected when multi-selection is active
-                        Rectangle {
-                            anchors.fill: parent
-                            color: "#60000000"
-                            visible: panel.selectedPanelIds.length > 0 && !isSelected
-                            z: 1
-                        }
-
                         // Dim the item that is currently being dragged
                         Rectangle {
                             anchors.fill: parent
                             color: "#88000000"
                             visible: isDragging
                             z: 4
+                        }
+
+                        HoverHandler { id: cellHover }
+
+                        // X button — removes tag (tag-panel) or deletes photo (no-tag panel)
+                        Rectangle {
+                            visible: cellHover.hovered && !isDragging && panel._dragFromIndex < 0
+                            anchors.top:    parent.top
+                            anchors.right:  parent.right
+                            anchors.margins: 4
+                            width: 22; height: 22; radius: 11
+                            color: xBtnArea.containsMouse ? "#dd3333" : "#90000000"
+                            z: 5
+
+                            Label {
+                                anchors.centerIn: parent
+                                text: "\u2715"
+                                font.pixelSize: 11
+                                color: "#ffffff"
+                            }
+
+                            MouseArea {
+                                id: xBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: function(mouse) {
+                                    mouse.accepted = true
+                                    if (panel.selectedTagId > 0) {
+                                        tagModel.removeTagFromPhoto(modelData, panel.selectedTagId)
+                                        panel.reloadPhotos()
+                                    } else {
+                                        photoModel.deletePhoto(modelData)
+                                        panel.reloadPhotos()
+                                    }
+                                }
+                            }
                         }
 
                         MouseArea {
@@ -878,21 +907,19 @@ Item {
                                         var toMove = (sel.length > 1 && sel.indexOf(modelData) >= 0)
                                                      ? sel : [modelData]
 
-                                        // Pre-insert into target at the marker position
-                                        // so that reloadPhotos() preserves the chosen order.
-                                        var insertAt = Math.max(0, Math.min(
-                                            target._dragInsertIndex, target.photoIds.length))
-                                        var dstIds = target.photoIds.filter(
-                                            function(id) { return toMove.indexOf(id) < 0 })
-                                        for (var k = toMove.length - 1; k >= 0; k--)
-                                            dstIds.splice(insertAt, 0, toMove[k])
-                                        target.photoIds = dstIds
-                                        target._rebuildDisplayModel()
-
-                                        // If the photos will leave the source panel
-                                        // (source has a tag that will be removed),
-                                        // pre-remove them so reloadPhotos() keeps order.
-                                        if (target.selectedTagId <= 0 && panel.selectedTagId > 0) {
+                                        if (target.selectedTagId > 0) {
+                                            // Pre-insert into target at the marker position
+                                            // so that reloadPhotos() preserves the chosen order.
+                                            var insertAt = Math.max(0, Math.min(
+                                                target._dragInsertIndex, target.photoIds.length))
+                                            var dstIds = target.photoIds.filter(
+                                                function(id) { return toMove.indexOf(id) < 0 })
+                                            for (var k = toMove.length - 1; k >= 0; k--)
+                                                dstIds.splice(insertAt, 0, toMove[k])
+                                            target.photoIds = dstIds
+                                            target._rebuildDisplayModel()
+                                        } else if (panel.selectedTagId > 0) {
+                                            // Dropping on no-tag panel: pre-remove from source
                                             panel.photoIds = panel.photoIds.filter(
                                                 function(id) { return toMove.indexOf(id) < 0 })
                                             panel._rebuildDisplayModel()
@@ -946,9 +973,9 @@ Item {
                                     }
                                 }
 
-                                if (hoverTarget)
+                                if (hoverTarget && hoverTarget.selectedTagId > 0)
                                     hoverTarget._updateInsertIndex(centroid.scenePosition)
-                                else
+                                else if (!hoverTarget)
                                     panel._updateInsertIndex(centroid.scenePosition)
                             }
                         }
