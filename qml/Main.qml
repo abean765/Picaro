@@ -184,13 +184,22 @@ ApplicationWindow {
                     onClicked: slideshowDialog.open()
                 }
 
-                // Tag-Panel toggle
+                // Thumbnail-Panel A toggle
                 SidebarButton {
-                    text: "Tag-Panel"
+                    text: "Panel A"
                     icon: "\u25C6"
-                    active: photosViewRoot.tagPanelVisible
+                    active: photosViewRoot.panel1Visible
                     visible: currentView === "photos"
-                    onClicked: photosViewRoot.tagPanelVisible = !photosViewRoot.tagPanelVisible
+                    onClicked: photosViewRoot.panel1Visible = !photosViewRoot.panel1Visible
+                }
+
+                // Thumbnail-Panel B toggle
+                SidebarButton {
+                    text: "Panel B"
+                    icon: "\u25C7"
+                    active: photosViewRoot.panel2Visible
+                    visible: currentView === "photos"
+                    onClicked: photosViewRoot.panel2Visible = !photosViewRoot.panel2Visible
                 }
 
                 // Vollbild toggle
@@ -325,42 +334,60 @@ ApplicationWindow {
                     readonly property real contentWidth: width - timelineView.width
                     readonly property bool detailVisible: root.selectedPhotoId > 0
 
-                    // Tag filter panel
-                    property bool tagPanelVisible: false
-                    readonly property real tagPanelWidth: tagPanelVisible ? 240 : 0
-                    // Width available for grid + detail (after tag panel)
+                    // Thumbnail panel visibility
+                    property bool panel1Visible: false
+                    property bool panel2Visible: false
+                    readonly property real panel1Width: panel1Visible ? 220 : 0
+                    readonly property real panel2Width: panel2Visible ? 220 : 0
+                    readonly property real tagPanelWidth: panel1Width + panel2Width
+                    // Width available for grid + detail (after all panels)
                     readonly property real gridDetailWidth: contentWidth - tagPanelWidth
 
-                    // Forward drag state (grid → panel = add tag)
-                    property int lastDragPhotoId: -1
-                    // Reverse drag state (panel → grid = remove tag)
-                    property int  lastPanelDragPhotoId: -1
-                    property bool panelDragOverGrid: false
+                    // ── Forward drag state (main grid → panel = add tag) ──────
+                    property int  lastDragPhotoId:  -1
 
-                    function isGhostOverPanel() {
-                        if (!tagFilterPanel.visible) return false
+                    // ── Panel drag state (panel → elsewhere) ──────────────────
+                    // Which panel is currently drag-source (-1 = none, 1 = panel1, 2 = panel2)
+                    property int  activeDragSourcePanel: -1
+                    property int  lastPanelDragPhotoId:  -1
+                    property bool panelDragOverGrid:     false
+                    property bool panelDragOverPanel1:   false
+                    property bool panelDragOverPanel2:   false
+
+                    // Returns true if the main-grid ghost is positioned over a panel.
+                    function isGhostOverPanel(panelRef) {
+                        if (!panelRef.visible) return false
                         var sp = photoGrid.dragScenePos
-                        var p = tagFilterPanel.mapFromItem(null, sp.x, sp.y)
+                        var p  = panelRef.mapFromItem(null, sp.x, sp.y)
                         return p.x >= 0 && p.y >= 0 &&
-                               p.x < tagFilterPanel.width &&
-                               p.y < tagFilterPanel.height
+                               p.x < panelRef.width && p.y < panelRef.height
                     }
 
-                    function isPanelGhostOverGrid() {
-                        var sp = tagFilterPanel.panelDragScenePos
+                    // Returns true if the drag ghost from srcPanel is over destPanel.
+                    function isPanelGhostOverPanel(srcPanel, destPanel) {
+                        if (!destPanel.visible || srcPanel === destPanel) return false
+                        var sp = srcPanel.panelDragScenePos
+                        var p  = destPanel.mapFromItem(null, sp.x, sp.y)
+                        return p.x >= 0 && p.y >= 0 &&
+                               p.x < destPanel.width && p.y < destPanel.height
+                    }
+
+                    // Returns true if a panel ghost is positioned over the main grid.
+                    function isPanelGhostOverGrid(srcPanel) {
+                        var sp = srcPanel.panelDragScenePos
                         var p  = photoGrid.mapFromItem(null, sp.x, sp.y)
                         return p.x >= 0 && p.y >= 0 &&
-                               p.x < photoGrid.width &&
-                               p.y < photoGrid.height
+                               p.x < photoGrid.width && p.y < photoGrid.height
                     }
 
-                    // Forward drag: grid → panel
+                    // ── Forward drag: main grid → panel ───────────────────────
                     Connections {
                         target: photoGrid
 
                         function onDragScenePosChanged() {
-                            if (photoGrid.draggingPhotoId > 0)
-                                tagFilterPanel.dragOver = photosViewRoot.isGhostOverPanel()
+                            if (photoGrid.draggingPhotoId <= 0) return
+                            panel1.dragOver = photosViewRoot.isGhostOverPanel(panel1)
+                            panel2.dragOver = photosViewRoot.isGhostOverPanel(panel2)
                         }
 
                         function onDraggingPhotoIdChanged() {
@@ -368,50 +395,98 @@ ApplicationWindow {
                             if (pid > 0) {
                                 photosViewRoot.lastDragPhotoId = pid
                             } else {
-                                // Drag released — assign tag if ghost was over panel
-                                if (tagFilterPanel.dragOver &&
-                                        tagFilterPanel.selectedTagId > 0 &&
-                                        photosViewRoot.lastDragPhotoId > 0) {
-                                    // If the dragged photo is part of a multi-selection,
-                                    // tag all selected photos; otherwise just the one.
-                                    var dragId = photosViewRoot.lastDragPhotoId
-                                    var sel    = root.selectedPhotoIds
-                                    var toTag  = (sel.length > 1 && sel.indexOf(dragId) >= 0)
-                                                 ? sel : [dragId]
-                                    tagFilterPanel.acceptDrop(toTag)
-                                }
-                                tagFilterPanel.dragOver = false
+                                // Drag released — assign tag if ghost was over a panel
+                                var dragId = photosViewRoot.lastDragPhotoId
+                                var sel    = root.selectedPhotoIds
+                                var toTag  = (sel.length > 1 && sel.indexOf(dragId) >= 0)
+                                             ? sel : [dragId]
+
+                                if (panel1.dragOver && panel1.selectedTagId > 0 && dragId > 0)
+                                    panel1.acceptDrop(toTag)
+                                else if (panel2.dragOver && panel2.selectedTagId > 0 && dragId > 0)
+                                    panel2.acceptDrop(toTag)
+
+                                panel1.dragOver = false
+                                panel2.dragOver = false
                                 photosViewRoot.lastDragPhotoId = -1
                             }
                         }
                     }
 
-                    // Reverse drag: panel → grid (remove tag)
-                    Connections {
-                        target: tagFilterPanel
+                    // ── Panel drag handler factory ────────────────────────────
+                    // Shared logic for when either panel emits drag signals.
+                    function onPanelDragPosChanged(srcPanel, otherPanel) {
+                        if (srcPanel.panelDraggingPhotoId <= 0 || srcPanel.isReordering) return
+                        photosViewRoot.panelDragOverGrid   = photosViewRoot.isPanelGhostOverGrid(srcPanel)
+                        photosViewRoot.panelDragOverPanel1 = (otherPanel === panel1) &&
+                                                             photosViewRoot.isPanelGhostOverPanel(srcPanel, panel1)
+                        photosViewRoot.panelDragOverPanel2 = (otherPanel === panel2) &&
+                                                             photosViewRoot.isPanelGhostOverPanel(srcPanel, panel2)
 
-                        function onPanelDragScenePosChanged() {
-                            if (tagFilterPanel.panelDraggingPhotoId > 0)
-                                photosViewRoot.panelDragOverGrid = photosViewRoot.isPanelGhostOverGrid()
-                        }
+                        panel1.dragOver = photosViewRoot.panelDragOverPanel1
+                        panel2.dragOver = photosViewRoot.panelDragOverPanel2
+                    }
 
-                        function onPanelDraggingPhotoIdChanged() {
-                            var pid = tagFilterPanel.panelDraggingPhotoId
-                            if (pid > 0) {
-                                photosViewRoot.lastPanelDragPhotoId = pid
-                            } else {
-                                if (photosViewRoot.panelDragOverGrid &&
-                                        tagFilterPanel.selectedTagId > 0 &&
-                                        photosViewRoot.lastPanelDragPhotoId > 0) {
-                                    var dragId  = photosViewRoot.lastPanelDragPhotoId
-                                    var sel     = tagFilterPanel.selectedPanelIds
-                                    var toRemove = (sel.length > 1 && sel.indexOf(dragId) >= 0)
-                                                   ? sel : [dragId]
-                                    tagFilterPanel.removeDraggedPhotos(toRemove)
+                    function onPanelDragIdChanged(srcPanel, otherPanel) {
+                        var pid = srcPanel.panelDraggingPhotoId
+                        if (pid > 0) {
+                            photosViewRoot.activeDragSourcePanel = (srcPanel === panel1) ? 1 : 2
+                            photosViewRoot.lastPanelDragPhotoId  = pid
+                        } else {
+                            // Drag released
+                            if (!srcPanel.isReordering) {
+                                var dragId   = photosViewRoot.lastPanelDragPhotoId
+                                var sel      = srcPanel.selectedPanelIds
+                                var toMove   = (sel.length > 1 && sel.indexOf(dragId) >= 0)
+                                               ? sel : [dragId]
+
+                                if (photosViewRoot.panelDragOverGrid && dragId > 0) {
+                                    // Drop on main grid → remove source tag
+                                    srcPanel.removeDraggedPhotos(toMove)
+                                } else if (photosViewRoot.panelDragOverPanel1 && dragId > 0) {
+                                    // Drop on panel1
+                                    if (panel1.selectedTagId > 0)
+                                        panel1.acceptDrop(toMove)
+                                    else
+                                        srcPanel.removeDraggedPhotos(toMove)
+                                } else if (photosViewRoot.panelDragOverPanel2 && dragId > 0) {
+                                    // Drop on panel2
+                                    if (panel2.selectedTagId > 0)
+                                        panel2.acceptDrop(toMove)
+                                    else
+                                        srcPanel.removeDraggedPhotos(toMove)
                                 }
-                                photosViewRoot.panelDragOverGrid    = false
-                                photosViewRoot.lastPanelDragPhotoId = -1
                             }
+
+                            panel1.dragOver = false
+                            panel2.dragOver = false
+                            photosViewRoot.panelDragOverGrid   = false
+                            photosViewRoot.panelDragOverPanel1 = false
+                            photosViewRoot.panelDragOverPanel2 = false
+                            photosViewRoot.lastPanelDragPhotoId  = -1
+                            photosViewRoot.activeDragSourcePanel = -1
+                        }
+                    }
+
+                    // ── Panel 1 drag connections ───────────────────────────────
+                    Connections {
+                        target: panel1
+                        function onPanelDragScenePosChanged() {
+                            photosViewRoot.onPanelDragPosChanged(panel1, panel2)
+                        }
+                        function onPanelDraggingPhotoIdChanged() {
+                            photosViewRoot.onPanelDragIdChanged(panel1, panel2)
+                        }
+                    }
+
+                    // ── Panel 2 drag connections ───────────────────────────────
+                    Connections {
+                        target: panel2
+                        function onPanelDragScenePosChanged() {
+                            photosViewRoot.onPanelDragPosChanged(panel2, panel1)
+                        }
+                        function onPanelDraggingPhotoIdChanged() {
+                            photosViewRoot.onPanelDragIdChanged(panel2, panel1)
                         }
                     }
 
@@ -746,16 +821,28 @@ ApplicationWindow {
                               : photosViewRoot.gridDetailWidth
                     }
 
-                    // Tag filter panel — optional, fixed width, between grid and detail
-                    TagFilterPanel {
-                        id: tagFilterPanel
-                        visible: photosViewRoot.tagPanelVisible
+                    // ── Thumbnail Panel A ─────────────────────────────────────
+                    ThumbnailPanel {
+                        id: panel1
                         anchors.left: photoGrid.right
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        width: photosViewRoot.tagPanelWidth
-
+                        width: photosViewRoot.panel1Width
+                        visible: photosViewRoot.panel1Visible
                         Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                        onCloseRequested: photosViewRoot.panel1Visible = false
+                    }
+
+                    // ── Thumbnail Panel B ─────────────────────────────────────
+                    ThumbnailPanel {
+                        id: panel2
+                        anchors.left: panel1.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: photosViewRoot.panel2Width
+                        visible: photosViewRoot.panel2Visible
+                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                        onCloseRequested: photosViewRoot.panel2Visible = false
                     }
 
                     // Drag ghost — follows the cursor while a thumbnail is being dragged
@@ -816,7 +903,9 @@ ApplicationWindow {
                         Behavior on opacity { NumberAnimation { duration: 80 } }
                     }
 
-                    // Reverse drag ghost (panel → grid): red border signals tag removal
+                    // ── Panel drag ghost ──────────────────────────────────────
+                    // Shown when dragging out of a panel (cross-panel or to grid).
+                    // Color indicates the outcome: green = add tag, red = remove tag.
                     Rectangle {
                         id: panelDragGhost
                         parent: photosViewRoot
@@ -824,13 +913,32 @@ ApplicationWindow {
                         width: 72; height: 72
                         radius: 6
                         clip: true
-                        border.color: "#cc4444"
                         border.width: 2
-                        color: "#1affaaaa"
-                        visible: tagFilterPanel.panelDraggingPhotoId > 0
+                        opacity: 0.9
+
+                        // Source panel (whichever is currently dragging)
+                        readonly property var _src: {
+                            if (panel1.panelDraggingPhotoId > 0 && !panel1.isReordering)
+                                return panel1
+                            if (panel2.panelDraggingPhotoId > 0 && !panel2.isReordering)
+                                return panel2
+                            return null
+                        }
+
+                        // Determine whether the drop will ADD or REMOVE a tag
+                        readonly property bool willAdd: {
+                            if (photosViewRoot.panelDragOverPanel1 && panel1.selectedTagId > 0) return true
+                            if (photosViewRoot.panelDragOverPanel2 && panel2.selectedTagId > 0) return true
+                            return false
+                        }
+
+                        border.color: willAdd ? root.accentColor : "#cc4444"
+                        color:        willAdd ? "#1affffff"       : "#1affaaaa"
+                        visible:      _src !== null
 
                         readonly property point _local: {
-                            var sp = tagFilterPanel.panelDragScenePos
+                            if (_src === null) return Qt.point(0, 0)
+                            var sp = _src.panelDragScenePos
                             return photosViewRoot.mapFromItem(null, sp.x, sp.y)
                         }
                         x: _local.x - width  / 2
@@ -839,21 +947,21 @@ ApplicationWindow {
                         Image {
                             anchors.fill: parent
                             anchors.margins: 2
-                            source: tagFilterPanel.panelDraggingPhotoId > 0
-                                    ? "image://thumbnail/" + tagFilterPanel.panelDraggingPhotoId : ""
+                            source: panelDragGhost._src !== null && panelDragGhost._src.panelDraggingPhotoId > 0
+                                    ? "image://thumbnail/" + panelDragGhost._src.panelDraggingPhotoId : ""
                             fillMode: Image.PreserveAspectCrop
                             cache: true
                             opacity: 0.65
                         }
 
-                        // Minus badge in center
+                        // Action badge (+ or −)
                         Rectangle {
                             anchors.centerIn: parent
                             width: 26; height: 26; radius: 13
-                            color: "#cc4444"
+                            color: panelDragGhost.willAdd ? root.accentColor : "#cc4444"
                             Label {
                                 anchors.centerIn: parent
-                                text: "\u2212"
+                                text: panelDragGhost.willAdd ? "+" : "\u2212"
                                 color: "#ffffff"
                                 font.pixelSize: 20
                                 font.bold: true
@@ -863,9 +971,11 @@ ApplicationWindow {
                         // Count badge for multi-selection
                         Rectangle {
                             visible: {
-                                var sel = tagFilterPanel.selectedPanelIds
+                                var src = panelDragGhost._src
+                                if (src === null) return false
+                                var sel = src.selectedPanelIds
                                 return sel.length > 1 &&
-                                       sel.indexOf(tagFilterPanel.panelDraggingPhotoId) >= 0
+                                       sel.indexOf(src.panelDraggingPhotoId) >= 0
                             }
                             anchors.top:   parent.top
                             anchors.right: parent.right
@@ -873,19 +983,20 @@ ApplicationWindow {
                             width:  panelCountLabel.implicitWidth + 8
                             height: 20
                             radius: 10
-                            color:  "#cc4444"
+                            color:  panelDragGhost.willAdd ? root.accentColor : "#cc4444"
 
                             Label {
                                 id: panelCountLabel
                                 anchors.centerIn: parent
-                                text: tagFilterPanel.selectedPanelIds.length
+                                text: {
+                                    var src = panelDragGhost._src
+                                    return src !== null ? src.selectedPanelIds.length : ""
+                                }
                                 color: "#ffffff"
                                 font.pixelSize: 11
                                 font.bold: true
                             }
                         }
-
-                        opacity: 0.9
                     }
 
                     // Grid drop zone overlay — shown while a panel photo is dragged over the grid
@@ -909,10 +1020,12 @@ ApplicationWindow {
                                 id: gridDropLabel
                                 anchors.centerIn: parent
                                 text: {
-                                    var n = tagFilterPanel.selectedPanelIds.length
-                                    var pid = photosViewRoot.lastPanelDragPhotoId
-                                    var inSel = n > 1 && tagFilterPanel.selectedPanelIds.indexOf(pid) >= 0
-                                    var count = inSel ? n : 1
+                                    var src = panelDragGhost._src
+                                    if (src === null) return ""
+                                    var pid  = photosViewRoot.lastPanelDragPhotoId
+                                    var sel  = src.selectedPanelIds
+                                    var inSel = sel.length > 1 && sel.indexOf(pid) >= 0
+                                    var count = inSel ? sel.length : 1
                                     return "\u2212 Tag von " + count +
                                            (count === 1 ? " Foto" : " Fotos") + " entfernen"
                                 }
@@ -929,10 +1042,14 @@ ApplicationWindow {
                         visible: photosViewRoot.detailVisible
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        // Position after the tag panel (if visible) or after the grid
-                        x: (photosViewRoot.tagPanelVisible
-                            ? tagFilterPanel.x + tagFilterPanel.width
-                            : photoGrid.x + photoGrid.width) - 3
+                        // Position after the rightmost visible panel (or after the grid)
+                        x: {
+                            if (photosViewRoot.panel2Visible)
+                                return panel2.x + panel2.width - 3
+                            if (photosViewRoot.panel1Visible)
+                                return panel1.x + panel1.width - 3
+                            return photoGrid.x + photoGrid.width - 3
+                        }
                         width: 6
                         color: splitterMouse.containsMouse || splitterMouse.pressed ? root.accentColor : "#333333"
                         z: 10
