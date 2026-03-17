@@ -302,7 +302,9 @@ Item {
         var dragId = photoIds[from]
         var arr = photoIds.slice()
         arr.splice(from, 1)
-        var ins = Math.max(0, Math.min(to, arr.length))
+        // When moving forward, removing 'from' shifts everything after it left by 1,
+        // so the target position must be adjusted accordingly.
+        var ins = Math.max(0, Math.min(to > from ? to - 1 : to, arr.length))
         arr.splice(ins, 0, dragId)
         photoIds = arr
         _rebuildDisplayModel()

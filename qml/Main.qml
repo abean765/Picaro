@@ -507,7 +507,7 @@ ApplicationWindow {
                             cache: true
                         }
 
-                        opacity: 0.88
+                        opacity: 0.28
                         Behavior on opacity { NumberAnimation { duration: 80 } }
                     }
 
