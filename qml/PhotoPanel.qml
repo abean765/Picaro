@@ -227,6 +227,7 @@ Item {
     // Reorder state
     property int  _dragFromIndex:   -1   // original index of the cell being dragged
     property int  _dragInsertIndex: -1   // current insertion target index
+    property int  _dropCount:        0   // how many photos are being dragged onto this panel
 
     property bool dropdownVisible: false
     property var  allTags:         []
@@ -265,7 +266,7 @@ Item {
         var cellLocalX = localPos.x - col * cellW
         if (cellLocalX > cellW / 2) rawIdx++
 
-        var newInsert = Math.max(0, Math.min(rawIdx, photoIds.length - 1))
+        var newInsert = Math.max(0, Math.min(rawIdx, photoIds.length))
         _dragInsertIndex = newInsert
     }
 
@@ -799,6 +800,31 @@ Item {
                     readonly property bool isDragging:
                         modelData === panel.draggingPhotoId
 
+                    // ── Drop-shift: visually slide items to make room ─────────
+                    // When an external drag hovers over a tagged panel, all items
+                    // at index >= _dragInsertIndex shift forward by _dropCount
+                    // cells so a gap appears at the insertion position.
+                    readonly property bool shiftedForDrop:
+                        panel.dragOver && panel.selectedTagId > 0 &&
+                        panel._dragInsertIndex >= 0 &&
+                        index >= panel._dragInsertIndex
+
+                    transform: Translate {
+                        readonly property int cols: Math.max(1, panel.photosPerRow)
+                        readonly property int n:    panel._dropCount
+                        readonly property int i:    cellDelegate.index
+                        // Column the item moves TO after inserting n placeholders
+                        readonly property int newCol: (i + n) % cols
+                        readonly property int oldCol:  i      % cols
+                        x: cellDelegate.shiftedForDrop
+                           ? (newCol - oldCol) * photoGrid._cellSize : 0
+                        y: cellDelegate.shiftedForDrop
+                           ? (Math.floor((i + n) / cols) - Math.floor(i / cols))
+                             * photoGrid._cellSize : 0
+                        Behavior on x { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                        Behavior on y { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                    }
+
                     // Photo thumbnail
                     Rectangle {
                         anchors.fill: parent
@@ -952,6 +978,7 @@ Item {
                                         panel.draggingPhotoId   = -1
                                         target.dragOver         = false
                                         target._dragInsertIndex = -1
+                                        target._dropCount       = 0
                                         return
                                     }
 
@@ -976,10 +1003,15 @@ Item {
                                         var over = (pp === hoverTarget)
                                         if (over !== pp.dragOver) {
                                             pp.dragOver = over
-                                            if (over)
+                                            if (over) {
                                                 panel._dragInsertIndex = -1
-                                            else
+                                                var sel2 = panel.selectedPanelIds
+                                                pp._dropCount = (sel2.length > 1 && sel2.indexOf(modelData) >= 0)
+                                                                ? sel2.length : 1
+                                            } else {
                                                 pp._dragInsertIndex = -1
+                                                pp._dropCount = 0
+                                            }
                                         }
                                     }
                                 }
@@ -1004,7 +1036,7 @@ Item {
                         width: 3
                         radius: 2
                         color: root.accentColor
-                        visible: (panel._dragFromIndex >= 0 || panel.dragOver)
+                        visible: panel._dragFromIndex >= 0
                                  && panel._dragInsertIndex >= 0
                                  && panel._dragInsertIndex === index
                                  && !isDragging
@@ -1014,14 +1046,50 @@ Item {
                 }
             }
 
-            // ── Drop zone overlay (shown while an external drag hovers) ──────
+            // ── Drop placeholder cells (tagged panel only) ───────────────────
+            // Shown as outlined ghost-cells at the insertion position while
+            // an external drag hovers over a tagged panel.
+            Item {
+                anchors.left:   photoGrid.left
+                anchors.top:    photoGrid.top
+                anchors.right:  photoGrid.right
+                anchors.bottom: photoGrid.bottom
+                z: 26
+                clip: true
+                visible: panel.dragOver && panel.selectedTagId > 0 &&
+                         panel._dragInsertIndex >= 0 && panel._dropCount > 0
+
+                Repeater {
+                    model: panel._dropCount
+                    Rectangle {
+                        readonly property int cols: Math.max(1, panel.photosPerRow)
+                        readonly property real cs:  photoGrid._cellSize
+                        readonly property int  idx: panel._dragInsertIndex + index
+                        x: (idx % cols) * cs + 3
+                        y: Math.floor(idx / cols) * cs - photoGrid.contentY + 3
+                        width:  cs - 6
+                        height: cs - 6
+                        radius: 4
+                        color: Qt.rgba(root.accentColor.r,
+                                       root.accentColor.g,
+                                       root.accentColor.b, 0.18)
+                        border.color: root.accentColor
+                        border.width: 2
+                        Behavior on x { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                        Behavior on y { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                    }
+                }
+            }
+
+            // ── Drop zone overlay (no-tag panel only: shows "remove tag") ───
+            // For tagged panels the placeholder-shift preview replaces this.
             Rectangle {
                 anchors.fill: photoGrid
                 z: 30
-                visible: panel.dragOver
+                visible: panel.dragOver && panel.selectedTagId <= 0
                 radius: 6
-                color: panel.selectedTagId > 0 ? "#20ffffff" : "#15ffffff"
-                border.color: panel.selectedTagId > 0 ? root.accentColor : "#cc4444"
+                color: "#15ffffff"
+                border.color: "#cc4444"
                 border.width: 2
 
                 Column {
@@ -1030,16 +1098,14 @@ Item {
 
                     Label {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: panel.selectedTagId > 0 ? "\u25BC" : "\u2715"
-                        color: panel.selectedTagId > 0 ? root.accentColor : "#cc4444"
+                        text: "\u2715"
+                        color: "#cc4444"
                         font.pixelSize: 28
                     }
                     Label {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: panel.selectedTagId > 0
-                              ? "Tag \"" + panel.selectedTagName + "\"\nhinzufügen"
-                              : "Tag entfernen"
-                        color: panel.selectedTagId > 0 ? "#ffffff" : "#ff8888"
+                        text: "Tag entfernen"
+                        color: "#ff8888"
                         font.pixelSize: 13
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
