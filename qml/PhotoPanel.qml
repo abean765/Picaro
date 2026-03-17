@@ -904,9 +904,12 @@ Item {
                 }
 
                 WheelHandler {
-                    target: photoGrid
-                    property: "contentY"
-                    rotationScale: -3.0
+                    onWheel: function(event) {
+                        var delta = event.angleDelta.y / 8 * (-3.0)
+                        var maxY  = Math.max(0, photoGrid.contentHeight - photoGrid.height)
+                        photoGrid.contentY = Math.max(0, Math.min(photoGrid.contentY + delta, maxY))
+                        event.accepted = true
+                    }
                 }
 
                 delegate: Item {
