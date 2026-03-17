@@ -883,8 +883,9 @@ Item {
                 interactive: false   // WheelHandler handles scrolling; keep mouse events for DragHandler
 
                 readonly property real _cellSize: Math.max(50, Math.floor((width - 2) / panel.photosPerRow))
-                cellWidth:  _cellSize
-                cellHeight: _cellSize
+                cellWidth:    _cellSize
+                cellHeight:   _cellSize
+                bottomMargin: _cellSize
 
                 // Update timeline active month based on scroll position
                 onContentYChanged: {
@@ -957,7 +958,11 @@ Item {
                             asynchronous: true
                             cache: true
                             opacity: status === Image.Ready ? 1.0 : 0.0
-                            Behavior on opacity { NumberAnimation { duration: 100 } }
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: (panel.draggingPhotoId >= 0 || panel.dragOver) ? 0 : 100
+                                }
+                            }
                         }
 
                         // Black background for fit mode
