@@ -181,6 +181,7 @@ Item {
         selectedTagId        = -1
         selectedTagName      = ""
         tagInput.text        = ""
+        dropdownVisible      = false
         selectedPanelIds     = []
         panelSelectionAnchor = -1
         reloadPhotos()
