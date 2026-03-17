@@ -244,14 +244,25 @@ Item {
             : allTags.filter(function(t) { return t.name.toLowerCase().indexOf(f) >= 0 })
     }
 
-    // _displayModel is always just photoIds — no placeholder insertion.
-    // The insertion indicator is rendered per-delegate via _dragInsertIndex.
+    // _displayModel is normally just photoIds.
+    // During a cross-panel drag over a tagged panel it also contains _dropCount
+    // placeholder items (-1) at _dragInsertIndex so GridView shows the gap directly.
     function _rebuildDisplayModel() {
         _displayModel = photoIds.slice()
     }
 
+    // Insert _dropCount placeholder cells into a copy of photoIds and assign it.
+    function _rebuildWithPlaceholders() {
+        var placeholders = []
+        for (var k = 0; k < _dropCount; k++) placeholders.push(-1)
+        _displayModel = photoIds.slice(0, _dragInsertIndex)
+                            .concat(placeholders)
+                            .concat(photoIds.slice(_dragInsertIndex))
+    }
+
     // Update insertion index from pointer scene position.
-    // No model rebuild — delegates react to _dragInsertIndex via bindings.
+    // When dragOver is active, _displayModel already contains placeholder cells, so
+    // the cursor maps directly to visual grid positions without any offset correction.
     function _updateInsertIndex(scenePos) {
         var localPos = photoGrid.mapFromItem(null, scenePos.x, scenePos.y)
         var cols = Math.max(1, photosPerRow)
@@ -262,22 +273,23 @@ Item {
         col = Math.max(0, Math.min(col, cols - 1))
         row = Math.max(0, row)
 
-        var rawIdx = row * cols + col
+        var D = row * cols + col
         var cellLocalX = localPos.x - col * cellW
-        if (cellLocalX > cellW / 2) rawIdx++
+        if (cellLocalX > cellW / 2) D++
 
-        // When items have been visually shifted to make room for a drop placeholder,
-        // the cursor position maps to layout slots that are offset by _dropCount.
-        // Correct rawIdx so _dragInsertIndex reflects the visual insertion point.
-        if (dragOver && selectedTagId > 0 && _dragInsertIndex >= 0 && _dropCount > 0) {
-            if (rawIdx >= _dragInsertIndex + _dropCount)
-                rawIdx -= _dropCount
-            else if (rawIdx >= _dragInsertIndex)
-                rawIdx = _dragInsertIndex
-        }
+        // If cursor is over the placeholder gap, leave the insert index unchanged.
+        if (dragOver && selectedTagId > 0 && _dragInsertIndex >= 0 && _dropCount > 0
+                && D >= _dragInsertIndex && D < _dragInsertIndex + _dropCount)
+            return
 
-        var newInsert = Math.max(0, Math.min(rawIdx, photoIds.length))
+        // Map display index D back to a photoIds insert index.
+        var newInsert = (dragOver && selectedTagId > 0
+                         && _dragInsertIndex >= 0 && D >= _dragInsertIndex + _dropCount)
+                        ? D - _dropCount : D
+        newInsert = Math.max(0, Math.min(newInsert, photoIds.length))
+        if (newInsert === _dragInsertIndex) return
         _dragInsertIndex = newInsert
+        if (dragOver && selectedTagId > 0) _rebuildWithPlaceholders()
     }
 
     // Finalise reorder: apply the pending move to photoIds
@@ -806,47 +818,26 @@ Item {
                     height: photoGrid._cellSize
 
                     readonly property bool isSelected:
-                        panel.selectedPanelIds.indexOf(modelData) >= 0
+                        modelData > 0 && panel.selectedPanelIds.indexOf(modelData) >= 0
                     readonly property bool isDragging:
-                        modelData === panel.draggingPhotoId
+                        modelData > 0 && modelData === panel.draggingPhotoId
 
-                    // ── Drop-shift: visually slide items to make room ─────────
-                    // When an external drag hovers over a tagged panel, all items
-                    // at index >= _dragInsertIndex shift forward by _dropCount
-                    // cells so a gap appears at the insertion position.
-                    readonly property bool shiftedForDrop:
-                        panel.dragOver && panel.selectedTagId > 0 &&
-                        panel._dragInsertIndex >= 0 &&
-                        index >= panel._dragInsertIndex
-
-                    // True when shifting this item causes it to wrap to a different row.
-                    // In that case we skip the x/y animation to avoid the item sweeping
-                    // backward across the entire row.
-                    readonly property bool rowWraps: {
-                        if (!shiftedForDrop) return false
-                        var c = Math.max(1, panel.photosPerRow)
-                        var n = panel._dropCount
-                        return Math.floor((index + n) / c) !== Math.floor(index / c)
-                    }
-
-                    transform: Translate {
-                        readonly property int cols: Math.max(1, panel.photosPerRow)
-                        readonly property int n:    panel._dropCount
-                        readonly property int i:    cellDelegate.index
-                        // Column the item moves TO after inserting n placeholders
-                        readonly property int newCol: (i + n) % cols
-                        readonly property int oldCol:  i      % cols
-                        x: cellDelegate.shiftedForDrop
-                           ? (newCol - oldCol) * photoGrid._cellSize : 0
-                        y: cellDelegate.shiftedForDrop
-                           ? (Math.floor((i + n) / cols) - Math.floor(i / cols))
-                             * photoGrid._cellSize : 0
-                        Behavior on x { enabled: !cellDelegate.rowWraps; NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
-                        Behavior on y { enabled: !cellDelegate.rowWraps; NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                    // Placeholder cell shown during cross-panel drag
+                    Rectangle {
+                        visible: modelData <= 0
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        radius: 4
+                        color: Qt.rgba(root.accentColor.r,
+                                       root.accentColor.g,
+                                       root.accentColor.b, 0.18)
+                        border.color: root.accentColor
+                        border.width: 2
                     }
 
                     // Photo thumbnail
                     Rectangle {
+                        visible: modelData > 0
                         anchors.fill: parent
                         anchors.margins: 1
                         color: "#2a2a2a"
@@ -1025,6 +1016,7 @@ Item {
                                             } else {
                                                 pp._dragInsertIndex = -1
                                                 pp._dropCount = 0
+                                                pp._rebuildDisplayModel()
                                             }
                                         }
                                     }
@@ -1060,43 +1052,7 @@ Item {
                 }
             }
 
-            // ── Drop placeholder cells (tagged panel only) ───────────────────
-            // Shown as outlined ghost-cells at the insertion position while
-            // an external drag hovers over a tagged panel.
-            Item {
-                anchors.left:   photoGrid.left
-                anchors.top:    photoGrid.top
-                anchors.right:  photoGrid.right
-                anchors.bottom: photoGrid.bottom
-                z: 26
-                clip: true
-                visible: panel.dragOver && panel.selectedTagId > 0 &&
-                         panel._dragInsertIndex >= 0 && panel._dropCount > 0
-
-                Repeater {
-                    model: panel._dropCount
-                    Rectangle {
-                        readonly property int cols: Math.max(1, panel.photosPerRow)
-                        readonly property real cs:  photoGrid._cellSize
-                        readonly property int  idx: panel._dragInsertIndex + index
-                        x: (idx % cols) * cs + 3
-                        y: Math.floor(idx / cols) * cs - photoGrid.contentY + 3
-                        width:  cs - 6
-                        height: cs - 6
-                        radius: 4
-                        color: Qt.rgba(root.accentColor.r,
-                                       root.accentColor.g,
-                                       root.accentColor.b, 0.18)
-                        border.color: root.accentColor
-                        border.width: 2
-                        Behavior on x { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
-                    }
-                }
-            }
-
             // ── Drop zone overlay (no-tag panel only: shows "remove tag") ───
-            // For tagged panels the placeholder-shift preview replaces this.
             Rectangle {
                 anchors.fill: photoGrid
                 z: 30
