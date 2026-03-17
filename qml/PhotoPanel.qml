@@ -111,16 +111,16 @@ Item {
 
     function acceptDrop(photoIdArr) {
         if (selectedTagId <= 0) return
-        for (var i = 0; i < photoIdArr.length; i++)
-            if (photoIdArr[i] > 0)
-                tagModel.addTagToPhoto(photoIdArr[i], selectedTagId)
+        var validIds = photoIdArr.filter(function(id) { return id > 0 })
+        if (validIds.length > 0)
+            tagModel.batchAddTagToPhotos(validIds, selectedTagId)
     }
 
     function removeDrop(photoIdArr) {
         if (selectedTagId <= 0) return
-        for (var i = 0; i < photoIdArr.length; i++)
-            if (photoIdArr[i] > 0)
-                tagModel.removeTagFromPhoto(photoIdArr[i], selectedTagId)
+        var validIds = photoIdArr.filter(function(id) { return id > 0 })
+        if (validIds.length > 0)
+            tagModel.batchRemoveTagFromPhotos(validIds, selectedTagId)
     }
 
     function selectTag(tagId, tagName) {
@@ -175,8 +175,17 @@ Item {
         for (var j = 0; j < kept.length; j++) keptSet[kept[j]] = true
         var added = newIds.filter(function(id) { return keptSet[id] !== true })
 
-        photoIds = kept.concat(added)
-        _rebuildDisplayModel()
+        var newPhotoIds = kept.concat(added)
+        var same = (newPhotoIds.length === photoIds.length)
+        if (same) {
+            for (var k = 0; k < newPhotoIds.length; k++) {
+                if (newPhotoIds[k] !== photoIds[k]) { same = false; break }
+            }
+        }
+        if (!same) {
+            photoIds = newPhotoIds
+            _rebuildDisplayModel()
+        }
     }
 
     function handlePanelCellClick(photoId, modifiers) {
@@ -262,15 +271,17 @@ Item {
 
     // Finalise reorder: apply the pending move to photoIds
     function _applyReorder() {
-        if (_dragFromIndex < 0 || _dragInsertIndex < 0) return
-        var dragId = photoIds[_dragFromIndex]
-        var arr    = photoIds.slice()
-        arr.splice(_dragFromIndex, 1)
-        var to = Math.max(0, Math.min(_dragInsertIndex, arr.length))
-        arr.splice(to, 0, dragId)
+        var from = _dragFromIndex
+        var to   = _dragInsertIndex
         _dragFromIndex   = -1
         _dragInsertIndex = -1
-        photoIds         = arr
+        if (from < 0 || to < 0) return
+        var dragId = photoIds[from]
+        var arr = photoIds.slice()
+        arr.splice(from, 1)
+        var ins = Math.max(0, Math.min(to, arr.length))
+        arr.splice(ins, 0, dragId)
+        photoIds = arr
         _rebuildDisplayModel()
         if (selectedTagId > 0)
             tagModel.saveTagPhotoOrder(selectedTagId, photoIds)

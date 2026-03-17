@@ -38,7 +38,9 @@ public:
     // Photo-tag association
     Q_INVOKABLE QVariantList tagsForPhoto(qint64 photoId) const;
     Q_INVOKABLE bool addTagToPhoto(qint64 photoId, qint64 tagId);
+    Q_INVOKABLE bool batchAddTagToPhotos(const QVariantList &photoIds, qint64 tagId);
     Q_INVOKABLE bool removeTagFromPhoto(qint64 photoId, qint64 tagId);
+    Q_INVOKABLE bool batchRemoveTagFromPhotos(const QVariantList &photoIds, qint64 tagId);
 
     // Get all photo IDs for a tag (for bulk operations like sending)
     Q_INVOKABLE QVariantList photoIdsForTag(qint64 tagId) const;

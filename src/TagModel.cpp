@@ -109,11 +109,31 @@ bool TagModel::addTagToPhoto(qint64 photoId, qint64 tagId)
     return ok;
 }
 
+bool TagModel::batchAddTagToPhotos(const QVariantList &photoIds, qint64 tagId)
+{
+    if (!m_db) return false;
+    bool ok = true;
+    for (const QVariant &v : photoIds)
+        ok = m_db->addTagToPhoto(v.toLongLong(), tagId) && ok;
+    reload();
+    return ok;
+}
+
 bool TagModel::removeTagFromPhoto(qint64 photoId, qint64 tagId)
 {
     if (!m_db) return false;
     bool ok = m_db->removeTagFromPhoto(photoId, tagId);
     if (ok) reload();
+    return ok;
+}
+
+bool TagModel::batchRemoveTagFromPhotos(const QVariantList &photoIds, qint64 tagId)
+{
+    if (!m_db) return false;
+    bool ok = true;
+    for (const QVariant &v : photoIds)
+        ok = m_db->removeTagFromPhoto(v.toLongLong(), tagId) && ok;
+    reload();
     return ok;
 }
 
@@ -151,11 +171,12 @@ QVariantList TagModel::allTagsFlat() const
     result.reserve(m_tags.size());
     for (const auto &t : m_tags) {
         QVariantMap m;
-        m[QStringLiteral("id")]    = t.id;
-        m[QStringLiteral("name")]  = t.name;
-        m[QStringLiteral("color")] = t.color;
-        m[QStringLiteral("icon")]  = t.icon;
-        m[QStringLiteral("depth")] = t.depth;
+        m[QStringLiteral("id")]         = t.id;
+        m[QStringLiteral("name")]       = t.name;
+        m[QStringLiteral("color")]      = t.color;
+        m[QStringLiteral("icon")]       = t.icon;
+        m[QStringLiteral("depth")]      = t.depth;
+        m[QStringLiteral("photoCount")] = t.photoCount;
         result.append(m);
     }
     return result;
