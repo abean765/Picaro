@@ -261,20 +261,18 @@ Item {
     }
 
     // Update insertion index from pointer scene position.
-    // When dragOver is active, _displayModel already contains placeholder cells, so
-    // the cursor maps directly to visual grid positions without any offset correction.
+    // Uses GridView.indexAt() to let Qt determine which cell the cursor is over,
+    // instead of error-prone manual row/column arithmetic.
     function _updateInsertIndex(scenePos) {
         var localPos = photoGrid.mapFromItem(null, scenePos.x, scenePos.y)
-        var cols = Math.max(1, photosPerRow)
-        // Use the grid's actual cell size (same value the GridView uses for layout)
-        // rather than an approximate float; the difference accumulates per row.
-        var cs = photoGrid.cellWidth
+        // indexAt() expects content coordinates (viewport y + scroll offset)
+        var contentX = localPos.x
+        var contentY = localPos.y + photoGrid.contentY
+        var D = photoGrid.indexAt(contentX, contentY)
 
-        var col = Math.min(Math.max(0, Math.floor(localPos.x / cs)), cols - 1)
-        var row = Math.max(0, Math.floor((localPos.y + photoGrid.contentY) / cs))
-
-        // The cell under the cursor IS the insert position – no half-cell splitting.
-        var D = Math.min(row * cols + col, _displayModel.length)
+        // indexAt returns -1 when the cursor is outside/below all cells;
+        // in that case, snap to the last position.
+        if (D < 0) D = _displayModel.length
 
         // If cursor is over the placeholder gap, leave the insert index unchanged.
         if (dragOver && selectedTagId > 0 && _dragInsertIndex >= 0 && _dropCount > 0
