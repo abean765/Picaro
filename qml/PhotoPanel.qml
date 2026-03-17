@@ -436,13 +436,35 @@ Item {
                                        : "#666666"
                             }
 
+                            // When dropdown is open and no tag is selected, show
+                            // an editable text field; otherwise show a static label.
                             Label {
+                                visible: panel.selectedTagId > 0
+                                         || !panel.dropdownVisible
                                 text: panel.selectedTagId > 0
                                       ? panel.selectedTagName
                                       : "Tag wählen…"
                                 color: panel.selectedTagId > 0 ? "#ffffff" : "#888888"
                                 font.pixelSize: 12
                                 font.bold: panel.selectedTagId > 0
+                            }
+
+                            TextInput {
+                                id: tagInput
+                                visible: panel.dropdownVisible
+                                         && panel.selectedTagId <= 0
+                                width: visible ? Math.max(80, implicitWidth + 4) : 0
+                                color: "#ffffff"
+                                font.pixelSize: 12
+                                clip: true
+                                onTextChanged: { panel._applyFilter(); panel.dropdownVisible = true }
+                                Keys.onEscapePressed: { panel.dropdownVisible = false; focus = false }
+                                Keys.onReturnPressed: {
+                                    if (panel.filteredTags.length > 0) {
+                                        var t = panel.filteredTags[0]
+                                        panel.selectTag(t.id, t.name)
+                                    }
+                                }
                             }
 
                             Label {
@@ -495,21 +517,10 @@ Item {
                             }
                             panel.rebuildTagList()
                             panel.dropdownVisible = !panel.dropdownVisible
-                            if (panel.dropdownVisible) tagInput.forceActiveFocus()
-                        }
-                    }
-                }
-
-                // Invisible text input drives the autocomplete filter
-                TextInput {
-                    id: tagInput
-                    visible: false
-                    onTextChanged: { panel._applyFilter(); panel.dropdownVisible = true }
-                    Keys.onEscapePressed: { panel.dropdownVisible = false; focus = false }
-                    Keys.onReturnPressed: {
-                        if (panel.filteredTags.length > 0) {
-                            var t = panel.filteredTags[0]
-                            panel.selectTag(t.id, t.name)
+                            if (panel.dropdownVisible) {
+                                tagInput.text = ""
+                                tagInput.forceActiveFocus()
+                            }
                         }
                     }
                 }
