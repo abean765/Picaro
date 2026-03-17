@@ -639,6 +639,20 @@ Item {
                         current.count++
                     }
                     monthGroups = groups
+                    // Sync active month to current scroll position after rebuild
+                    var cols2 = Math.max(1, panel.photosPerRow)
+                    var topIdx2 = Math.floor(photoGrid.contentY / photoGrid._cellSize) * cols2
+                    activeMonth = -1
+                    if (topIdx2 >= 0 && topIdx2 < panel._displayModel.length) {
+                        var topId2 = panel._displayModel[topIdx2]
+                        if (topId2 > 0) {
+                            var mk2 = photoModel.monthKeyForId(topId2)
+                            for (var m = 0; m < groups.length; m++) {
+                                if (groups[m].key === mk2) { activeMonth = m; break }
+                            }
+                        }
+                    }
+                    if (activeMonth < 0 && groups.length > 0) activeMonth = 0
                 }
 
                 function _monthLabel(mk) {
@@ -768,7 +782,7 @@ Item {
                     anchors.right: parent.right
                     anchors.rightMargin: 2
                     height: handleH
-                    y: fillRatio < 1.0 ? (photoGrid.contentY / scrollMax) * maxTrackY : 0
+                    y: fillRatio < 1.0 ? Math.min(maxTrackY, Math.max(0, (photoGrid.contentY / scrollMax) * maxTrackY)) : 0
                     visible: fillRatio < 1.0
 
                     radius: 5
