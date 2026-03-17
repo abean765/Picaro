@@ -228,6 +228,7 @@ Item {
     property int  _dragFromIndex:   -1   // original index of the cell being dragged
     property int  _dragInsertIndex: -1   // current insertion target index
     property int  _dropCount:        0   // how many photos are being dragged onto this panel
+    property real _savedScrollY:    -1   // scroll position to restore after model rebuild
 
     property bool dropdownVisible: false
     property var  allTags:         []
@@ -247,13 +248,23 @@ Item {
     // _displayModel is normally just photoIds.
     // During a cross-panel drag over a tagged panel it also contains _dropCount
     // placeholder items (-1) at _dragInsertIndex so GridView shows the gap directly.
+    function _restoreScrollY() {
+        if (_savedScrollY < 0) return
+        var maxY = Math.max(0, photoGrid.contentHeight - photoGrid.height)
+        photoGrid.contentY = Math.max(0, Math.min(_savedScrollY, maxY))
+        _savedScrollY = -1
+    }
+
     function _rebuildDisplayModel(resetScroll) {
-        var savedY = resetScroll ? 0 : photoGrid.contentY
+        if (resetScroll) {
+            _savedScrollY = -1
+        } else if (_savedScrollY < 0) {
+            // Only capture on the first call; subsequent calls in the same
+            // event loop iteration must not overwrite with the already-reset 0.
+            _savedScrollY = photoGrid.contentY
+        }
         _displayModel = photoIds.slice()
-        Qt.callLater(function() {
-            var maxY = Math.max(0, photoGrid.contentHeight - photoGrid.height)
-            photoGrid.contentY = Math.max(0, Math.min(savedY, maxY))
-        })
+        Qt.callLater(_restoreScrollY)
     }
 
     // Insert _dropCount placeholder cells into a copy of photoIds and assign it.
