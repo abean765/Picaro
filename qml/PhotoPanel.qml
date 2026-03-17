@@ -608,19 +608,20 @@ Item {
                 onClicked: panel.dropdownVisible = false
             }
 
-            // Mini timeline sidebar ─────────────────────────────────────────
-            // Shows months derived from the panel's own photoIds
-            Rectangle {
+            // Timeline + Scrollbar (right side) ────────────────────────────────
+            // Replaces the former left mini-timeline and the built-in ScrollBar.
+            // The draggable handle scrolls the photo grid; the month list scrolls
+            // automatically when the handle is dragged near the top/bottom edge.
+            Item {
                 id: miniTimeline
-                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                width: 70
-                color: "#1e1e1e"
-                clip: true
+                width: 72
 
-                // Build month groups from photoIds
+                // ── Data (unchanged API) ─────────────────────────────────────
                 property var monthGroups: []
+                property int activeMonth: -1
 
                 function rebuildMonths() {
                     if (photoIds.length === 0) { monthGroups = []; return }
@@ -647,16 +648,31 @@ Item {
                     return names[month - 1] || mk
                 }
 
-                property int activeMonth: -1
+                // ── Background ───────────────────────────────────────────────
+                Rectangle { anchors.fill: parent; color: "#1e1e1e" }
 
+                // Left separator line
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 1
+                    color: "#2a2a2a"
+                }
+
+                // ── Month list ───────────────────────────────────────────────
                 ListView {
                     id: monthList
-                    anchors.fill: parent
+                    anchors.left: parent.left
+                    anchors.leftMargin: 1
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
                     anchors.topMargin: 4
                     anchors.bottomMargin: 4
                     clip: true
                     model: miniTimeline.monthGroups
-                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: false   // scrolling is driven by the handle / edge timer
 
                     delegate: Item {
                         required property var modelData
@@ -702,7 +718,7 @@ Item {
                                 anchors.left: parent.left
                                 anchors.leftMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: isActive ? 7 : 5; height: width; radius: width/2
+                                width: isActive ? 7 : 5; height: width; radius: width / 2
                                 color: isActive ? root.accentColor : "#555555"
                             }
 
@@ -722,7 +738,6 @@ Item {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    // Scroll grid to the first photo of this month
                                     var firstIdx = modelData.firstIdx
                                     var cols     = Math.max(1, panel.photosPerRow)
                                     var row      = Math.floor(firstIdx / cols)
@@ -732,15 +747,88 @@ Item {
                             }
                         }
                     }
+                }
 
-                    WheelHandler {
-                        target: monthList
-                        property: "contentY"
-                        rotationScale: -1.0
+                // ── Scroll handle ────────────────────────────────────────────
+                // Dragging it scrolls the photo grid.
+                // Independent of the month list position.
+                Rectangle {
+                    id: scrollHandle
+
+                    readonly property real contentH:  Math.max(1, photoGrid.contentHeight)
+                    readonly property real viewH:     photoGrid.height
+                    readonly property real trackH:    miniTimeline.height
+                    readonly property real fillRatio: viewH / contentH
+                    readonly property real handleH:   Math.max(24, Math.min(trackH, fillRatio * trackH))
+                    readonly property real maxTrackY: trackH - handleH
+                    readonly property real scrollMax: Math.max(1, contentH - viewH)
+
+                    anchors.left:  parent.left
+                    anchors.leftMargin: 1
+                    anchors.right: parent.right
+                    height: handleH
+                    y: fillRatio < 1.0 ? (photoGrid.contentY / scrollMax) * maxTrackY : 0
+                    visible: fillRatio < 1.0
+
+                    radius: 5
+                    color: handleDrag.active
+                           ? Qt.lighter(root.accentColor, 1.2)
+                           : handleHover.containsMouse
+                             ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.65)
+                             : Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.35)
+                    border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.8)
+                    border.width: 1
+
+                    HoverHandler { id: handleHover }
+
+                    DragHandler {
+                        id: handleDrag
+                        target: null
+                        dragAxis: DragHandler.YAxis
+
+                        property real _startY: 0
+
+                        onActiveChanged: {
+                            if (active) _startY = scrollHandle.y
+                        }
+
+                        onTranslationChanged: {
+                            var newY = Math.max(0, Math.min(scrollHandle.maxTrackY,
+                                                            _startY + translation.y))
+                            if (scrollHandle.maxTrackY > 0)
+                                photoGrid.contentY = (newY / scrollHandle.maxTrackY)
+                                                     * scrollHandle.scrollMax
+                        }
                     }
                 }
 
-                // Rebuild when photoIds change
+                // Auto-scroll the month list when the handle is dragged near the edges
+                Timer {
+                    id: edgeScrollTimer
+                    interval: 40
+                    repeat: true
+                    running: handleDrag.active
+
+                    onTriggered: {
+                        var panelH  = miniTimeline.height
+                        var edgePx  = Math.min(60, panelH * 0.15)
+                        var maxCY   = Math.max(0, monthList.contentHeight - panelH)
+                        if (maxCY <= 0) return
+
+                        var hy = scrollHandle.y
+                        var hb = hy + scrollHandle.height
+
+                        if (hy < edgePx) {
+                            monthList.contentY = Math.max(0,
+                                monthList.contentY - Math.round(8 * (1.0 - hy / edgePx)))
+                        } else if (hb > panelH - edgePx) {
+                            monthList.contentY = Math.min(maxCY,
+                                monthList.contentY + Math.round(8 * (1.0 - (panelH - hb) / edgePx)))
+                        }
+                    }
+                }
+
+                // ── Rebuild when photoIds change ─────────────────────────────
                 onVisibleChanged: if (visible) rebuildMonths()
                 Connections {
                     target: panel
@@ -748,23 +836,13 @@ Item {
                 }
             }
 
-            // Left separator
-            Rectangle {
-                anchors.left: miniTimeline.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 1
-                color: "#2a2a2a"
-            }
-
             // Photo grid ────────────────────────────────────────────────────
             GridView {
                 id: photoGrid
-                anchors.left: miniTimeline.right
-                anchors.leftMargin: 1
+                anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                anchors.right: parent.right
+                anchors.right: miniTimeline.left
                 clip: true
                 model: panel._displayModel
                 interactive: false   // WheelHandler handles scrolling; keep mouse events for DragHandler
@@ -787,22 +865,6 @@ Item {
                             miniTimeline.activeMonth = i
                             break
                         }
-                    }
-                }
-
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                    contentItem: Rectangle {
-                        implicitWidth: 18
-                        radius: 9
-                        color: parent.pressed ? Qt.lighter(root.accentColor, 1.2)
-                             : parent.hovered ? root.accentColor
-                             : Qt.darker(root.accentColor, 1.4)
-                    }
-                    background: Rectangle {
-                        implicitWidth: 28
-                        color: parent.hovered ? "#1affffff" : "transparent"
-                        radius: 14
                     }
                 }
 
