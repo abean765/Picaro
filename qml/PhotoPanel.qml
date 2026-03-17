@@ -784,7 +784,8 @@ Item {
                     DragHandler {
                         id: handleDrag
                         target: null
-                        dragAxis: DragHandler.YAxis
+                        xAxis.enabled: false
+                        yAxis.enabled: true
 
                         property real _startY: 0
 
