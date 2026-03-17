@@ -250,7 +250,7 @@ Item {
     // placeholder items (-1) at _dragInsertIndex so GridView shows the gap directly.
     function _restoreScrollY() {
         if (_savedScrollY < 0) return
-        var maxY = Math.max(0, photoGrid.contentHeight - photoGrid.height)
+        var maxY = Math.max(0, photoGrid.contentHeight + photoGrid.bottomMargin - photoGrid.height)
         photoGrid.contentY = Math.max(0, Math.min(_savedScrollY, maxY))
         _savedScrollY = -1
     }
@@ -267,49 +267,22 @@ Item {
         Qt.callLater(_restoreScrollY)
     }
 
-    // Insert _dropCount placeholder cells into a copy of photoIds and assign it.
-    function _rebuildWithPlaceholders() {
-        if (_savedScrollY < 0)
-            _savedScrollY = photoGrid.contentY
-        var placeholders = []
-        for (var k = 0; k < _dropCount; k++) placeholders.push(-1)
-        _displayModel = photoIds.slice(0, _dragInsertIndex)
-                            .concat(placeholders)
-                            .concat(photoIds.slice(_dragInsertIndex))
-        Qt.callLater(_restoreScrollY)
-    }
-
     // Update insertion index from pointer scene position.
     // Uses GridView.indexAt() to let Qt determine which cell the cursor is over,
     // instead of error-prone manual row/column arithmetic.
     function _updateInsertIndex(scenePos) {
         var localPos = photoGrid.mapFromItem(null, scenePos.x, scenePos.y)
-        // indexAt() expects content coordinates (viewport y + scroll offset)
         var contentX = localPos.x
         var contentY = localPos.y + photoGrid.contentY
         var D = photoGrid.indexAt(contentX, contentY)
 
         // indexAt returns -1 when the cursor is outside/below all cells;
         // in that case, snap to the last position.
-        if (D < 0) D = _displayModel.length
+        if (D < 0) D = photoIds.length
 
-        // If cursor is over the placeholder gap, leave the insert index unchanged.
-        if (dragOver && selectedTagId > 0 && _dragInsertIndex >= 0 && _dropCount > 0
-                && D >= _dragInsertIndex && D < _dragInsertIndex + _dropCount)
-            return
-
-        // Map display index D back to a photoIds insert index.
-        // When cursor is past the placeholder region, D - _dropCount gives the
-        // photoIds index of the photo under the cursor.  Adding 1 places the
-        // placeholder AT the cursor cell (pushing that photo right), so the gap
-        // visually tracks the cursor instead of lagging one cell to the left.
-        var newInsert = (dragOver && selectedTagId > 0
-                         && _dragInsertIndex >= 0 && D >= _dragInsertIndex + _dropCount)
-                        ? D - _dropCount + 1 : D
-        newInsert = Math.max(0, Math.min(newInsert, photoIds.length))
+        var newInsert = Math.max(0, Math.min(D, photoIds.length))
         if (newInsert === _dragInsertIndex) return
         _dragInsertIndex = newInsert
-        if (dragOver && selectedTagId > 0) _rebuildWithPlaceholders()
     }
 
     // Finalise reorder: apply the pending move to photoIds
@@ -794,7 +767,7 @@ Item {
                     readonly property real fillRatio: viewH / contentH
                     readonly property real handleH:   Math.max(24, Math.min(trackH, fillRatio * trackH))
                     readonly property real maxTrackY: trackH - handleH
-                    readonly property real scrollMax: Math.max(1, contentH - viewH)
+                    readonly property real scrollMax: Math.max(1, contentH + photoGrid.bottomMargin - viewH)
 
                     anchors.left:  parent.left
                     anchors.leftMargin: 3
@@ -907,7 +880,7 @@ Item {
                 WheelHandler {
                     onWheel: function(event) {
                         var delta = event.angleDelta.y / 8 * (-3.0)
-                        var maxY  = Math.max(0, photoGrid.contentHeight - photoGrid.height)
+                        var maxY  = Math.max(0, photoGrid.contentHeight + photoGrid.bottomMargin - photoGrid.height)
                         photoGrid.contentY = Math.max(0, Math.min(photoGrid.contentY + delta, maxY))
                         event.accepted = true
                     }
@@ -927,18 +900,6 @@ Item {
                         modelData > 0 && modelData === panel.draggingPhotoId
 
                     // Placeholder cell shown during cross-panel drag
-                    Rectangle {
-                        visible: modelData <= 0
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        radius: 4
-                        color: Qt.rgba(root.accentColor.r,
-                                       root.accentColor.g,
-                                       root.accentColor.b, 0.18)
-                        border.color: root.accentColor
-                        border.width: 2
-                    }
-
                     // Photo thumbnail
                     Rectangle {
                         visible: modelData > 0
@@ -958,11 +919,7 @@ Item {
                             asynchronous: true
                             cache: true
                             opacity: status === Image.Ready ? 1.0 : 0.0
-                            Behavior on opacity {
-                                NumberAnimation {
-                                    duration: (panel.draggingPhotoId >= 0 || panel.dragOver) ? 0 : 100
-                                }
-                            }
+                            Behavior on opacity { NumberAnimation { duration: 100 } }
                         }
 
                         // Black background for fit mode
@@ -1124,7 +1081,6 @@ Item {
                                             } else {
                                                 pp._dragInsertIndex = -1
                                                 pp._dropCount = 0
-                                                pp._rebuildDisplayModel()
                                             }
                                         }
                                     }
@@ -1138,10 +1094,8 @@ Item {
                         }
                     }
 
-                    // ── Insertion-point indicator ─────────────────────────────
+                    // ── Insertion-point indicator (left edge) ────────────────
                     // Shown on the cell where the dragged item would land.
-                    // Uses a left-edge bar (before this cell) or right-edge bar
-                    // (after last cell). No model rebuild needed.
                     Rectangle {
                         anchors.top:    parent.top
                         anchors.bottom: parent.bottom
@@ -1150,11 +1104,29 @@ Item {
                         width: 3
                         radius: 2
                         color: root.accentColor
-                        visible: panel._dragFromIndex >= 0
+                        visible: (panel._dragFromIndex >= 0 || (panel.dragOver && panel.selectedTagId > 0))
                                  && panel._dragInsertIndex >= 0
                                  && panel._dragInsertIndex === index
                                  && !isDragging
                         x: 0
+                        z: 20
+                    }
+
+                    // ── Insertion-point indicator (right edge, append) ───────
+                    // Shown on the last cell when inserting at the very end.
+                    Rectangle {
+                        anchors.top:    parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.topMargin:    3
+                        anchors.bottomMargin: 3
+                        width: 3
+                        radius: 2
+                        color: root.accentColor
+                        visible: (panel._dragFromIndex >= 0 || (panel.dragOver && panel.selectedTagId > 0))
+                                 && panel._dragInsertIndex === panel.photoIds.length
+                                 && index === panel._displayModel.length - 1
+                                 && !isDragging
+                        x: parent.width - 3
                         z: 20
                     }
                 }
