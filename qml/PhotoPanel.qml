@@ -764,17 +764,18 @@ Item {
                     readonly property real scrollMax: Math.max(1, contentH - viewH)
 
                     anchors.left:  parent.left
-                    anchors.leftMargin: 1
+                    anchors.leftMargin: 3
                     anchors.right: parent.right
+                    anchors.rightMargin: 2
                     height: handleH
                     y: fillRatio < 1.0 ? (photoGrid.contentY / scrollMax) * maxTrackY : 0
                     visible: fillRatio < 1.0
 
                     radius: 5
                     color: handleDrag.active
-                           ? Qt.lighter(root.accentColor, 1.2)
+                           ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.45)
                            : handleHover.containsMouse
-                             ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.65)
+                             ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.50)
                              : Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.35)
                     border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.8)
                     border.width: 1
