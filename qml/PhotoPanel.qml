@@ -158,7 +158,7 @@ Item {
             // Context switch: adopt the new list without any order carry-over
             _loadedTagId = selectedTagId
             photoIds = newIds
-            _rebuildDisplayModel()
+            _rebuildDisplayModel(true)
             return
         }
 
@@ -247,8 +247,13 @@ Item {
     // _displayModel is normally just photoIds.
     // During a cross-panel drag over a tagged panel it also contains _dropCount
     // placeholder items (-1) at _dragInsertIndex so GridView shows the gap directly.
-    function _rebuildDisplayModel() {
+    function _rebuildDisplayModel(resetScroll) {
+        var savedY = resetScroll ? 0 : photoGrid.contentY
         _displayModel = photoIds.slice()
+        Qt.callLater(function() {
+            var maxY = Math.max(0, photoGrid.contentHeight - photoGrid.height)
+            photoGrid.contentY = Math.max(0, Math.min(savedY, maxY))
+        })
     }
 
     // Insert _dropCount placeholder cells into a copy of photoIds and assign it.
