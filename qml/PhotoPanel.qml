@@ -266,6 +266,16 @@ Item {
         var cellLocalX = localPos.x - col * cellW
         if (cellLocalX > cellW / 2) rawIdx++
 
+        // When items have been visually shifted to make room for a drop placeholder,
+        // the cursor position maps to layout slots that are offset by _dropCount.
+        // Correct rawIdx so _dragInsertIndex reflects the visual insertion point.
+        if (dragOver && selectedTagId > 0 && _dragInsertIndex >= 0 && _dropCount > 0) {
+            if (rawIdx >= _dragInsertIndex + _dropCount)
+                rawIdx -= _dropCount
+            else if (rawIdx >= _dragInsertIndex)
+                rawIdx = _dragInsertIndex
+        }
+
         var newInsert = Math.max(0, Math.min(rawIdx, photoIds.length))
         _dragInsertIndex = newInsert
     }
@@ -809,6 +819,16 @@ Item {
                         panel._dragInsertIndex >= 0 &&
                         index >= panel._dragInsertIndex
 
+                    // True when shifting this item causes it to wrap to a different row.
+                    // In that case we skip the x/y animation to avoid the item sweeping
+                    // backward across the entire row.
+                    readonly property bool rowWraps: {
+                        if (!shiftedForDrop) return false
+                        var c = Math.max(1, panel.photosPerRow)
+                        var n = panel._dropCount
+                        return Math.floor((index + n) / c) !== Math.floor(index / c)
+                    }
+
                     transform: Translate {
                         readonly property int cols: Math.max(1, panel.photosPerRow)
                         readonly property int n:    panel._dropCount
@@ -821,8 +841,8 @@ Item {
                         y: cellDelegate.shiftedForDrop
                            ? (Math.floor((i + n) / cols) - Math.floor(i / cols))
                              * photoGrid._cellSize : 0
-                        Behavior on x { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
-                        Behavior on y { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                        Behavior on x { enabled: !cellDelegate.rowWraps; NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                        Behavior on y { enabled: !cellDelegate.rowWraps; NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
                     }
 
                     // Photo thumbnail
@@ -831,6 +851,8 @@ Item {
                         anchors.margins: 1
                         color: "#2a2a2a"
                         clip: true
+                        opacity: isDragging ? 0.35 : 1.0
+                        Behavior on opacity { NumberAnimation { duration: 80 } }
 
                         Image {
                             anchors.fill: parent
@@ -859,14 +881,6 @@ Item {
                             border.color: root.accentColor
                             border.width: isSelected ? 3 : 0
                             z: 2
-                        }
-
-                        // Dim the item that is currently being dragged
-                        Rectangle {
-                            anchors.fill: parent
-                            color: "#88000000"
-                            visible: isDragging
-                            z: 4
                         }
 
                         HoverHandler { id: cellHover }
