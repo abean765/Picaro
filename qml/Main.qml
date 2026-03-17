@@ -419,6 +419,7 @@ ApplicationWindow {
                                 width: panelsRow.width / Math.max(1, panelsModel.count)
 
                                 allPanels:       panelsRepeater
+                                panelsListModel: panelsModel
                                 showLeftDivider: index > 0
 
                                 // Initialise from saved state (avoids naming collision

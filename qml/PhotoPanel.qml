@@ -47,6 +47,50 @@ Item {
     // Named 'allPanels' (not 'panelsRepeater') to avoid shadowing the Repeater id in Main.qml
     property var allPanels: null
 
+    // ListModel keeping per-panel tag state — passed from Main.qml so we can
+    // react to sibling panels' tag changes without complex cross-panel bindings.
+    property var panelsListModel: null
+
+    // Maps "photoId" -> array of tag-color strings for every sibling tag the
+    // photo already carries.  Only populated when this panel has no tag.
+    property var _siblingTagPhotoColors: ({})
+
+    function _refreshSiblingTags() {
+        if (!panelsListModel || selectedTagId > 0) {
+            _siblingTagPhotoColors = {}
+            return
+        }
+        var result = {}
+        for (var i = 0; i < panelsListModel.count; i++) {
+            var m = panelsListModel.get(i)
+            if (m.tagId <= 0) continue
+            var color = tagModel.tagColor(m.tagId)
+            var ids   = tagModel.photoIdsForTag(m.tagId)
+            for (var j = 0; j < ids.length; j++) {
+                var key = "" + ids[j]
+                if (!result[key]) result[key] = []
+                result[key].push(color)
+            }
+        }
+        _siblingTagPhotoColors = result
+    }
+
+    Connections {
+        target: panel.panelsListModel
+        function onDataChanged()  { panel._refreshSiblingTags() }
+        function onRowsInserted() { panel._refreshSiblingTags() }
+        function onRowsRemoved()  { panel._refreshSiblingTags() }
+        function onModelReset()   { panel._refreshSiblingTags() }
+    }
+
+    Connections {
+        target: tagModel
+        function onTagsChanged() { panel._refreshSiblingTags() }
+    }
+
+    onSelectedTagIdChanged: _refreshSiblingTags()
+    onPanelsListModelChanged: _refreshSiblingTags()
+
     // Show a 1 px left divider (set true for every panel after the first)
     property bool showLeftDivider: false
 
@@ -321,6 +365,7 @@ Item {
     Component.onCompleted: {
         rebuildTagList()
         reloadPhotos()
+        _refreshSiblingTags()
     }
 
     // ── Layout ──────────────────────────────────────────────────────────────
@@ -937,6 +982,33 @@ Item {
                             border.color: root.accentColor
                             border.width: isSelected ? 3 : 0
                             z: 2
+                        }
+
+                        // Sibling-tag dots — visible in no-tag panels to show
+                        // whether this photo already belongs to a sibling panel's tag
+                        Row {
+                            id: siblingTagDots
+                            property var tagColors: {
+                                if (panel.selectedTagId > 0 || modelData <= 0) return []
+                                var c = panel._siblingTagPhotoColors["" + modelData]
+                                return c ? c : []
+                            }
+                            visible: tagColors.length > 0
+                            spacing: 3
+                            anchors.bottom: parent.bottom
+                            anchors.left:   parent.left
+                            anchors.bottomMargin: 4
+                            anchors.leftMargin:   4
+                            z: 4
+                            Repeater {
+                                model: siblingTagDots.tagColors
+                                Rectangle {
+                                    width: 10; height: 10; radius: 5
+                                    color: modelData
+                                    border.color: Qt.rgba(0, 0, 0, 0.45)
+                                    border.width: 1
+                                }
+                            }
                         }
 
                         HoverHandler { id: cellHover }
