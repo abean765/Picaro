@@ -275,9 +275,10 @@ Item {
     property int  _dropCount:        0   // how many photos are being dragged onto this panel
     property real _savedScrollY:    -1   // scroll position to restore after model rebuild
 
-    property bool dropdownVisible: false
-    property var  allTags:         []
-    property var  filteredTags:    []
+    property bool dropdownVisible:    false
+    property var  allTags:            []
+    property var  filteredTags:       []
+    property int  _tagHighlightIndex: -1
 
     function rebuildTagList() {
         allTags = tagModel.allTagsFlat()
@@ -288,6 +289,7 @@ Item {
         var f = tagInput.text.trim().toLowerCase()
         filteredTags = (f === "") ? allTags
             : allTags.filter(function(t) { return t.name.toLowerCase().indexOf(f) >= 0 })
+        _tagHighlightIndex = -1
     }
 
     // _displayModel is normally just photoIds.
@@ -460,10 +462,27 @@ Item {
                                 onTextChanged: { panel._applyFilter(); panel.dropdownVisible = true }
                                 Keys.onEscapePressed: { panel.dropdownVisible = false; focus = false }
                                 Keys.onReturnPressed: {
-                                    if (panel.filteredTags.length > 0) {
-                                        var t = panel.filteredTags[0]
+                                    var idx = panel._tagHighlightIndex >= 0
+                                              ? panel._tagHighlightIndex : 0
+                                    if (idx < panel.filteredTags.length) {
+                                        var t = panel.filteredTags[idx]
                                         panel.selectTag(t.id, t.name)
                                     }
+                                }
+                                Keys.onDownPressed: {
+                                    if (panel.filteredTags.length === 0) return
+                                    panel._tagHighlightIndex = Math.min(
+                                        panel._tagHighlightIndex + 1,
+                                        panel.filteredTags.length - 1)
+                                    tagDropList.positionViewAtIndex(
+                                        panel._tagHighlightIndex, ListView.Contain)
+                                }
+                                Keys.onUpPressed: {
+                                    if (panel.filteredTags.length === 0) return
+                                    panel._tagHighlightIndex = Math.max(
+                                        panel._tagHighlightIndex - 1, 0)
+                                    tagDropList.positionViewAtIndex(
+                                        panel._tagHighlightIndex, ListView.Contain)
                                 }
                             }
 
@@ -602,11 +621,13 @@ Item {
                 clip: true
 
                 delegate: Rectangle {
-                    required property var modelData
+                    required property var  modelData
+                    required property int  index
                     width: ListView.view.width
                     height: 30
                     radius: 4
-                    color: tagDropHover.containsMouse ? "#3a3a3a" : "transparent"
+                    color: tagDropHover.containsMouse || panel._tagHighlightIndex === index
+                           ? "#3a3a3a" : "transparent"
 
                     RowLayout {
                         anchors.fill: parent
