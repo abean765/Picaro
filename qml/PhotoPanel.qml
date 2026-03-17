@@ -266,16 +266,15 @@ Item {
     function _updateInsertIndex(scenePos) {
         var localPos = photoGrid.mapFromItem(null, scenePos.x, scenePos.y)
         var cols = Math.max(1, photosPerRow)
-        var cellW = photoGrid.width / cols
+        // Use the grid's actual cell size (same value the GridView uses for layout)
+        // rather than an approximate float; the difference accumulates per row.
+        var cs = photoGrid.cellWidth
 
-        var col = Math.floor(localPos.x / cellW)
-        var row = Math.floor((localPos.y + photoGrid.contentY) / cellW)
-        col = Math.max(0, Math.min(col, cols - 1))
-        row = Math.max(0, row)
+        var col = Math.min(Math.max(0, Math.floor(localPos.x / cs)), cols - 1)
+        var row = Math.max(0, Math.floor((localPos.y + photoGrid.contentY) / cs))
 
-        var D = row * cols + col
-        var cellLocalX = localPos.x - col * cellW
-        if (cellLocalX > cellW / 2) D++
+        // The cell under the cursor IS the insert position – no half-cell splitting.
+        var D = Math.min(row * cols + col, _displayModel.length)
 
         // If cursor is over the placeholder gap, leave the insert index unchanged.
         if (dragOver && selectedTagId > 0 && _dragInsertIndex >= 0 && _dropCount > 0
