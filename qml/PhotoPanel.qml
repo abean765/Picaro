@@ -269,11 +269,14 @@ Item {
 
     // Insert _dropCount placeholder cells into a copy of photoIds and assign it.
     function _rebuildWithPlaceholders() {
+        if (_savedScrollY < 0)
+            _savedScrollY = photoGrid.contentY
         var placeholders = []
         for (var k = 0; k < _dropCount; k++) placeholders.push(-1)
         _displayModel = photoIds.slice(0, _dragInsertIndex)
                             .concat(placeholders)
                             .concat(photoIds.slice(_dragInsertIndex))
+        Qt.callLater(_restoreScrollY)
     }
 
     // Update insertion index from pointer scene position.
