@@ -280,9 +280,13 @@ Item {
             return
 
         // Map display index D back to a photoIds insert index.
+        // When cursor is past the placeholder region, D - _dropCount gives the
+        // photoIds index of the photo under the cursor.  Adding 1 places the
+        // placeholder AT the cursor cell (pushing that photo right), so the gap
+        // visually tracks the cursor instead of lagging one cell to the left.
         var newInsert = (dragOver && selectedTagId > 0
                          && _dragInsertIndex >= 0 && D >= _dragInsertIndex + _dropCount)
-                        ? D - _dropCount : D
+                        ? D - _dropCount + 1 : D
         newInsert = Math.max(0, Math.min(newInsert, photoIds.length))
         if (newInsert === _dragInsertIndex) return
         _dragInsertIndex = newInsert
